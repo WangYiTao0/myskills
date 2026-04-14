@@ -1,0 +1,30 @@
+{
+  "name": "myskills",
+  "version": "0.1.0",
+  "description": "Personal Claude Code / Agent skills collection — focused on Power BI, manufacturing data engineering, and document automation.",
+  "author": "WangYiTao0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WangYiTao0/myskills.git"
+  },
+  "homepage": "https://github.com/WangYiTao0/myskills#readme",
+  "bugs": {
+    "url": "https://github.com/WangYiTao0/myskills/issues"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "agent-skills",
+    "skills",
+    "power-bi",
+    "powerbi",
+    "pbip",
+    "dax",
+    "power-query",
+    "manufacturing"
+  ],
+  "skills": {
+    "directory": "skills"
+  }
+}
