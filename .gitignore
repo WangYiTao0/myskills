@@ -1,2 +1,13 @@
-
 .DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Build artifacts (do NOT match assets/template.pptx)
+/output.pptx
+/*.pdf
+/slide-*.png
+/slide-*.jpg
