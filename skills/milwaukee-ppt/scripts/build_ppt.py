@@ -40,10 +40,27 @@ from lxml import etree
 SKILL_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "template.pptx"
 
-# Brand
+# Brand palette — see references/design-guidelines.md for usage rules.
 MILWAUKEE_RED = RGBColor(0xDB, 0x02, 0x1D)
 TEXT_DARK = RGBColor(0x33, 0x33, 0x33)
+TEXT_MID = RGBColor(0x66, 0x66, 0x66)
+BG_LIGHT = RGBColor(0xF5, 0xF5, 0xF5)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+# Status colors (charts / KPIs only, not for layout decoration)
+STATUS_OK = RGBColor(0x2E, 0x7D, 0x32)
+STATUS_WARN = RGBColor(0xED, 0x6C, 0x02)
+STATUS_DANGER = RGBColor(0xC6, 0x28, 0x28)
+
+PALETTE = {
+    "red": MILWAUKEE_RED,
+    "dark": TEXT_DARK,
+    "mid": TEXT_MID,
+    "bg_light": BG_LIGHT,
+    "white": WHITE,
+    "ok": STATUS_OK,
+    "warn": STATUS_WARN,
+    "danger": STATUS_DANGER,
+}
 
 # Font fallback chain. python-pptx font.name sets latin typeface only;
 # for east-asian (zh) we set <a:ea> via direct rPr edit.
@@ -209,6 +226,115 @@ class _Slide:
         self._next_top_cm = (pic.top + pic.height) / 360000 + 0.3
         return pic
 
+    # ---- polish helpers ----
+    def columns(self, n: int, *, ratios: list[float] | None = None,
+                gap_cm: float = 0.5,
+                top_cm: float | None = None,
+                height_cm: float | None = None) -> list[dict]:
+        """Return n column rects covering the content area.
+
+        Each rect is a dict {left_cm, top_cm, width_cm, height_cm} ready to be
+        passed as **kwargs to add_paragraphs/add_image/add_table.
+
+        Example:
+            cols = slide.columns(3)
+            for col, item in zip(cols, items):
+                slide.add_paragraphs([(item, {"size": 16})], **col)
+        """
+        if n < 1:
+            raise ValueError("n must be >= 1")
+        ratios = ratios or [1.0] * n
+        if len(ratios) != n:
+            raise ValueError("len(ratios) must equal n")
+        total_gap = gap_cm * (n - 1)
+        usable = CONTENT_WIDTH_CM - total_gap
+        unit = usable / sum(ratios)
+        widths = [r * unit for r in ratios]
+        top = top_cm if top_cm is not None else self._next_top_cm
+        height = height_cm if height_cm is not None else (CONTENT_BOTTOM_CM - top)
+        rects = []
+        x = CONTENT_LEFT_CM
+        for w in widths:
+            rects.append({"left_cm": x, "top_cm": top, "width_cm": w, "height_cm": height})
+            x += w + gap_cm
+        return rects
+
+    def add_kpi(self, value: str, label: str, *,
+                color: RGBColor = MILWAUKEE_RED,
+                left_cm: float | None = None,
+                top_cm: float | None = None,
+                width_cm: float | None = None):
+        """Big number + small caption underneath. Use for stat highlights."""
+        left = Cm(left_cm if left_cm is not None else CONTENT_LEFT_CM)
+        top = Cm(top_cm if top_cm is not None else self._next_top_cm)
+        width = Cm(width_cm if width_cm is not None else CONTENT_WIDTH_CM)
+        height = Cm(4.5)
+        tb = self._slide.shapes.add_textbox(left, top, width, height)
+        tf = tb.text_frame
+        tf.word_wrap = True
+        p1 = tf.paragraphs[0]
+        p1.alignment = PP_ALIGN.CENTER
+        r1 = p1.add_run()
+        r1.text = value
+        _set_run_font(r1, name=LATIN_FONT, size=72, bold=True, color=color, ea=EA_FONT_PRIMARY)
+        p2 = tf.add_paragraph()
+        p2.alignment = PP_ALIGN.CENTER
+        r2 = p2.add_run()
+        r2.text = label
+        _set_run_font(r2, name=LATIN_FONT, size=14, color=TEXT_MID, ea=EA_FONT_PRIMARY)
+        self._next_top_cm = (top + height) / 360000 + 0.3
+        return tb
+
+    def add_quote(self, text: str, author: str = "", *,
+                  left_cm: float | None = None,
+                  top_cm: float | None = None,
+                  width_cm: float | None = None):
+        """Centered italic quote with optional right-aligned attribution."""
+        left = Cm(left_cm if left_cm is not None else CONTENT_LEFT_CM + 2.0)
+        top = Cm(top_cm if top_cm is not None else self._next_top_cm)
+        width = Cm(width_cm if width_cm is not None else CONTENT_WIDTH_CM - 4.0)
+        height = Cm(5.0)
+        tb = self._slide.shapes.add_textbox(left, top, width, height)
+        tf = tb.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        r = p.add_run()
+        r.text = f"“{text}”"
+        _set_run_font(r, name=LATIN_FONT, size=24, color=TEXT_DARK, ea=EA_FONT_PRIMARY)
+        r.font.italic = True
+        if author:
+            p2 = tf.add_paragraph()
+            p2.alignment = PP_ALIGN.RIGHT
+            r2 = p2.add_run()
+            r2.text = f"— {author}"
+            _set_run_font(r2, name=LATIN_FONT, size=14, color=TEXT_MID, ea=EA_FONT_PRIMARY)
+        self._next_top_cm = (top + height) / 360000 + 0.3
+        return tb
+
+    def add_section_divider(self, text: str):
+        """Big centered red text — for chapter intros. Use as a full-page block."""
+        left = Cm(CONTENT_LEFT_CM)
+        top = Cm(CONTENT_TOP_CM + 4.0)
+        width = Cm(CONTENT_WIDTH_CM)
+        height = Cm(6.0)
+        tb = self._slide.shapes.add_textbox(left, top, width, height)
+        tf = tb.text_frame
+        tf.word_wrap = True
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        r = p.add_run()
+        r.text = text
+        _set_run_font(r, name=LATIN_FONT, size=54, bold=True, color=MILWAUKEE_RED, ea=EA_FONT_PRIMARY)
+        self._next_top_cm = (top + height) / 360000 + 0.3
+        return tb
+
+    def add_speaker_notes(self, text: str):
+        """Add speaker notes (operational text that should not appear on slide face)."""
+        notes = self._slide.notes_slide
+        notes.notes_text_frame.text = text
+        return notes
+
 
 def _apply_bullet(paragraph):
     """Add a • bullet to a paragraph via direct pPr edit (python-pptx
@@ -249,8 +375,18 @@ class MilwaukeeDeck:
             wrapper.set_subtitle(subtitle)
         return wrapper
 
-    def save(self, path: str | Path) -> Path:
+    def save(self, path: str | Path, *, force: bool = False) -> Path:
+        """Save the deck. Refuses to overwrite a file that PowerPoint has open
+        (detected via the platform-standard ~$ lock file). Pass force=True to
+        skip the check."""
         path = Path(path).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
+        if not force:
+            lock = path.parent / f"~${path.name}"
+            if lock.exists():
+                raise RuntimeError(
+                    f"{path.name} appears to be open in PowerPoint (lock file "
+                    f"{lock.name} exists). Close it first, or pass force=True."
+                )
         self._prs.save(str(path))
         return path

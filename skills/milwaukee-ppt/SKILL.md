@@ -94,19 +94,79 @@ pdftoppm -png -r 100 output.pdf slide
 
 ## API 速查（`scripts/build_ppt.py`）
 
+**基础内容：**
+
 | 方法 | 作用 | 关键参数 |
 |------|------|----------|
 | `MilwaukeeDeck(template_path?)` | 初始化（可指定模板） | 默认 `assets/template.pptx` |
 | `deck.add_slide(title, subtitle="")` | 加一页 | 返回 `_Slide` |
-| `slide.add_paragraphs(items, left_cm?, top_cm?, width_cm?, height_cm?)` | 多段文字 | `items` 是 `[(text, style_dict), ...]` |
+| `slide.add_paragraphs(items, ...)` | 多段文字 | `items` 是 `[(text, style_dict), ...]` |
 | `slide.add_bullets(bullets, size=14, ...)` | 项目符号列表 | |
 | `slide.add_table(rows, header=True, ...)` | 表格（首行红底白字） | `rows` 是 `list[list[str]]` |
-| `slide.add_image(path, left_cm?, top_cm?, width_cm?, height_cm?)` | 嵌入图片 | |
-| `deck.save(path)` | 保存 | 返回绝对路径 |
+| `slide.add_image(path, ...)` | 嵌入图片 | `*_cm` 控制位置和尺寸 |
+| `deck.save(path, force=False)` | 保存（自动检测 PowerPoint 锁定） | 返回绝对路径 |
+
+**Polish 版式（推荐用于美化）：**
+
+| 方法 | 作用 |
+|------|------|
+| `slide.columns(n, ratios?, gap_cm=0.5, ...)` | 返回 n 列的 rect 字典列表，喂给 `add_*` 做并列版式 |
+| `slide.add_kpi(value, label, color=red)` | 巨大数字 + 下方说明（统计高光页） |
+| `slide.add_quote(text, author="")` | 居中斜体引述 + 右对齐署名 |
+| `slide.add_section_divider(text)` | 居中超大红字（章节封面） |
+| `slide.add_speaker_notes(text)` | 写到 speaker notes，**不出现在幻灯片正面** |
 
 `style_dict` 支持：`size`（pt）、`bold`、`color`（`RGBColor`）、`align`（`'l'/'c'/'r'`）、`bullet`、`name`（latin 字体）、`ea`（中文字体）。
 
 省略坐标时按内置内容流自动堆叠（每个块下方留 0.3cm）。
+
+**调色板常量：**`MILWAUKEE_RED`、`TEXT_DARK`、`TEXT_MID`、`BG_LIGHT`、`WHITE`、`STATUS_OK`、`STATUS_WARN`、`STATUS_DANGER`，或用 `PALETTE` dict 取。
+
+## Polish workflow（美化）
+
+构建完 deck 后跑 linter，把违规指出来再修：
+
+```bash
+python scripts/polish.py output.pptx
+# 或严格模式（任何 warning 都退出非零）
+python scripts/polish.py output.pptx --strict
+```
+
+linter 检查项（参见 `references/design-guidelines.md` 的具体阈值）：
+
+- 标题 ≤ 40 字符 / 副标题 ≤ 60 字符
+- 字体族 ≤ 2（Latin + CJK）
+- 配色在品牌调色板内（红 + 中性灰白 + 状态色）
+- 项目符号 ≤ 6 / 页，单条 ≤ 12 字（中）或 ≤ 6 词（英）
+- 表格 ≤ 7 行
+- 图片 ≥ 1280×720
+- 检测 PowerPoint 是否正在打开该文件（`~$xxx.pptx` 锁文件）
+
+设计规范完整版（字号阶梯、配色、间距、反模式）见 `references/design-guidelines.md`。
+
+**Polish 示例：**
+
+```python
+# 章节封面
+s = deck.add_slide("CHAPTER 01", "Strategy")
+s.add_section_divider("Why M18 FUEL Now")
+
+# 三栏对比
+s = deck.add_slide("THREE PILLARS", "Product Strategy")
+for col, (head, body) in zip(s.columns(3, gap_cm=0.6, top_cm=4, height_cm=10), data):
+    s.add_paragraphs([
+        (head, {"size": 20, "bold": True, "color": MILWAUKEE_RED, "align": "c"}),
+        (body, {"size": 14, "align": "c"}),
+    ], **col)
+
+# KPI 高光
+s = deck.add_slide("MARKET IMPACT", "FY2025 Recap")
+s.add_kpi("+34%", "全球专业渠道销售同比增长", top_cm=4)
+
+# 引述
+s = deck.add_slide("VOICE OF CUSTOMER", "Field Feedback")
+s.add_quote("M18 FUEL 让我每天少充两次电。", author="资深木工 · 香港", top_cm=5)
+```
 
 ## 单位换算
 
@@ -118,15 +178,21 @@ pdftoppm -png -r 100 output.pdf slide
 
 `build_ppt.py` 中文默认 `Microsoft JhengHei`；macOS 没装时系统会回退（Mac 常见可用：`PingFang TC`、`Heiti TC`）。客户机如严重在意一致性，把 PPT 转 PDF 再发。
 
-## 设计规范
+## 设计规范（速查）
+
+完整版见 `references/design-guidelines.md`。摘要：
 
 | 元素 | 规范 |
 |------|------|
 | 主标题 | 模板继承（粗体白色 24pt 阴影） |
 | 副标题 | 模板继承（白色 15pt 右对齐） |
-| 内容标题 | Calibri Bold 18-20pt #333333 |
-| 内容正文 | Calibri 14-16pt #333333 |
-| 强调色 | Milwaukee 红 `#DB021D`（已暴露为 `MILWAUKEE_RED`） |
+| 内容一级标题 | Calibri/JhengHei Bold 28-32pt #333333 |
+| 内容二级标题 | Calibri/JhengHei Semibold 20-24pt |
+| 正文 | Calibri/JhengHei 16pt #333333（密集场景 14pt） |
+| 强调色 | Milwaukee 红 `#DB021D`，每页面积 ≤ 10% |
+| 边距 | 1.0 cm（外缘）/ 0.3 cm（段间）/ 0.6 cm（小节间） |
+| 字体族数 | ≤ 2（Calibri + Microsoft JhengHei） |
+| 项目符号 | ≤ 6 / 页，每条 ≤ 12 字（中）/ ≤ 6 词（英） |
 
 ## 注意事项
 
