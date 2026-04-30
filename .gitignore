@@ -15,3 +15,6 @@ venv/
 /*.pdf
 /slide-*.png
 /slide-*.jpg
+
+# Scratch / smoke-test artifacts
+/tmp/
