@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "skills": {
+    "html-ppt": {
+      "source": "lewislulu/html-ppt-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "977bae0cdd515696cf400bb050b1c8741e8d911466fb1ec011138f4411396a03"
+    },
+    "pptx": {
+      "source": "nexu-io/open-design",
+      "sourceType": "github",
+      "skillPath": "skills/pptx/SKILL.md",
+      "computedHash": "1d78c6c2d59385881e6186b46a8a199d70145fcf95fef219dc75d44c7f30b3df"
+    },
+    "pptx-generator": {
+      "source": "nexu-io/open-design",
+      "sourceType": "github",
+      "skillPath": "skills/pptx-generator/SKILL.md",
+      "computedHash": "ed8d97d3a87bca97e1c9c038314e36e4f449f4c54be63d6124f0ad4207ae587c"
+    },
+    "pptx-html-fidelity-audit": {
+      "source": "nexu-io/open-design",
+      "sourceType": "github",
+      "skillPath": "skills/pptx-html-fidelity-audit/SKILL.md",
+      "computedHash": "ff3a8f75c04ea9a641e65d3d636393c84c2fd542ebe9d12a1a2a04ea8d3f8520"
+    }
+  }
+}
