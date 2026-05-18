@@ -390,3 +390,117 @@ class MilwaukeeDeck:
                 )
         self._prs.save(str(path))
         return path
+
+
+# ---------------------------------------------------------------------------
+# YAML entry point (added 2026-05-18 — dual-track refactor)
+# ---------------------------------------------------------------------------
+
+def _promote_title_placeholder(slide) -> None:
+    """Move the title placeholder element (ph type='title') to be the first
+    sp child of spTree so that iterating slide.shapes yields the title before
+    the subtitle.  The template stores subtitle (ph idx=10) before title in
+    the XML; this fixes the ordering without touching the template binary."""
+    spTree = slide._element.spTree
+    from pptx.oxml.ns import qn as _qn
+    title_sp = None
+    for sp in list(spTree):
+        ph_el = sp.find(_qn("p:ph"))
+        if ph_el is None:
+            # Try nested inside nvSpPr/nvPr
+            ph_el = sp.find(f".//{_qn('p:ph')}")
+        if ph_el is not None:
+            # Title placeholder: type="title" OR (no idx / idx="0")
+            ph_type = ph_el.get("type", "")
+            ph_idx = ph_el.get("idx")
+            if ph_type == "title" or (ph_idx is None or ph_idx == "0"):
+                title_sp = sp
+                break
+    if title_sp is not None:
+        spTree.remove(title_sp)
+        # nvGrpSpPr is [0], grpSpPr is [1]; insert title as first sp at [2]
+        spTree.insert(2, title_sp)
+
+
+def _render_slide_from_spec(deck: "MilwaukeeDeck", spec: dict) -> None:
+    """Dispatch one slide spec to the appropriate MilwaukeeDeck API."""
+    t = spec["type"]
+    title = spec.get("title", "")
+    subtitle = spec.get("subtitle", "")
+    s = deck.add_slide(title, subtitle)
+    _promote_title_placeholder(s._slide)
+
+    if t == "title":
+        return
+
+    if t == "text":
+        items = []
+        for block in spec.get("blocks", []):
+            style = {k: v for k, v in block.items() if k != "text"}
+            items.append((block["text"], style))
+        s.add_paragraphs(items)
+    elif t == "bullets":
+        s.add_bullets(spec["items"])
+    elif t == "table":
+        s.add_table(spec["rows"])
+    elif t == "kpi":
+        s.add_kpi(spec["value"], spec["label"])
+    elif t == "quote":
+        s.add_quote(spec["text"], spec.get("author", ""))
+    elif t == "section":
+        s.add_section_divider(spec.get("text", title))
+    elif t == "image":
+        s.add_image(spec["path"])
+        if caption := spec.get("caption"):
+            s.add_paragraphs([(caption, {"size": 14, "color": TEXT_MID})])
+    elif t == "columns":
+        cols = spec["columns"]
+        rects = s.columns(len(cols))
+        for col, rect in zip(cols, rects):
+            s.add_paragraphs(
+                [
+                    (col["head"], {"size": 20, "bold": True, "color": MILWAUKEE_RED}),
+                    (col["body"], {"size": 16}),
+                ],
+                **rect,
+            )
+    else:
+        raise ValueError(f"unknown slide type {t!r}")
+
+
+def build_from_yaml(content_path: str, out_path: str,
+                    template_path: str | None = None) -> str:
+    """YAML → .pptx one-shot entry. Validates schema, dispatches each slide
+    to the matching MilwaukeeDeck API, saves the result.
+
+    Returns the absolute output path.
+    """
+    import yaml
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from fill_html import validate_content
+
+    content = yaml.safe_load(Path(content_path).read_text())
+    validate_content(content)
+
+    deck = MilwaukeeDeck(template_path or DEFAULT_TEMPLATE)
+    for spec in content["slides"]:
+        _render_slide_from_spec(deck, spec)
+    return deck.save(out_path)
+
+
+def _cli() -> int:
+    import argparse
+    p = argparse.ArgumentParser(description="Milwaukee YAML → .pptx")
+    p.add_argument("content", help="path to content.yaml")
+    p.add_argument("--out", required=True, help="output .pptx path")
+    p.add_argument("--template", default=None, help="override template.pptx")
+    args = p.parse_args()
+    out = build_from_yaml(args.content, args.out, args.template)
+    print(f"wrote {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(_cli())
