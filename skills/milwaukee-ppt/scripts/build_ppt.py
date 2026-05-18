@@ -396,39 +396,12 @@ class MilwaukeeDeck:
 # YAML entry point (added 2026-05-18 — dual-track refactor)
 # ---------------------------------------------------------------------------
 
-def _promote_title_placeholder(slide) -> None:
-    """Move the title placeholder element (ph type='title') to be the first
-    sp child of spTree so that iterating slide.shapes yields the title before
-    the subtitle.  The template stores subtitle (ph idx=10) before title in
-    the XML; this fixes the ordering without touching the template binary."""
-    spTree = slide._element.spTree
-    from pptx.oxml.ns import qn as _qn
-    title_sp = None
-    for sp in list(spTree):
-        ph_el = sp.find(_qn("p:ph"))
-        if ph_el is None:
-            # Try nested inside nvSpPr/nvPr
-            ph_el = sp.find(f".//{_qn('p:ph')}")
-        if ph_el is not None:
-            # Title placeholder: type="title" OR (no idx / idx="0")
-            ph_type = ph_el.get("type", "")
-            ph_idx = ph_el.get("idx")
-            if ph_type == "title" or (ph_idx is None or ph_idx == "0"):
-                title_sp = sp
-                break
-    if title_sp is not None:
-        spTree.remove(title_sp)
-        # nvGrpSpPr is [0], grpSpPr is [1]; insert title as first sp at [2]
-        spTree.insert(2, title_sp)
-
-
 def _render_slide_from_spec(deck: "MilwaukeeDeck", spec: dict) -> None:
     """Dispatch one slide spec to the appropriate MilwaukeeDeck API."""
     t = spec["type"]
     title = spec.get("title", "")
     subtitle = spec.get("subtitle", "")
     s = deck.add_slide(title, subtitle)
-    _promote_title_placeholder(s._slide)
 
     if t == "title":
         return

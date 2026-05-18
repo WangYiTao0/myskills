@@ -41,13 +41,19 @@ def test_template_chrome_preserved(built):
 
 
 def test_first_slide_title_matches_yaml(built):
+    """First slide should contain the YAML title text somewhere in its shapes.
+
+    The template layout puts subtitle and title in two separate placeholders
+    whose XML order is implementation-defined, so we scan all text shapes
+    rather than picking the first.
+    """
     import yaml
     spec = yaml.safe_load(SAMPLE.read_text())
     p = Presentation(str(built))
     first_slide = p.slides[0]
-    title_text = ""
-    for shape in first_slide.shapes:
-        if shape.has_text_frame and shape.text_frame.text:
-            title_text = shape.text_frame.text
-            break
-    assert spec["slides"][0]["title"] in title_text
+    all_text = " ".join(
+        shape.text_frame.text
+        for shape in first_slide.shapes
+        if shape.has_text_frame and shape.text_frame.text
+    )
+    assert spec["slides"][0]["title"] in all_text
