@@ -21,3 +21,7 @@ venv/
 
 # PowerPoint / Office lock files
 ~$*
+
+# Claude Code harness artifacts (user/runtime-local)
+.agents/
+.claude/
