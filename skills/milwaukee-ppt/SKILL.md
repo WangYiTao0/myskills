@@ -1,201 +1,133 @@
 ---
 name: milwaukee-ppt
-description: 使用 Milwaukee Tool 品牌模板制作 PPT。当用户明确提到"Milwaukee 模板"、"Milwaukee PPT"、"MS 模板"、"Milwaukee slide"、"Milwaukee 品牌简报"，或上传了 MS_-_Template1.pptx / 当前 skill 的 template.pptx 并要求制作演示文稿时使用。仅在 Milwaukee 品牌上下文下触发——不要因为用户单纯说"做个PPT"就启用。
+description: Milwaukee Tool 品牌 PPT 生成。当用户明确提到"Milwaukee 模板"、"Milwaukee PPT"、"MS 模板"、"Milwaukee slide"、"Milwaukee 品牌简报"，或上传了 MS_-_Template1.pptx / 当前 skill 的 template.pptx 并要求制作演示文稿时使用。仅在 Milwaukee 品牌上下文下触发——不要因为用户单纯说"做个PPT"就启用。
 ---
 
-# Milwaukee Tool PPT Template Skill
+# Milwaukee Tool PPT Skill
 
-跨平台（macOS / Linux）。基于 `python-pptx` 生成，不手编 XML。
+跨平台（macOS / Linux）。**双轨**：一份 `content.yaml` 同时驱动浏览器预览（HTML）和最终 `.pptx` 交付。
 
-## 模板结构
-
-模板文件：`assets/template.pptx`
-
-- 16:9 宽屏，33.87 × 19.05 cm（EMU 12192000 × 6858000）
-- 单 layout：`Blank Slide`
-- 固定元素（在 slideMaster 中，**不要改**）：左上 Milwaukee logo、顶部红色横幅、底部灰色页脚
-- 占位符（在 slideLayout1 + slide1 中）：
-  - **idx=0** TITLE — 红色横幅右上排，白色粗体大写，约 24pt
-  - **idx=10** BODY  — 红色横幅右下排，白色 15pt 右对齐（用作副标题）
-- 内容白区：约 left=1cm, top=2.5cm, right=32.87cm, bottom=17.5cm
-
-## 前置依赖
+## 工作流
 
 ```bash
-# 推荐用 venv（Mac 上 brew Python 不允许全局 pip）
+# 0) 装依赖（一次）
+cd skills/milwaukee-ppt
 python3 -m venv .venv && source .venv/bin/activate
-pip install python-pptx Pillow markitdown[pptx]
+pip install python-pptx PyYAML Jinja2 Pillow pytest
+
+# 1) 写内容
+cp sample/content.yaml my_deck.yaml
+# 编辑 my_deck.yaml
+
+# 2) 浏览器预览 / 规划 / 演讲（依赖 html-ppt skill 提供 runtime.js）
+python scripts/fill_html.py my_deck.yaml --out ~/talks/my-deck/
+open ~/talks/my-deck/index.html
+# ← → 翻页、S 演讲者模式、F 全屏（如 runtime.js 可用）
+# 改 → 重跑 fill_html.py → 浏览器刷新
+
+# 3) 出 .pptx
+python scripts/build_ppt.py my_deck.yaml --out my-deck.pptx
+
+# 4) Linter（可选）
+python scripts/polish.py my-deck.pptx
 ```
 
-## 制作流程
+## content.yaml schema
 
-### Step 1：写一个调用脚本（参考 `scripts/build_ppt.py` 的 API）
+支持 9 种 slide `type`，每页可选 `title` + `subtitle`（嵌入红横幅）：
 
-`scripts/build_ppt.py` 提供 `MilwaukeeDeck` 类。每页一个 `add_slide(title, subtitle)`，再链式加内容。**第一页会复用模板自带的 slide1**，后续页通过 layout 自动拷贝（保留 logo/横幅/页脚）。
+| type | 必填字段 | 说明 |
+|---|---|---|
+| `title` | — | 仅红横幅显示，内容区空白 |
+| `text` | `blocks: [{text, bold?, size?, color?}]` | 多段正文 |
+| `bullets` | `items: [str]` | 项目符号列表 |
+| `table` | `rows: [[str]]` | 首行表头（红底白字） |
+| `kpi` | `value`, `label` | 巨大数字 + 说明 |
+| `quote` | `text`, `author?` | 居中斜体引述 |
+| `section` | `text?` | 章节封面（默认用 title） |
+| `image` | `path`, `caption?` | 嵌入图片 |
+| `columns` | `columns: [{head, body}]` | 多列并排 |
+
+完整样例见 `sample/content.yaml`。
+
+## 品牌规范（来源：`assets/tokens.json` + template.pptx 实测）
+
+| 元素 | 值 |
+|---|---|
+| 主色 | `#DB011C`（PPT 模板 Rectangle 3 fill 实测） |
+| Canvas | 1280×720 px @ 96 DPI（= 13.333" × 7.5"） |
+| 红横幅 | 顶部满宽，高 96 px |
+| Logo | 左上 (8, 8)，176×79 px |
+| Footer | 底部 16 px："**Confidential Document** Property of MILWAUKEE TOOL Brookfield, Wisconsin 53005" |
+| 内容区 | top=96 px（横幅下）/ bottom=696 px（footer 上） |
+| 横幅标题 | 24 pt 白色粗体大写右对齐 |
+| 横幅副标题 | 15 pt 白色右对齐 |
+| 英文字体 | Calibri |
+| 中文字体 | Microsoft JhengHei（fallback: PingFang TC, Heiti TC, Noto Sans TC） |
+
+改 `assets/tokens.json` 同时影响 HTML 和 PPT 输出。
+
+## 文件结构
+
+```
+skills/milwaukee-ppt/
+├── assets/
+│   ├── template.pptx          PowerPoint 母版（logo/横幅/footer 在 slideMaster）
+│   ├── logo.png               HTML chrome 用
+│   ├── tokens.json            共享 token（颜色 / 字号 / chrome 几何）
+│   └── html-template/
+│       ├── milwaukee.css      HTML 主题
+│       └── deck.html.j2       Jinja2 deck 模板
+├── scripts/
+│   ├── fill_html.py           YAML → 独立 HTML deck 文件夹
+│   ├── build_ppt.py           YAML → .pptx（含 MilwaukeeDeck 类，可手动构建）
+│   └── polish.py              PPT linter
+├── sample/
+│   └── content.yaml           示例 deck
+├── tests/                     pytest（19 测试）
+└── references/
+    └── design-guidelines.md   完整设计规范
+```
+
+## fill_html.py 查找 html-ppt skill 的顺序
+
+1. `--html-ppt-dir <path>` 参数
+2. `HTML_PPT_SKILL_DIR` 环境变量
+3. 默认路径：`~/Repo/myskills/.claude/skills/html-ppt/`、`~/.claude/plugins/cache/*/skills/html-ppt/`
+4. 找不到 → 输出 stub runtime.js + 警告（CSS 仍正确，键盘导航不可用）
+
+## 进阶：直接用 imperative API
+
+如要精细控制位置/样式，绕过 YAML 用 `MilwaukeeDeck` 类：
 
 ```python
 import sys
 sys.path.insert(0, "<skill绝对路径>/scripts")
-from build_ppt import MilwaukeeDeck
+from build_ppt import MilwaukeeDeck, MILWAUKEE_RED
 
-deck = MilwaukeeDeck()  # 默认加载 assets/template.pptx
-
-# --- 页 1：纯文字介绍 ---
-s1 = deck.add_slide("PRODUCT OVERVIEW", "M18 FUEL Series · 2026")
-s1.add_paragraphs([
-    ("产品定位", {"size": 18, "bold": True}),
-    ("面向专业用户的高扭矩冲击钻系列，电池续航提升 30%。", {"size": 14}),
-])
-
-# --- 页 2：项目符号列表 ---
-s2 = deck.add_slide("KEY FEATURES", "Why M18 FUEL")
-s2.add_bullets([
-    "POWERSTATE 无刷电机，扭矩 1200 Nm",
-    "REDLINK PLUS 智能保护",
-    "REDLITHIUM HIGH OUTPUT 电池兼容",
-])
-
-# --- 页 3：表格 ---
-s3 = deck.add_slide("SPEC COMPARISON", "Models")
-s3.add_table([
-    ["Model", "Torque (Nm)", "Speed (RPM)", "Weight (kg)"],
-    ["M18-A", "1000", "0-2000", "1.8"],
-    ["M18-B", "1200", "0-2100", "2.0"],
-])
-
-# --- 页 4：图片 + 说明 ---
-s4 = deck.add_slide("PRODUCT SHOT", "Hero image")
-s4.add_image("/path/to/product.png", left_cm=2, top_cm=3, width_cm=12)
-s4.add_paragraphs(
-    [("便携、强劲、耐用。", {"size": 16, "bold": True})],
-    left_cm=15, top_cm=6, width_cm=15, height_cm=2,
-)
-
-deck.save("output.pptx")  # 保存到当前工作目录
+deck = MilwaukeeDeck()
+s = deck.add_slide("KEY FEATURES", "Why M18 FUEL")
+s.add_bullets(["POWERSTATE 电机", "REDLINK 保护"])
+s2 = deck.add_slide("SPEC")
+s2.add_table([["Model","Torque"],["A","1000Nm"]])
+deck.save("out.pptx")
 ```
 
-### Step 2：运行
-
-```bash
-python build_my_deck.py
-```
-
-### Step 3：QA
-
-```bash
-# 内容核对
-python -m markitdown output.pptx | head -80
-
-# 视觉核对（macOS：brew install --cask libreoffice && brew install poppler）
-soffice --headless --convert-to pdf output.pptx
-pdftoppm -png -r 100 output.pdf slide
-# 然后 view slide-*.png
-```
-
-## API 速查（`scripts/build_ppt.py`）
-
-**基础内容：**
-
-| 方法 | 作用 | 关键参数 |
-|------|------|----------|
-| `MilwaukeeDeck(template_path?)` | 初始化（可指定模板） | 默认 `assets/template.pptx` |
-| `deck.add_slide(title, subtitle="")` | 加一页 | 返回 `_Slide` |
-| `slide.add_paragraphs(items, ...)` | 多段文字 | `items` 是 `[(text, style_dict), ...]` |
-| `slide.add_bullets(bullets, size=14, ...)` | 项目符号列表 | |
-| `slide.add_table(rows, header=True, ...)` | 表格（首行红底白字） | `rows` 是 `list[list[str]]` |
-| `slide.add_image(path, ...)` | 嵌入图片 | `*_cm` 控制位置和尺寸 |
-| `deck.save(path, force=False)` | 保存（自动检测 PowerPoint 锁定） | 返回绝对路径 |
-
-**Polish 版式（推荐用于美化）：**
-
-| 方法 | 作用 |
-|------|------|
-| `slide.columns(n, ratios?, gap_cm=0.5, ...)` | 返回 n 列的 rect 字典列表，喂给 `add_*` 做并列版式 |
-| `slide.add_kpi(value, label, color=red)` | 巨大数字 + 下方说明（统计高光页） |
-| `slide.add_quote(text, author="")` | 居中斜体引述 + 右对齐署名 |
-| `slide.add_section_divider(text)` | 居中超大红字（章节封面） |
-| `slide.add_speaker_notes(text)` | 写到 speaker notes，**不出现在幻灯片正面** |
-
-`style_dict` 支持：`size`（pt）、`bold`、`color`（`RGBColor`）、`align`（`'l'/'c'/'r'`）、`bullet`、`name`（latin 字体）、`ea`（中文字体）。
-
-省略坐标时按内置内容流自动堆叠（每个块下方留 0.3cm）。
-
-**调色板常量：**`MILWAUKEE_RED`、`TEXT_DARK`、`TEXT_MID`、`BG_LIGHT`、`WHITE`、`STATUS_OK`、`STATUS_WARN`、`STATUS_DANGER`，或用 `PALETTE` dict 取。
-
-## Polish workflow（美化）
-
-构建完 deck 后跑 linter，把违规指出来再修：
-
-```bash
-python scripts/polish.py output.pptx
-# 或严格模式（任何 warning 都退出非零）
-python scripts/polish.py output.pptx --strict
-```
-
-linter 检查项（参见 `references/design-guidelines.md` 的具体阈值）：
-
-- 标题 ≤ 40 字符 / 副标题 ≤ 60 字符
-- 字体族 ≤ 2（Latin + CJK）
-- 配色在品牌调色板内（红 + 中性灰白 + 状态色）
-- 项目符号 ≤ 6 / 页，单条 ≤ 12 字（中）或 ≤ 6 词（英）
-- 表格 ≤ 7 行
-- 图片 ≥ 1280×720
-- 检测 PowerPoint 是否正在打开该文件（`~$xxx.pptx` 锁文件）
-
-设计规范完整版（字号阶梯、配色、间距、反模式）见 `references/design-guidelines.md`。
-
-**Polish 示例：**
-
-```python
-# 章节封面
-s = deck.add_slide("CHAPTER 01", "Strategy")
-s.add_section_divider("Why M18 FUEL Now")
-
-# 三栏对比
-s = deck.add_slide("THREE PILLARS", "Product Strategy")
-for col, (head, body) in zip(s.columns(3, gap_cm=0.6, top_cm=4, height_cm=10), data):
-    s.add_paragraphs([
-        (head, {"size": 20, "bold": True, "color": MILWAUKEE_RED, "align": "c"}),
-        (body, {"size": 14, "align": "c"}),
-    ], **col)
-
-# KPI 高光
-s = deck.add_slide("MARKET IMPACT", "FY2025 Recap")
-s.add_kpi("+34%", "全球专业渠道销售同比增长", top_cm=4)
-
-# 引述
-s = deck.add_slide("VOICE OF CUSTOMER", "Field Feedback")
-s.add_quote("M18 FUEL 让我每天少充两次电。", author="资深木工 · 香港", top_cm=5)
-```
+`_Slide` 提供方法：`add_paragraphs / add_bullets / add_table / add_image / add_kpi / add_quote / add_section_divider / columns / add_speaker_notes`。完整 API 见 `scripts/build_ppt.py` 顶部 docstring。
 
 ## 单位换算
 
-- 1 cm = 360000 EMU
-- 1 inch = 914400 EMU
-- 幻灯片：33.87cm × 19.05cm（13.33" × 7.5"）
+- 1 pt = 1.3333 px @ 96 DPI（`fill_html.py` 自动换算注入 CSS）
+- 1 cm = 360000 EMU；1 inch = 914400 EMU
+- 幻灯片：13.333" × 7.5"（EMU 12192000 × 6858000）
 
-## 字体兜底
+## 设计规范
 
-`build_ppt.py` 中文默认 `Microsoft JhengHei`；macOS 没装时系统会回退（Mac 常见可用：`PingFang TC`、`Heiti TC`）。客户机如严重在意一致性，把 PPT 转 PDF 再发。
-
-## 设计规范（速查）
-
-完整版见 `references/design-guidelines.md`。摘要：
-
-| 元素 | 规范 |
-|------|------|
-| 主标题 | 模板继承（粗体白色 24pt 阴影） |
-| 副标题 | 模板继承（白色 15pt 右对齐） |
-| 内容一级标题 | Calibri/JhengHei Bold 28-32pt #333333 |
-| 内容二级标题 | Calibri/JhengHei Semibold 20-24pt |
-| 正文 | Calibri/JhengHei 16pt #333333（密集场景 14pt） |
-| 强调色 | Milwaukee 红 `#DB021D`，每页面积 ≤ 10% |
-| 边距 | 1.0 cm（外缘）/ 0.3 cm（段间）/ 0.6 cm（小节间） |
-| 字体族数 | ≤ 2（Calibri + Microsoft JhengHei） |
-| 项目符号 | ≤ 6 / 页，每条 ≤ 12 字（中）/ ≤ 6 词（英） |
+完整版见 `references/design-guidelines.md`：字号阶梯、配色规则、反模式。
 
 ## 注意事项
 
-- 不要修改 `slideMaster` 或 `slideLayout1`——logo / 横幅 / 页脚都在那
-- 主标题建议大写英文，符合品牌语气
-- 模板开发于 macOS。Linux 也能跑，沙箱环境如果带 `/mnt/skills/public/pptx/scripts/` 也可继续用那套老路径，但本 skill 不再依赖它
+- **不要修改 `slideMaster`**——logo/横幅/footer 都在那
+- 改 `tokens.json` 后必须重新跑 `fill_html.py` 和 `build_ppt.py` 才会同步到输出
+- HTML 预览/演讲依赖 html-ppt skill 的 runtime.js（不修改 html-ppt 仓本身）
+- HTML 锁 1280×720 设计画布 + CSS transform 缩放适配视口；PPT 像素级一致
