@@ -128,18 +128,24 @@ body { background: #1a1a1a; }  /* letterbox color outside the scaled slide */
   line-height: 1.2;
 }
 
-/* Footer text strip */
+/* Footer text strip — matches PPT master Text Box 2: bottom-left, gray,
+   "Confidential Document" in bold, rest regular weight. */
 .slide .mw-footer {
   position: absolute;
   left: 0; bottom: 0;
   width: 100%;
   height: var(--mw-footer-h);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--mw-text-mid);
-  text-align: center;
+  text-align: left;
+  padding-left: 8px;
   line-height: var(--mw-footer-h);
   z-index: 2;
 }
+.slide .mw-footer strong { font-weight: 700; }
+
+/* Hide html-ppt runtime.js progress bar (PPT has no such element) */
+.progress-bar { display: none !important; }
 
 /* Content area — between banner and footer */
 .slide .mw-content {

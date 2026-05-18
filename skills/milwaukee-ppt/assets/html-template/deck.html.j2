@@ -25,7 +25,9 @@
 {%- endmacro %}
 
 {%- macro render_footer() %}
-  <div class="mw-footer">{{ chrome.footer_text }}</div>
+  {#- Bold the first two words ("Confidential Document"), rest regular -#}
+  {%- set _w = chrome.footer_text.split() %}
+  <div class="mw-footer"><strong>{{ _w[0] }} {{ _w[1] }}</strong> {{ _w[2:] | join(' ') }}</div>
 {%- endmacro %}
 
 {% for slide in slides %}
