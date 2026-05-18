@@ -183,8 +183,18 @@ def fill(content_path: Path, out_dir: Path, html_ppt_dir: Path | None) -> Path:
                 print(f"warning: {src} not found", file=sys.stderr)
     else:
         print(
-            "warning: html-ppt skill not found; keyboard navigation disabled.\n"
-            "  pass --html-ppt-dir <path> or set HTML_PPT_SKILL_DIR.",
+            "\n"
+            "⚠️  html-ppt skill not found — milwaukee-ppt requires it for HTML preview.\n"
+            "    Install one of these ways, then re-run:\n"
+            "      • npx skills add WangYiTao0/myskills    (installs both via skills-lock)\n"
+            "      • npx skills add lewislulu/html-ppt-skill   (html-ppt only)\n"
+            "    Or, if already installed in a non-standard location:\n"
+            "      python fill_html.py <yaml> --out <dir> --html-ppt-dir <path>\n"
+            "      (or set environment variable HTML_PPT_SKILL_DIR=<path>)\n"
+            "\n"
+            "    Continuing with stub runtime.js / base.css — the static HTML will\n"
+            "    render correctly but keyboard navigation and presenter mode will\n"
+            "    not work.\n",
             file=sys.stderr,
         )
         # Write a stub base.css and empty runtime.js so the HTML still loads

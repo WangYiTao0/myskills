@@ -1,11 +1,22 @@
 ---
 name: milwaukee-ppt
-description: Milwaukee Tool 品牌 PPT 生成。当用户明确提到"Milwaukee 模板"、"Milwaukee PPT"、"MS 模板"、"Milwaukee slide"、"Milwaukee 品牌简报"，或上传了 MS_-_Template1.pptx / 当前 skill 的 template.pptx 并要求制作演示文稿时使用。仅在 Milwaukee 品牌上下文下触发——不要因为用户单纯说"做个PPT"就启用。
+description: Milwaukee Tool 品牌 PPT 生成（需配合 html-ppt skill 提供浏览器预览运行时）。当用户明确提到"Milwaukee 模板"、"Milwaukee PPT"、"MS 模板"、"Milwaukee slide"、"Milwaukee 品牌简报"，或上传了 MS_-_Template1.pptx / 当前 skill 的 template.pptx 并要求制作演示文稿时使用。仅在 Milwaukee 品牌上下文下触发——不要因为用户单纯说"做个PPT"就启用。
+requires:
+  skills: [html-ppt]
 ---
 
 # Milwaukee Tool PPT Skill
 
 跨平台（macOS / Linux）。**双轨**：一份 `content.yaml` 同时驱动浏览器预览（HTML）和最终 `.pptx` 交付。
+
+## 依赖
+
+- **html-ppt skill**（必装）：提供 HTML deck 的浏览器运行时（`runtime.js` 键盘导航 + 演讲者模式、`base.css` 排版基线、`scripts/render.sh` PNG 导出）。本 skill 在生成 HTML 时会从已安装的 html-ppt 目录拷贝这两个文件到输出 deck 文件夹。
+  - 通过 `npx skills add WangYiTao0/myskills` 安装本仓库时，`skills-lock.json` 会自动同步安装 html-ppt
+  - 手动安装：`npx skills add lewislulu/html-ppt-skill`
+  - 已安装但路径不在默认搜索范围：传 `--html-ppt-dir <path>` 或设置环境变量 `HTML_PPT_SKILL_DIR`
+- **Python 包**：`python-pptx`、`PyYAML`、`Jinja2`、`Pillow`（可选）、`pytest`（可选，跑测试）
+- **LibreOffice + poppler**（可选，PPT → PDF → PNG 验证用）：`brew install --cask libreoffice && brew install poppler`
 
 ## 工作流
 

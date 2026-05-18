@@ -41,13 +41,18 @@ npx skills add WangYiTao0/myskills
 
 Milwaukee Tool 品牌 PPT 生成。一份 `content.yaml` 同时产出浏览器预览（HTML）和最终交付（`.pptx`），双轨像素级对齐。
 
-### 安装依赖（一次）
+### 依赖
+
+- **html-ppt skill**（必装）：HTML 预览运行时（键盘导航 + 演讲者模式 + PNG 导出）。用 `npx skills add WangYiTao0/myskills` 装本仓库时会自动一起带上（见 `skills-lock.json`）。手动安装：`npx skills add lewislulu/html-ppt-skill`
+- **Python 包**：
 
 ```bash
 cd skills/milwaukee-ppt
 python3 -m venv .venv && source .venv/bin/activate
 pip install python-pptx PyYAML Jinja2 Pillow pytest
 ```
+
+- **可选**：LibreOffice + poppler（PPT 转 PDF/PNG 验证用）`brew install --cask libreoffice && brew install poppler`
 
 ### 三步工作流
 
