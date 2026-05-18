@@ -121,6 +121,18 @@
 {% endfor %}
 {% endautoescape %}
 
+<script>
+// Proportional scale to fit viewport while preserving 1280x720 design canvas.
+// Sets --mw-fit (a unitless multiplier) consumed by .slide transform: scale().
+(function () {
+  function fit() {
+    var s = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    document.documentElement.style.setProperty('--mw-fit', s);
+  }
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>
 <script src="runtime.js"></script>
 </body>
 </html>

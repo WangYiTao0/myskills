@@ -23,8 +23,8 @@ def test_build_css_injects_primary_color():
 
 def test_build_css_injects_pt_to_px_conversion():
     css = build_css(TOKENS)
-    # title 32pt * 1.3333 = 42.67px
-    assert re.search(r"--mw-title-size:\s*42\.67px", css)
+    # title 24pt * 1.3333 = 32.00px (matches PPT master titleStyle)
+    assert re.search(r"--mw-title-size:\s*32\.00px", css)
     # banner_height = 96 (px directly, no conversion)
     assert "--mw-banner-h: 96px;" in css
 

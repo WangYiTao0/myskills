@@ -15,8 +15,8 @@
   --mw-font-en: Calibri, sans-serif;
   --mw-font-cjk: "Microsoft JhengHei", "PingFang TC", "Heiti TC", "Noto Sans TC", sans-serif;
 
-  --mw-title-size: 42.67px;   /* 32pt */
-  --mw-subtitle-size: 26.67px; /* 20pt */
+  --mw-title-size: 32px;      /* 24pt — matches PPT master titleStyle */
+  --mw-subtitle-size: 20px;   /* 15pt — matches PPT master bodyStyle (subtitle placeholder) */
   --mw-body-size: 21.33px;    /* 16pt */
   --mw-body-dense-size: 18.67px; /* 14pt */
   --mw-kpi-size: 128px;       /* 96pt */
@@ -35,11 +35,38 @@
   --mw-content-bottom: 696px;
 }
 
-/* Slide canvas — locked to 1280x720 px to match PPT pixel-for-pixel */
-.slide {
+/* === Layout strategy ===
+   Slides are LOCKED to a 1280x720 design canvas (matches PPT
+   13.333"x7.5" @ 96 DPI). All inner positions (banner 96px, logo at
+   8,8 sized 176x79, etc.) are in this 1280x720 coordinate space.
+
+   The entire slide is then scaled with CSS transform to fit whatever
+   the browser viewport is, preserving the 16:9 aspect ratio and
+   pixel proportions. A tiny inline script in deck.html.j2 sets
+   `--mw-fit` to min(vw/1280, vh/720) on load + resize. =================== */
+
+html, body { margin: 0; padding: 0; }
+body { background: #1a1a1a; }  /* letterbox color outside the scaled slide */
+
+.deck {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Override base.css .slide and .slide.is-active to keep our centered+scaled
+   transform. Higher specificity (.deck .slide) beats base.css's .slide.is-active. */
+.deck .slide,
+.deck .slide.is-active {
   width: var(--mw-canvas-w);
   height: var(--mw-canvas-h);
-  position: relative;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(var(--mw-fit, 1));
+  transform-origin: center center;
+  padding: 0;  /* override base.css padding:72px 96px */
   background: var(--mw-white);
   font-family: var(--mw-font-cjk), var(--mw-font-en);
   color: var(--mw-text-dark);
@@ -67,7 +94,7 @@
   z-index: 2;
 }
 
-/* Banner title (right side, white, bold) */
+/* Banner title (right side, white, bold, right-aligned per PPT master) */
 .slide .mw-title {
   position: absolute;
   left: 488px;
@@ -82,6 +109,7 @@
   letter-spacing: 0.02em;
   line-height: 1;
   padding-right: 16px;
+  text-align: right;
 }
 
 /* Banner subtitle (below title, white, right-aligned) */
