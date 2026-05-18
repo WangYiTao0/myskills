@@ -12,8 +12,14 @@ requires:
 ## 依赖
 
 - **html-ppt skill**（必装）：提供 HTML deck 的浏览器运行时（`runtime.js` 键盘导航 + 演讲者模式、`base.css` 排版基线、`scripts/render.sh` PNG 导出）。本 skill 在生成 HTML 时会从已安装的 html-ppt 目录拷贝这两个文件到输出 deck 文件夹。
-  - 通过 `npx skills add WangYiTao0/myskills` 安装本仓库时，`skills-lock.json` 会自动同步安装 html-ppt
-  - 手动安装：`npx skills add lewislulu/html-ppt-skill`
+
+  **安装需要分两步**（`npx skills add` 不会自动 transitively 装依赖；本仓库的 `skills-lock.json` 只是开发环境的本地锁）：
+
+  ```bash
+  npx skills add WangYiTao0/myskills          # milwaukee-ppt 本体
+  npx skills add lewislulu/html-ppt-skill     # html-ppt（必装）
+  ```
+
   - 已安装但路径不在默认搜索范围：传 `--html-ppt-dir <path>` 或设置环境变量 `HTML_PPT_SKILL_DIR`
 - **Python 包**：`python-pptx`、`PyYAML`、`Jinja2`、`Pillow`（可选）、`pytest`（可选，跑测试）
 - **LibreOffice + poppler**（可选，PPT → PDF → PNG 验证用）：`brew install --cask libreoffice && brew install poppler`

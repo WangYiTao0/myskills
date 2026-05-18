@@ -185,9 +185,8 @@ def fill(content_path: Path, out_dir: Path, html_ppt_dir: Path | None) -> Path:
         print(
             "\n"
             "⚠️  html-ppt skill not found — milwaukee-ppt requires it for HTML preview.\n"
-            "    Install one of these ways, then re-run:\n"
-            "      • npx skills add WangYiTao0/myskills    (installs both via skills-lock)\n"
-            "      • npx skills add lewislulu/html-ppt-skill   (html-ppt only)\n"
+            "    Install it (one-time):\n"
+            "      npx skills add lewislulu/html-ppt-skill\n"
             "    Or, if already installed in a non-standard location:\n"
             "      python fill_html.py <yaml> --out <dir> --html-ppt-dir <path>\n"
             "      (or set environment variable HTML_PPT_SKILL_DIR=<path>)\n"
