@@ -6,7 +6,7 @@ Personal Claude Code plugin — a collection of custom skills for daily workflow
 
 | Skill | Description |
 |-------|-------------|
-| [milwaukee-ppt](skills/milwaukee-ppt/) | 使用 Milwaukee Tool 品牌模板制作 PPT |
+| [milwaukee-ppt](skills/milwaukee-ppt/) | Milwaukee Tool 工作汇报格式规范 — 输出 NotebookLM Markdown |
 | [pq-splitter](skills/pq-splitter/) | 将 Power BI 合并的 Power Query 代码拆分为多个独立 `.m` 文件 |
 | [pbip-mcp-workflow](skills/pbip-mcp-workflow/) | PBIP + powerbi-modeling MCP 安全工作流规则 |
 
@@ -39,79 +39,25 @@ npx skills add WangYiTao0/myskills
 
 ## milwaukee-ppt — quick reference
 
-Milwaukee Tool 品牌 PPT 生成。一份 `content.yaml` 同时产出浏览器预览（HTML）和最终交付（`.pptx`），双轨像素级对齐。
+Milwaukee Tool 工作汇报**格式规范**。强制执行固定 Agenda 顺序、PDCA 阶段标注、"已落地 vs 未来"严格分离、标题三层结构。**输出 Markdown 文档**，用户把它喂给 NotebookLM 渲染成最终 PPT。本 skill 不直接生成 .pptx。
 
-### 依赖
+### 五条强制规则（违反任一会被驳回）
 
-- **html-ppt skill**（必装）：HTML 预览运行时（键盘导航 + 演讲者模式 + PNG 导出）。`npx skills add` 不会 transitively 装依赖，所以**要分两步装**：
+1. **Agenda 8 节固定顺序**：项目背景 → 项目目标 → 项目范围 → 项目应用场景 → 项目节点 → 项目行动与成果 → 项目团队 → 持续优化与经验沉淀
+2. **PDCA 标注**：每节标 `P` / `D` / `C` / `A`，做成正文区右上角的小图标（不写进红 banner 副标题）
+3. **不写未来**：禁止 Next Step / Roadmap / 画饼（月报底部"下一步计划"是唯一例外，且必须是已确定、有 owner、有时间的动作）
+4. **标题三层**：主标题（话题）+ 副标题（action title）+ 正文 lead（结论 + 数据）
+5. **每节一个核心信息**：超出就拆，不要塞满
 
-```bash
-npx skills add WangYiTao0/myskills          # milwaukee-ppt 本体
-npx skills add lewislulu/html-ppt-skill     # html-ppt（必装）
-```
-- **Python 包**：
+### 交付物
 
-```bash
-cd skills/milwaukee-ppt
-python3 -m venv .venv && source .venv/bin/activate
-pip install python-pptx PyYAML Jinja2 Pillow pytest
-```
+- 一份 Markdown 文档：每张 slide 用 `---` 分隔，块内含 `layout` / `section` / `pdca` / 三层标题 / 正文
+- 一份图片建议清单：明确每张配图是 **Claude 生成** 还是 **必须用户提供**（实拍照、内部数据图表、含品牌识别的真实场景一律走"用户提供"）
 
-- **可选**：LibreOffice + poppler（PPT 转 PDF/PNG 验证用）`brew install --cask libreoffice && brew install poppler`
+### 资源（已内置，无需额外安装）
 
-### 三步工作流
+- 模板：`skills/milwaukee-ppt/assets/MS_Template.pptx`（顶部红 banner + 左上 logo + 底部页脚）
+- Logo：`skills/milwaukee-ppt/assets/logo.png`
+- 品牌色：Milwaukee Red `#DB011C`（红色累计面积 ≤ 画布 5%）
 
-```bash
-# 1) 写内容（拷贝样例当起点）
-cp sample/content.yaml my_deck.yaml
-# 编辑 my_deck.yaml — 改标题、bullets、表格等
-
-# 2) 浏览器预览 / 规划 / 演讲
-python scripts/fill_html.py my_deck.yaml --out ~/talks/my-deck/
-open ~/talks/my-deck/index.html
-# ← → 翻页 / S 演讲者模式 / F 全屏（需 html-ppt skill 提供 runtime.js）
-# 改内容 → 重跑 fill_html.py → 浏览器刷新即可迭代
-
-# 3) 出最终 .pptx
-python scripts/build_ppt.py my_deck.yaml --out my-deck.pptx
-python scripts/polish.py my-deck.pptx   # 可选 linter
-```
-
-### content.yaml 支持的 9 种 slide type
-
-| type | 必填字段 | 说明 |
-|---|---|---|
-| `title` | — | 仅红横幅（标题 + 副标题），内容区空白 |
-| `text` | `blocks: [{text, bold?, size?, color?}]` | 多段正文 |
-| `bullets` | `items: [str]` | 项目符号列表 |
-| `table` | `rows: [[str]]` | 首行表头（红底白字） |
-| `kpi` | `value`, `label` | 巨大数字 + 说明 |
-| `quote` | `text`, `author?` | 居中斜体引述 |
-| `section` | `text?` | 章节封面（默认用 title） |
-| `image` | `path`, `caption?` | 嵌入图片 |
-| `columns` | `columns: [{head, body}]` | 多列并排 |
-
-每页都可选加 `title` / `subtitle`，会渲染到红横幅。完整样例见 `skills/milwaukee-ppt/sample/content.yaml`。
-
-### 品牌规范（自动应用，无需配置）
-
-- 主色 `#DB011C`、Canvas 1280×720 px @ 96 DPI
-- 红横幅 96 px、左上 Milwaukee logo (8,8) 176×79、底部 16 px confidential footer
-- 横幅标题 24 pt 白色粗体右对齐、副标题 15 pt 白色右对齐
-- 英文 Calibri / 中文 Microsoft JhengHei（macOS fallback：PingFang TC, Heiti TC, Noto Sans TC）
-
-改 `assets/tokens.json` 同时影响 HTML 和 PPT 输出。完整文档见 [`skills/milwaukee-ppt/SKILL.md`](skills/milwaukee-ppt/SKILL.md)。
-
-### 进阶：imperative API（绕过 YAML）
-
-```python
-import sys; sys.path.insert(0, "skills/milwaukee-ppt/scripts")
-from build_ppt import MilwaukeeDeck
-
-deck = MilwaukeeDeck()
-deck.add_slide("KEY FEATURES", "Why M18 FUEL").add_bullets(["POWERSTATE 电机", "REDLINK 保护"])
-deck.add_slide("SPEC").add_table([["Model","Torque"],["A","1000Nm"]])
-deck.save("out.pptx")
-```
-
-`_Slide` 方法：`add_paragraphs / add_bullets / add_table / add_image / add_kpi / add_quote / add_section_divider / columns / add_speaker_notes`。
+完整规范见 [`skills/milwaukee-ppt/SKILL.md`](skills/milwaukee-ppt/SKILL.md)。
