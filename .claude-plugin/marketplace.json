@@ -1,0 +1,24 @@
+{
+  "name": "myskills",
+  "owner": { "name": "WangYiTao" },
+  "plugins": [
+    {
+      "name": "milwaukee-ppt",
+      "source": "./skills/milwaukee-ppt",
+      "description": "Milwaukee Tool 工作汇报格式规范 — 输出 NotebookLM Markdown",
+      "version": "0.2.0"
+    },
+    {
+      "name": "pq-splitter",
+      "source": "./skills/pq-splitter",
+      "description": "Power Query 合并代码拆分为多个 .m 文件",
+      "version": "0.1.0"
+    },
+    {
+      "name": "pbip-mcp-workflow",
+      "source": "./skills/pbip-mcp-workflow",
+      "description": "PBIP + powerbi-modeling MCP 安全工作流规则",
+      "version": "0.1.0"
+    }
+  ]
+}
