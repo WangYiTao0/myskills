@@ -1,12 +1,13 @@
 ---
 name: milwaukee-ppt
-description: Milwaukee Tool 工作汇报格式规范。当用户撰写内部工作汇报、项目总结、月报、阶段性汇报、客户简报、复盘文档等结构化内容，或提到"Milwaukee 汇报格式"、"MS 汇报模板"、"工作汇报"、"项目总结"、"月报"时，使用此 skill 强制执行：固定 Agenda 顺序、PDCA 阶段标注、"已落地 vs 未来"严格分离、标题三层结构、页面布局规则。本 skill 只规范"写什么 / 怎么布局"，不生成 PPT 文件。
+description: Milwaukee Tool 工作汇报格式规范。当用户撰写内部工作汇报、项目总结、月报、阶段性汇报、客户简报、复盘文档等结构化内容，或提到"Milwaukee 汇报格式"、"MS 汇报模板"、"工作汇报"、"项目总结"、"月报"时，使用此 skill 强制执行：固定 Agenda 顺序、PDCA 阶段标注、"已落地 vs 未来"严格分离、标题三层结构、页面布局规则。**最终输出 Markdown 文档**，配带图片建议清单，交由 NotebookLM 渲染成 PPT；本 skill 不直接生成 .pptx 文件。
 ---
 
 # Milwaukee Tool 工作汇报格式规范
 
 为 Milwaukee Tool 内部工作汇报场景定义**统一格式**。
-本 skill 只定义"写什么 / 怎么布局"，不负责生成 PPT 文件。
+
+**交付物 = 一份 Markdown 文档**（按 §11 格式），加一份图片建议清单。用户把 MD 提供给 NotebookLM，由 NotebookLM 渲染成最终 PPT。本 skill 不直接生成 .pptx。
 
 ---
 
@@ -237,3 +238,122 @@ milwaukee-ppt/
     ├── MS_Template.pptx    # 官方模板（顶部红 banner + 左上 logo + 底部页脚）
     └── logo.png            # Milwaukee Logo（白底版，用于 banner）
 ```
+
+---
+
+## 11. 输出格式 — 给 NotebookLM 的 Markdown
+
+最终交付一份 Markdown，由用户喂给 NotebookLM 生成 PPT。文档头一段元信息，然后**每张 slide 用 `---` 分隔，每张一个块**。
+
+### 单 slide 块的字段（必填）
+
+- `layout`：Cover / Body / Monthly / Before-After / Closing
+- `section`：Agenda 节号 + 节名（Cover / Closing 写 `—`）
+- `pdca`：`P` / `D` / `C` / `A`（07 节、Cover、Closing 留空）
+- **主标题** / **副标题** / **正文 lead** / **正文内容**
+- **图片建议**（按 §11.2，无图时写"无"）
+
+### 11.1 Markdown 模板
+
+````markdown
+# [项目名] 工作汇报
+
+- 汇报人：xxx
+- 团队：xxx
+- 日期：YYYY-MM-DD
+- 模板：MS_Template.pptx
+
+---
+
+## Slide 1 · Cover
+
+- layout: Cover
+- section: —
+- pdca: —
+
+**主标题**: DATA OPERATION CENTER
+**副标题**: 项目总结 · 2026 Q2
+
+**图片建议**:
+- 位置：背景
+- 描述：工厂大厅夜景，工业风
+- 比例：16:9
+- 状态：[ ] Claude 生成 / [ ] 用户提供
+
+---
+
+## Slide 2 · 项目背景
+
+- layout: Body
+- section: 01 项目背景
+- pdca: P
+
+**主标题**: 项目背景 / BACKGROUND
+**副标题**: 报表分散已成为扩展瓶颈
+**正文 lead**: 报表分散管理已成为扩展瓶颈
+
+**正文内容**:
+- 01 报表管理分散：各业务组数据散落在多个网盘路径
+- 02 高度依赖个人：关键报表无标准化访问入口
+- 03 IT 资源紧张：请求积压，项目交付周期被拉长
+- 04 缺少统一平台：无法支撑数字化精益运营能力
+
+**图片建议**: 无
+
+---
+
+## Slide N · 硬件改造
+
+- layout: Before-After
+- section: 06 项目行动与成果
+- pdca: D/C
+
+**主标题**: 硬件改造 / HARDWARE
+**副标题**: 早会会议室升级为数据运营中心
+**正文 lead**: 早会会议室升级为数据运营中心
+
+**BEFORE**（左侧）:
+- 普通会议桌椅
+- 单投影屏
+- 无数据接入
+
+**AFTER**（右侧 · 红色强调）:
+- U 型工位 8 席
+- 三联屏 + 主屏
+- 实时数据看板
+
+**图片建议**:
+- BEFORE 图：会议室改造前实拍照，4:3，⚠️ 必须用户提供
+- AFTER 图：改造后实拍照（建议同机位），4:3，⚠️ 必须用户提供
+````
+
+### 11.2 图片处理规则
+
+每个"图片建议"必须包含 4 个字段：**位置、描述、比例、状态**。
+
+**应主动要求用户提供（不要由 Claude 生成）**：
+
+- 实拍照（产品、现场、团队、改造前后）
+- 内部数据图表（应由用户从 BI / 报表系统导出）
+- 含品牌识别或人脸的真实场景
+- 财务 / 经营数据可视化
+
+**可以由 Claude 生成或提议生成**：
+
+- 抽象示意图（架构图、流程图、信息图）
+- 装饰性配图（封面背景、章节过场）
+- 图标 / 小元素（PDCA 图标、milestone 标记）
+- 概念图（流程、对比、时间线骨架）
+
+**状态字段的三种取值**：
+- `[ ] Claude 生成` — 待 Claude 生成
+- `[ ] 用户提供` — 等用户上传
+- `[x] 已确认无需` — 这张 slide 不要图
+
+### 11.3 NotebookLM 适配要点
+
+- 用 `---` 做 slide 分隔，NotebookLM 默认按此切片
+- 每张 slide 第一行用 `## Slide N · 标题`，便于识别页码
+- 图片建议块用 `**图片建议**:` 显式标记，方便用户清点缺图
+- 不要在 MD 里嵌套复杂表格 / SVG / 代码块 —— NotebookLM 转 PPT 时可能丢失
+- Markdown 头部元信息（汇报人 / 日期 / 模板）一并保留，NotebookLM 会读到

@@ -25,3 +25,5 @@ venv/
 # Claude Code harness artifacts (user/runtime-local)
 .agents/
 .claude/
+
+skills/milwaukee-ppt/assets/Thumbs.db
