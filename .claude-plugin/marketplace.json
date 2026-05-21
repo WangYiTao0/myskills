@@ -19,6 +19,12 @@
       "source": "./skills/pbip-mcp-workflow",
       "description": "PBIP + powerbi-modeling MCP 安全工作流规则",
       "version": "0.1.0"
+    },
+    {
+      "name": "ppt-design-principles",
+      "source": "./skills/ppt-design-principles",
+      "description": "《写给大家看的设计书》CRAP 四原则浓缩版 — PPT 单页视觉判断框架",
+      "version": "0.1.0"
     }
   ]
 }
