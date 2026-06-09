@@ -6,24 +6,30 @@
       "name": "milwaukee-ppt",
       "source": "./skills/milwaukee-ppt",
       "description": "Milwaukee Tool 工作汇报格式规范 — 输出 NotebookLM Markdown",
-      "version": "0.2.0"
-    },
-    {
-      "name": "pq-splitter",
-      "source": "./skills/pq-splitter",
-      "description": "Power Query 合并代码拆分为多个 .m 文件",
-      "version": "0.1.0"
+      "version": "0.3.0"
     },
     {
       "name": "pbip-mcp-workflow",
       "source": "./skills/pbip-mcp-workflow",
       "description": "PBIP + powerbi-modeling MCP 安全工作流规则",
-      "version": "0.1.0"
+      "version": "0.2.0"
     },
     {
       "name": "ppt-design-principles",
       "source": "./skills/ppt-design-principles",
       "description": "《写给大家看的设计书》CRAP 四原则浓缩版 — PPT 单页视觉判断框架",
+      "version": "0.1.0"
+    },
+    {
+      "name": "report-voice",
+      "source": "./skills/report-voice",
+      "description": "工作汇报/邮件/公告的务实用词规范 — 剔除浮夸空洞表达",
+      "version": "0.1.0"
+    },
+    {
+      "name": "sediment",
+      "source": "./skills/sediment",
+      "description": "复盘会话，沉淀经验为 skill / CLAUDE.md 规则 / 记忆",
       "version": "0.1.0"
     }
   ]
