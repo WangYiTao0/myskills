@@ -21,6 +21,12 @@
       "version": "0.1.0"
     },
     {
+      "name": "prompt-advise",
+      "source": "./skills/prompt-advise",
+      "description": "把模糊需求扩展成几个实质不同的候选 prompt，选定后执行或复制",
+      "version": "0.1.0"
+    },
+    {
       "name": "report-voice",
       "source": "./skills/report-voice",
       "description": "工作汇报/邮件/公告的务实用词规范 — 剔除浮夸空洞表达",
