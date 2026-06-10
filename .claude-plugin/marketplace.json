@@ -3,10 +3,40 @@
   "owner": { "name": "WangYiTao" },
   "plugins": [
     {
-      "name": "myskills",
-      "source": "./",
-      "description": "个人 skills 合集：milwaukee-ppt / pbip-mcp-workflow / ppt-design-principles / prompt-advise / report-voice / sediment",
-      "version": "1.0.0"
+      "name": "milwaukee-ppt",
+      "source": "./skills/milwaukee-ppt",
+      "description": "Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式案例库",
+      "version": "0.4.1"
+    },
+    {
+      "name": "pbip-mcp-workflow",
+      "source": "./skills/pbip-mcp-workflow",
+      "description": "PBIP + powerbi-modeling MCP 安全工作流规则",
+      "version": "0.2.0"
+    },
+    {
+      "name": "ppt-design-principles",
+      "source": "./skills/ppt-design-principles",
+      "description": "《写给大家看的设计书》CRAP 四原则浓缩版 — PPT 单页视觉判断框架",
+      "version": "0.1.0"
+    },
+    {
+      "name": "prompt-advise",
+      "source": "./skills/prompt-advise",
+      "description": "把模糊需求扩展成几个实质不同的候选 prompt，选定后执行或复制",
+      "version": "0.1.0"
+    },
+    {
+      "name": "report-voice",
+      "source": "./skills/report-voice",
+      "description": "工作汇报/邮件/公告的务实用词规范 — 剔除浮夸空洞表达",
+      "version": "0.1.0"
+    },
+    {
+      "name": "sediment",
+      "source": "./skills/sediment",
+      "description": "复盘会话，沉淀经验为 skill / CLAUDE.md 规则 / 记忆",
+      "version": "0.1.0"
     }
   ]
 }

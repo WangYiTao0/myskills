@@ -21,10 +21,7 @@ Personal Claude Code plugin marketplace — a collection of custom skills for da
 
 ```bash
 /plugin marketplace add WangYiTao0/myskills
-/plugin install myskills@myskills
 ```
-
-整个仓库是一个名为 `myskills` 的插件，安装后所有 skill 以 `/myskills:<skill-name>` 调用，例如 `/myskills:prompt-advise`。
 
 ### Via npx
 
@@ -47,7 +44,7 @@ npx skills add WangYiTao0/myskills
 
 - 每个 skill 一个目录：`skills/<name>/SKILL.md`（必须），按需加 `references/`、`assets/`、`scripts/`
 - `SKILL.md` frontmatter 的 `description` 写"什么时候用 + 触发关键词"，不是"这是什么"
-- 整仓库是单一插件 `myskills`，版本号维护在 `.claude-plugin/marketplace.json` 与 `.claude-plugin/plugin.json` 两处（须一致，validate.py 会检查）
+- 版本号只维护在 `.claude-plugin/marketplace.json` 一处
 - 新增/修改 skill 后运行校验：
 
 ```bash
