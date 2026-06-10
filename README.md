@@ -6,7 +6,7 @@ Personal Claude Code plugin marketplace — a collection of custom skills for da
 
 | Skill | Description |
 |-------|-------------|
-| [milwaukee-ppt](skills/milwaukee-ppt/) | Milwaukee Tool 工作汇报 PPT 的格式与视觉规范（品牌锚点、Agenda/PDCA、标题三层结构） |
+| [milwaukee-ppt](skills/milwaukee-ppt/) | Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式目录 |
 | [pbip-mcp-workflow](skills/pbip-mcp-workflow/) | PBIP + powerbi-modeling MCP 安全工作流规则 |
 | [ppt-design-principles](skills/ppt-design-principles/) | 《写给大家看的设计书》CRAP 四原则浓缩版 — PPT 单页视觉判断框架 |
 | [prompt-advise](skills/prompt-advise/) | 把模糊需求扩展成几个实质不同的候选 prompt，选定后执行或复制 |

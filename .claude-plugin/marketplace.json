@@ -5,8 +5,8 @@
     {
       "name": "milwaukee-ppt",
       "source": "./skills/milwaukee-ppt",
-      "description": "Milwaukee Tool 工作汇报格式规范 — 输出 NotebookLM Markdown",
-      "version": "0.3.0"
+      "description": "Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式案例库",
+      "version": "0.4.1"
     },
     {
       "name": "pbip-mcp-workflow",
