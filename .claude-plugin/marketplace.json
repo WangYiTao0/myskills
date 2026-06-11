@@ -3,6 +3,12 @@
   "owner": { "name": "WangYiTao" },
   "plugins": [
     {
+      "name": "email-voice",
+      "source": "./skills/email-voice",
+      "description": "工作邮件语气与结构润色 — 按收件人分档、缓冲词限量、请求编号化",
+      "version": "0.1.0"
+    },
+    {
       "name": "milwaukee-ppt",
       "source": "./skills/milwaukee-ppt",
       "description": "Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式案例库",
@@ -29,8 +35,8 @@
     {
       "name": "report-voice",
       "source": "./skills/report-voice",
-      "description": "工作汇报/邮件/公告的务实用词规范 — 剔除浮夸空洞表达",
-      "version": "0.1.0"
+      "description": "工作汇报/公告的务实用词规范 — 剔除浮夸空洞表达（邮件归 email-voice）",
+      "version": "0.2.0"
     },
     {
       "name": "sediment",

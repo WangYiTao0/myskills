@@ -6,11 +6,12 @@ Personal Claude Code plugin marketplace — a collection of custom skills for da
 
 | Skill | Description |
 |-------|-------------|
+| [email-voice](skills/email-voice/) | 工作邮件语气与结构润色 — 按收件人分档、缓冲词限量、请求编号化 |
 | [milwaukee-ppt](skills/milwaukee-ppt/) | Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式目录 |
 | [pbip-mcp-workflow](skills/pbip-mcp-workflow/) | PBIP + powerbi-modeling MCP 安全工作流规则 |
 | [ppt-design-principles](skills/ppt-design-principles/) | 《写给大家看的设计书》CRAP 四原则浓缩版 — PPT 单页视觉判断框架 |
 | [prompt-advise](skills/prompt-advise/) | 把模糊需求扩展成几个实质不同的候选 prompt，选定后执行或复制 |
-| [report-voice](skills/report-voice/) | 工作汇报/邮件/公告的务实用词规范 — 剔除浮夸空洞表达 |
+| [report-voice](skills/report-voice/) | 工作汇报/公告的务实用词规范 — 剔除浮夸空洞表达（邮件归 email-voice） |
 | [sediment](skills/sediment/) | 复盘会话，沉淀经验为 skill / CLAUDE.md 规则 / 记忆 |
 
 每个 skill 的完整说明见对应目录下的 `SKILL.md`。
