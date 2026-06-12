@@ -39,6 +39,12 @@
       "version": "0.2.0"
     },
     {
+      "name": "share-voice",
+      "source": "./skills/share-voice",
+      "description": "培训课件/内部分享文案纪律 — 不吹自己、不贬听众、例子密度（汇报归 report-voice，邮件归 email-voice）",
+      "version": "0.1.0"
+    },
+    {
       "name": "sediment",
       "source": "./skills/sediment",
       "description": "复盘会话，沉淀经验为 skill / CLAUDE.md 规则 / 记忆",
