@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>monogatari-deck 时间轴模板</title>
+<!--
+  monogatari-ppt 时间轴模板(经截屏验证)
+  · 卡组件:.s-koma 黒齣卡 / .s-acc 赤齣卡 / .s-end 設定集白卡 /
+    .s-talk 台词页 / .s-wall 竖排文字墙 / .s-close 特写页 / .s-base 内容页
+  · 动效参数已锁死(频闪/砸词/snap/遮幅/慢推),只许替换文字与素材槽位
+  · 时长不按字数:闪帧自动走,内容页由讲述者按键控制(→/空格逐拍,←回退)
+  · assets/ 字体与纹理自备,见 references/assets-setup.md;缺资产自动降级回退
+-->
+<style>
+:root{
+  --kuro:#0d0d0d; --kome:#f0ede6; --shiro:#ffffff;
+  --gunjo:#25408f; --shu:#d7282d; --chiaka:#b3201f;
+}
+@font-face{font-family:'HGPMinchoB';src:url('assets/HGPMinchoB.woff') format('woff')}
+@font-face{font-family:'MonotypeCorsiva';src:url('assets/MonotypeCorsiva.woff') format('woff')}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#000}
+body{font-family:"Hiragino Mincho ProN","Yu Mincho","Songti SC",serif;cursor:none}
+.display{font-family:'HGPMinchoB',"Hiragino Mincho ProN","Yu Mincho",serif}
+.latin{font-family:'MonotypeCorsiva','Apple Chancery',Georgia,cursive}
+
+.slide{position:absolute;inset:0;display:none;overflow:hidden}
+.slide.on{display:block}
+.inner{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;
+  justify-content:center;padding:8vh 10vw}
+.on .inner{animation:push 14s linear forwards}
+@keyframes push{to{transform:scale(1.05)}}
+
+[data-beat]{visibility:hidden}
+[data-beat].hit{visibility:visible;animation:punch .12s steps(2,end)}
+@keyframes punch{0%{transform:scale(1.3)}100%{transform:scale(1)}}
+.w{visibility:hidden;display:inline-block}
+.w.hit{visibility:visible;animation:punch .1s steps(2,end)}
+.snapped{animation:none!important}
+
+/* 黒齣卡:八拍三色频闪后定格 */
+.s-koma{color:var(--shiro)}
+.s-koma.on{animation:strobe8 .8s steps(1,end) both}
+@keyframes strobe8{
+  0%   {background:var(--chiaka);color:var(--kuro)}
+  12.5%{background:var(--kuro); color:var(--shiro)}
+  25%  {background:var(--shiro);color:var(--kuro)}
+  37.5%{background:var(--kuro); color:var(--shiro)}
+  50%  {background:var(--chiaka);color:var(--shiro)}
+  62.5%{background:var(--kuro); color:var(--shiro)}
+  75%  {background:var(--shiro);color:var(--chiaka)}
+  87.5%,100%{background:var(--kuro);color:var(--shiro)}
+}
+/* 赤齣强调页:黑红互换 + 黒帯压入 */
+.s-acc.on{animation:blink .32s steps(1,end) both}
+@keyframes blink{
+  0%{background:var(--kuro);color:var(--chiaka)}
+  50%{background:var(--chiaka);color:var(--kuro)}
+  75%{background:var(--kuro);color:var(--chiaka)}
+  100%{background:var(--chiaka);color:var(--kuro)}
+}
+.bar{position:absolute;left:0;right:0;height:0;background:var(--kuro);z-index:3}
+.bar.top{top:0}.bar.bot{bottom:0}
+.s-acc.on .bar{animation:barIn .25s steps(3,end) .4s forwards}
+@keyframes barIn{to{height:9vh}}
+
+.tex{position:absolute;inset:0;background-size:cover;background-position:center;
+  pointer-events:none;z-index:0}
+.tex.koma{background-image:url('assets/BakemonogatariStyle.png');mix-blend-mode:screen;opacity:.22}
+.tex.aka{background-image:url('assets/BakemonogatariStyle.png');mix-blend-mode:multiply;opacity:.4}
+.tex.setting{background-image:url('assets/BakemonogatariSetting.png');mix-blend-mode:multiply;opacity:.5}
+.tex.gunjo{background-image:url('assets/BakemonogatariStyle.png');mix-blend-mode:screen;opacity:.14}
+
+.corner{position:absolute;top:5vh;left:6vw;font-size:1.5vh;letter-spacing:.6em;opacity:.7;z-index:2}
+.corner i{display:block;font-family:'MonotypeCorsiva','Apple Chancery',Georgia,cursive;
+  font-style:normal;letter-spacing:.15em;margin-top:.7em;opacity:.75;font-size:1.6vh}
+.pageno{position:absolute;bottom:4.5vh;right:6vw;font-size:1.7vh;
+  letter-spacing:.25em;opacity:.6;z-index:2}
+
+.s-cover{background:var(--kuro);color:var(--shiro)}
+.s-cover h1{font-size:6vh;letter-spacing:.3em}
+.s-cover p{margin-top:4vh;font-size:1.9vh;opacity:.6;letter-spacing:.3em;line-height:2.2}
+.s-cover em{font-style:normal;margin-top:3vh;font-size:1.7vh;opacity:.45;letter-spacing:.2em}
+
+.s-koma .mark{position:absolute;top:5vh;right:6vw;font-size:2vh;
+  letter-spacing:.6em;opacity:.7;z-index:2}
+.s-koma .mid{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;white-space:nowrap}
+.s-koma .mid .main{font-size:34vh;letter-spacing:0;line-height:1}
+.s-koma .mid .sub1{font-size:5.2vh;letter-spacing:-.02em;margin-top:1.2vh;opacity:.92}
+.s-koma .mid .sub2{font-size:4.2vh;letter-spacing:-.02em;margin-top:.4vh;opacity:.85}
+.s-koma .btm{position:absolute;bottom:11vh;left:0;right:0;text-align:center}
+.s-koma .btm .main{font-size:5.4vh;letter-spacing:.65em;text-indent:.65em}
+.s-koma .btm .sub{font-size:2.4vh;letter-spacing:.18em;margin-top:1.6vh;opacity:.6}
+
+.s-base{background:var(--kome);color:var(--kuro)}
+.s-base h2{font-size:4.6vh;font-weight:800;letter-spacing:.12em;margin-bottom:6vh}
+.s-base .line{font-size:2.6vh;line-height:2.4;letter-spacing:.12em}
+.s-base .line.dim{opacity:.6}
+.s-base .verdict{margin-top:6vh;font-size:3.6vh;font-weight:800;letter-spacing:.3em}
+
+/* 特写:怪异单字出血裁切 */
+.s-close{background:var(--kuro);color:var(--shiro)}
+/* 出血特写:上下各裁约 15vh,但字形必须可辨;锚定屏幕中心,宽窗口下不漂移 */
+.s-close .kanji-huge{position:absolute;font-size:130vh;line-height:1;
+  color:var(--chiaka);left:50%;top:50%;transform:translate(-34%,-50%);
+  opacity:.94;z-index:1}
+.s-close .said{position:absolute;left:10vw;bottom:14vh;font-size:4.2vh;
+  font-weight:800;letter-spacing:.3em;z-index:2}
+
+.s-talk{background:var(--kuro);color:var(--shiro)}
+.s-talk .line{font-size:4.4vh;font-weight:700;line-height:2.1;letter-spacing:.18em}
+.s-talk .red{color:var(--shu)}
+
+.s-acc{background:var(--chiaka);color:var(--kuro)}
+.s-acc .top{font-size:4.4vh;letter-spacing:.5em}
+.s-acc .midline{font-size:6vh;letter-spacing:.3em;margin-top:4.5vh}
+.s-acc .big{font-size:12vh;letter-spacing:.35em;margin-top:5.5vh}
+.s-acc .big b{font-weight:normal;display:inline-block}
+
+/* 文字墙:群青整墙,右起左行 */
+.s-wall{background:var(--gunjo);color:var(--shiro)}
+.s-wall .inner{flex-direction:row-reverse;justify-content:flex-start;align-items:stretch;
+  padding:10vh 8vw}
+.s-wall p{writing-mode:vertical-rl;font-size:2.2vh;line-height:2.6;
+  letter-spacing:.28em;margin-left:3.2vw}
+.s-wall p.head{font-size:3.4vh;font-weight:800}
+.s-wall p.shu{color:#ffb3ae}
+.s-wall .tcy{text-combine-upright:all;letter-spacing:0}
+
+.s-end{background:var(--kome);color:var(--kuro)}
+.s-end .mid{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;white-space:nowrap}
+.s-end .mid .top{font-size:4.6vh;letter-spacing:.4em;text-indent:.4em;opacity:.75}
+.s-end .mid .main{font-size:11vh;letter-spacing:.3em;text-indent:.3em;margin-top:3vh}
+.s-end .mid .sub{font-size:3vh;letter-spacing:.1em;margin-top:4vh;opacity:.55}
+.s-end .seal{position:absolute;right:8vw;bottom:10vh;writing-mode:vertical-rl;
+  color:var(--shu);font-size:2.6vh;letter-spacing:.4em;border:1px solid var(--shu);
+  padding:1.6vh .5vw;z-index:2}
+</style>
+</head>
+<body>
+
+<section class="slide s-cover on">
+  <div class="tex koma" style="opacity:.15"></div>
+  <div class="inner">
+    <h1 class="display">monogatari-deck</h1>
+    <p>物语动画 · 风格小样 C(激进档，动画感上限)<br>
+       三色频闪黒齣卡 · 逐词自动连砸 · 黒帯遮幅 · 特写出血 · 整墙浸色</p>
+    <em class="latin">→ / space to advance</em>
+  </div>
+</section>
+
+<section class="slide s-koma display">
+  <div class="tex koma"></div>
+  <div class="inner" style="padding:0">
+    <div class="corner">AI物語<i>ai monogatari</i></div>
+    <div class="mark">黒 齣</div>
+    <div class="mid">
+      <div class="main">凡</div>
+      <div class="sub1 latin">( bon. )</div>
+      <div class="sub2">( 壹 )</div>
+    </div>
+    <div class="btm">
+      <div class="main">閒 談　其 ノ 壹</div>
+      <div class="sub latin">chapter one — chatbox</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide s-base">
+  <div class="tex setting" style="opacity:.45"></div>
+  <div class="corner">壱章 ・ 症状<i>chapter one</i></div>
+  <div class="inner">
+    <h2>「帮我做一份关于 AI 的 PPT。」</h2>
+    <div class="line dim" data-beat>→ 它罗列了十页通用大纲</div>
+    <div class="line dim" data-beat>→ 复制、粘贴、调字体</div>
+    <div class="line dim" data-beat>→ 看着成品，你心想 ——</div>
+    <div class="verdict" data-beat>「 也 就 那 样。」</div>
+  </div>
+  <div class="pageno latin">002 / 007</div>
+</section>
+
+<section class="slide s-close">
+  <div class="tex koma"></div>
+  <div class="kanji-huge display">凡</div>
+  <div class="said" data-beat>病名，凡。</div>
+  <div class="pageno latin">003 / 007</div>
+</section>
+
+<section class="slide s-talk">
+  <div class="tex koma" style="opacity:.16"></div>
+  <div class="corner" style="color:#fff">壱章 ・ 真相<i>the truth</i></div>
+  <div class="inner">
+    <div class="line" data-beat data-cascade>
+      <span class="w">你用的，</span><span class="w">是</span><span class="w">搜索引擎</span><span class="w">的方式</span>
+    </div>
+    <div class="line" data-beat data-cascade><span class="w">在</span><span class="w">使</span><span class="w">唤 ——</span></div>
+    <div class="line" data-beat data-cascade>
+      <span class="w">一个</span><span class="w red">会</span><span class="w red">思</span><span class="w red">考</span><span class="w red">的</span><span class="w red">同</span><span class="w red">事</span><span class="w">。</span>
+    </div>
+  </div>
+  <div class="pageno latin">004 / 007</div>
+</section>
+
+<section class="slide s-acc display">
+  <div class="bar top"></div><div class="bar bot"></div>
+  <div class="tex aka"></div>
+  <div class="inner">
+    <div class="top">同 樣 的 工 具</div>
+    <div class="midline">會用 與 不會用</div>
+    <div class="big"><b data-beat data-snap>差 十 倍</b></div>
+  </div>
+  <div class="pageno latin" style="color:#fff;z-index:4;opacity:.85">005 / 007</div>
+</section>
+
+<section class="slide s-wall">
+  <div class="tex gunjo"></div>
+  <div class="inner" data-beat data-cascade data-int="220">
+    <p class="w head shu display">凡之怪異 ・ 病歴</p>
+    <p class="w">把它当搜索引擎，问一句答一句，答完即走。</p>
+    <p class="w">不给背景，不给样例，不说目的，让它猜。</p>
+    <p class="w">猜错一次，便断言「也就那样」，从此只用它查天气。</p>
+    <p class="w">殊不知同一个对话框里，坐着的是一个读过整个互联网、不会嫌你烦、随叫随到的同事。</p>
+    <p class="w shu">病不在 <span class="tcy">AI</span>，在问法。</p>
+  </div>
+  <div class="pageno latin">006 / 007</div>
+</section>
+
+<section class="slide s-end display">
+  <div class="tex setting"></div>
+  <div class="inner" style="padding:0">
+    <div class="corner">AI物語<i>ai monogatari</i></div>
+    <div class="mid">
+      <div class="top">壹 章 ・ 結</div>
+      <div class="main"><span data-beat data-snap>是 起 點　　非 終 點</span></div>
+      <div class="sub latin" data-beat>chatbox is the starting point</div>
+    </div>
+    <div class="seal">凡 之 怪 異</div>
+  </div>
+  <div class="pageno latin">007 / 007</div>
+</section>
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+let cur=0,timers=[];
+function clearTimers(){timers.forEach(clearTimeout);timers=[]}
+function show(i){
+  clearTimers();
+  slides[cur].classList.remove('on');
+  cur=Math.max(0,Math.min(slides.length-1,i));
+  const s=slides[cur];
+  s.querySelectorAll('[data-beat]').forEach(b=>b.classList.remove('hit'));
+  s.querySelectorAll('.w').forEach(w=>w.classList.remove('hit'));
+  const inner=s.querySelector('.inner');
+  if(inner){inner.classList.remove('snapped');inner.style.transformOrigin='';inner.style.transform=''}
+  s.classList.add('on');
+  if(inner){inner.style.animation='none'; void inner.offsetWidth; inner.style.animation=''}
+}
+function advance(){
+  const s=slides[cur];
+  const beats=[...s.querySelectorAll('[data-beat]:not(.hit)')];
+  if(beats.length){
+    const b=beats[0];
+    if(b.hasAttribute('data-snap')){
+      const inner=s.querySelector('.inner');
+      if(inner){
+        // 先冻结慢推取未变换坐标,再以命中词为原点变焦;
+        // 倍率自适应(宽句自动降倍)+原点钳位:命中词整句留屏,只许四周出血
+        inner.style.animation='none';
+        const r=b.getBoundingClientRect();
+        const pad=24,W=innerWidth,H=innerHeight;
+        const k=Math.max(1.08,Math.min(1.45,(W-2*pad)/r.width,(H-2*pad)/r.height));
+        let ox=(r.left+r.right)/2,oy=(r.top+r.bottom)/2;
+        ox=Math.max((k*r.right-(W-pad))/(k-1),Math.min((k*r.left-pad)/(k-1),ox));
+        oy=Math.max((k*r.bottom-(H-pad))/(k-1),Math.min((k*r.top-pad)/(k-1),oy));
+        inner.style.transformOrigin=ox+'px '+oy+'px';
+        inner.style.transform='scale('+k+')';
+        inner.classList.add('snapped');
+      }
+    }
+    b.classList.add('hit');
+    if(b.hasAttribute('data-cascade')){
+      // 拍内逐词/逐列自动连砸,间隔可由 data-int 覆盖
+      const int=+b.dataset.int||120;
+      [...b.querySelectorAll('.w')].forEach((w,i)=>
+        timers.push(setTimeout(()=>w.classList.add('hit'),i*int)));
+    }
+    return;
+  }
+  if(cur<slides.length-1)show(cur+1);
+}
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();advance()}
+  if(e.key==='ArrowLeft'){e.preventDefault();show(cur-1)}
+});
+addEventListener('click',advance);
+</script>
+</body>
+</html>

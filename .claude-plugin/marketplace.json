@@ -1,6 +1,8 @@
 {
   "name": "myskills",
-  "owner": { "name": "WangYiTao" },
+  "owner": {
+    "name": "WangYiTao"
+  },
   "plugins": [
     {
       "name": "email-voice",
@@ -48,6 +50,12 @@
       "name": "sediment",
       "source": "./skills/sediment",
       "description": "复盘会话，沉淀经验为 skill / CLAUDE.md 规则 / 记忆",
+      "version": "0.1.0"
+    },
+    {
+      "name": "monogatari-ppt",
+      "source": "./skills/monogatari-ppt",
+      "description": "《物语系列》风格演出规范 — 逐帧逆向的硬切/字卡/色彩语义规则 + 文本程式 + 经验证的 HTML 时间轴模板",
       "version": "0.1.0"
     }
   ]

@@ -8,6 +8,7 @@ Personal Claude Code plugin marketplace — a collection of custom skills for da
 |-------|-------------|
 | [email-voice](skills/email-voice/) | 工作邮件语气与结构润色 — 按收件人分档、缓冲词限量、请求编号化 |
 | [milwaukee-ppt](skills/milwaukee-ppt/) | Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式目录 |
+| [monogatari-ppt](skills/monogatari-ppt/) | 《物语系列》风格演出规范 — 逐帧逆向的硬切/字卡/色彩语义规则 + 文本程式 + HTML 时间轴模板 |
 | [pbip-mcp-workflow](skills/pbip-mcp-workflow/) | PBIP + powerbi-modeling MCP 安全工作流规则 |
 | [ppt-design-principles](skills/ppt-design-principles/) | 《写给大家看的设计书》CRAP 四原则浓缩版 — PPT 单页视觉判断框架 |
 | [prompt-advise](skills/prompt-advise/) | 把模糊需求扩展成几个实质不同的候选 prompt，选定后执行或复制 |
