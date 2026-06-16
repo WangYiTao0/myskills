@@ -55,7 +55,13 @@
     {
       "name": "monogatari-ppt",
       "source": "./skills/monogatari-ppt",
-      "description": "《物语系列》风格演出规范 — 逐帧逆向的硬切/字卡/色彩语义规则 + 文本程式 + 经验证的 HTML 时间轴模板",
+      "description": "《物语系列》风格演出规范 — 逐帧逆向的硬切/字卡/色彩语义规则 + 经验证的 HTML 时间轴模板(文本规则见 monogatari-prose)",
+      "version": "0.2.0"
+    },
+    {
+      "name": "monogatari-prose",
+      "source": "./skills/monogatari-prose",
+      "description": "《物语系列》(西尾维新/SHAFT)风格「物语腔」文字程式 — 卡面/台词/独白/三声部句式,只管文字怎么写(视觉归 monogatari-ppt)",
       "version": "0.1.0"
     }
   ]
