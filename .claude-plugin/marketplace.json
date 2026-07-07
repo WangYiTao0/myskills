@@ -63,6 +63,12 @@
       "source": "./skills/monogatari-prose",
       "description": "《物语系列》(西尾维新/SHAFT)风格「物语腔」文字程式 — 卡面/台词/独白/三声部句式,只管文字怎么写(视觉归 monogatari-ppt)",
       "version": "0.1.0"
+    },
+    {
+      "name": "sediment-basin",
+      "source": "./skills/sediment-basin",
+      "description": "经验账本(累积器)— 持久堆积经验、Pattern-Key 去重、成岩阈值(复发≥3×跨2commit×30天)冒泡转正 CLAUDE.md(顾问诊断归 sediment)",
+      "version": "0.1.0"
     }
   ]
 }
