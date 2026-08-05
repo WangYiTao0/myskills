@@ -17,9 +17,9 @@ UI 入口接收注入的引擎/数据源（`run(engine)` 模式），别在 UI �
 
 **webview（pywebview 等）**：demo 脚本加 `--autopilot`：真开窗后在 `on_ready` 钩子里用 `evaluate_js` 逐条断言 DOM（元素数、文案、class、计算样式），走真 js_api 桥触发点击与轮询，断言失败退出码非 0。
 
-## 两个会骗人的陷阱
+## 会骗人的陷阱
 
-1. **截图**：窗口被遮挡/页面不可见时，浏览器冻结渲染帧且 rAF 停摆——截图是动画中途的陈旧帧，看起来像"没渲染"的假 bug。分辨法：读 `document.visibilityState` 与 `getComputedStyle`；给页面留一条**不经 rAF 的同步挂载函数**，自动化验证一律走它。
+1. **隐藏/遮挡窗口三部曲**（同一根因：页面不可见时浏览器降功耗）：①渲染帧冻结——截图是动画中途的陈旧帧，像"没渲染"的假 bug；②rAF 停摆——走 requestAnimationFrame 的挂载/回调压根不执行，querySelector 空手而归；③`setInterval` 被渐进节流——JS 侧定时采样只采到零星几个点。分辨法：读 `document.visibilityState` 与 `getComputedStyle`。对策：给页面留**不经 rAF 的同步挂载函数**；采样/轮询一律由 **Python 侧 `evaluate_js` 驱动**（驱动泵在页面外，不受页面节流管辖），JS 侧定时器只当装饰。
 2. **绿色驱动脚本本身**：按"验证也要自证"的纪律，故意改错一条期望→确认脚本红→改回。没红过的断言不算断言。
 
 ## 报告
