@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# 看一个 GitHub 仓库里的 wayfinder 地图：持续同步快照，同时开着查看器。
+#
+# 快照只读、单向；票只活在 GitHub。后台每 WF_INTERVAL 秒重拉一次，查看器前端自己在
+# 轮询快照的 mtime，所以在 GitHub 上改完票，页面会自己更新，不用重开。
+#
+#   wf-map                    原生窗口，仓库取自当前目录
+#   wf-map serve              浏览器（:7777，改 PORT 可换）
+#   WF_REPO=owner/name wf-map 指定仓库（不在该仓目录下时用）
+#   WF_INTERVAL=10 wf-map     同步间隔，默认 45 秒
+#   WF_ONCE=1 wf-map          只同步一次，不起后台循环
+#   WF_PREFIX=wf: wf-map      label 前缀，默认 wayfinder:
+#
+# 前置：gh 已登录、python3、wayfinder-maps 在 PATH 里。
+
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+sync="$here/wf_sync.py"
+mode="${1:-app}"
+interval="${WF_INTERVAL:-45}"
+
+args=()
+[ -n "${WF_REPO:-}" ] && args+=(--repo "${WF_REPO}")
+[ -n "${WF_PREFIX:-}" ] && args+=(--prefix "${WF_PREFIX}")
+[ -n "${WF_OUT:-}" ] && args+=(--out "${WF_OUT}")
+
+if ! command -v gh >/dev/null; then
+  echo "找不到 gh。装：brew install gh && gh auth login" >&2
+  exit 127
+fi
+if ! command -v wayfinder-maps >/dev/null; then
+  echo "找不到 wayfinder-maps。从 https://github.com/rengwu/wayfinder-maps/releases" >&2
+  echo "下对应平台的包，把二进制放进 PATH（如 ~/.local/bin）。" >&2
+  exit 127
+fi
+
+snapshot="$(python3 "$sync" "${args[@]+"${args[@]}"}" --print-dir)"
+
+# 首次同步是同步的：查看器必须开在已经有内容的目录上，否则只会看到空欢迎页。
+# 退出码 2 = 这个仓库压根没有地图票，那是要告诉人的事实，不是故障。
+echo "从 GitHub 同步…" >&2
+set +e
+python3 "$sync" "${args[@]+"${args[@]}"}"
+rc=$?
+set -e
+if [ "$rc" = 2 ]; then
+  echo "没有地图可看。先用 wayfinder 方法建一张图（一个带 ${WF_PREFIX:-wayfinder:}map 标签的 issue）。" >&2
+  exit 2
+elif [ "$rc" != 0 ]; then
+  exit "$rc"
+fi
+
+# 同步完核对一遍：快照解析不了或有漂移，这里就看得见，不用等界面里发现数字不对
+for effort in "$snapshot"/.plan/*/; do
+  [ -d "$effort" ] || continue
+  if ! wayfinder-maps lint "$effort" >/dev/null 2>&1; then
+    echo "⚠ $(basename "$effort") 有漂移：" >&2
+    wayfinder-maps lint "$effort" >&2 || true
+  fi
+done
+
+sync_pid=""
+if [ -z "${WF_ONCE:-}" ]; then
+  # 后台续拉。同步脚本内容没变就不碰文件，所以静止期不会让页面反复重绘。
+  while sleep "$interval"; do
+    python3 "$sync" "${args[@]+"${args[@]}"}" >/dev/null 2>&1 || true
+  done &
+  sync_pid=$!
+  # 变量名一律加花括号：紧跟其后的中文全角字符会被当成变量名的一部分，
+  # 在 set -u 下直接炸成 unbound variable。
+  echo "后台每 ${interval}s 同步一次（PID ${sync_pid}），关掉查看器即停。" >&2
+fi
+
+# 不能用 exec：exec 会顶掉当前 shell，trap 永远不会跑，后台循环就成了孤儿进程。
+cleanup() {
+  if [ -n "${sync_pid}" ]; then
+    kill "${sync_pid}" 2>/dev/null || true
+    # while 循环当下多半卡在 sleep 上，那是它的子进程，得连着收掉
+    pkill -P "${sync_pid}" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT INT TERM
+
+wayfinder-maps "$mode" "$snapshot"

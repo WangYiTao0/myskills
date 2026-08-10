@@ -69,6 +69,12 @@
       "source": "./skills/sediment-basin",
       "description": "经验账本(累积器)— 持久堆积经验、Pattern-Key 去重、成岩阈值(复发≥3×跨2commit×30天)冒泡转正 CLAUDE.md(顾问诊断归 sediment)",
       "version": "0.1.0"
+    },
+    {
+      "name": "wayfinder-github",
+      "source": "./skills/wayfinder-github",
+      "description": "把存在 GitHub issue 里的 wayfinder 地图画成星图看 — 只读快照喂给 wayfinder-maps 查看器并持续跟随，兼管这套 GitHub adapter 的字段约定(规划方法本身归 wayfinder-maps)",
+      "version": "0.1.0"
     }
   ]
 }
