@@ -71,6 +71,12 @@
       "version": "0.1.0"
     },
     {
+      "name": "dispatch",
+      "source": "./skills/dispatch",
+      "description": "调度台：一个会话当指挥，用 cmux 开窗口派票（按难度自动选 cglm/ckimi/opus/fable）、收工核验、派 Opus 审核代理、关票回填地图、看板交接（start / handoff / resume）",
+      "version": "0.1.0"
+    },
+    {
       "name": "wayfinder-github",
       "source": "./skills/wayfinder-github",
       "description": "把存在 GitHub issue 里的 wayfinder 地图画成星图看 — 只读快照喂给 wayfinder-maps 查看器并持续跟随，兼管这套 GitHub adapter 的字段约定(规划方法本身归 wayfinder-maps)",

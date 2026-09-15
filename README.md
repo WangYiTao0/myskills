@@ -6,6 +6,7 @@ Personal Claude Code plugin marketplace — a collection of custom skills for da
 
 | Skill | Description |
 |-------|-------------|
+| [dispatch](skills/dispatch/) | 调度台 — 一个会话当指挥，cmux 开窗口派票（按难度自动选 cglm/ckimi/opus/fable）、收工核验、Opus 审核、看板交接；换电脑配置见 skills/dispatch/references/setup-new-machine.md |
 | [email-voice](skills/email-voice/) | 工作邮件语气与结构润色 — 按收件人分档、缓冲词限量、请求编号化 |
 | [milwaukee-ppt](skills/milwaukee-ppt/) | Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式目录 |
 | [monogatari-ppt](skills/monogatari-ppt/) | 《物语系列》风格演出规范 — 逐帧逆向的硬切/字卡/色彩语义规则 + HTML 时间轴模板(文本规则见 monogatari-prose) |
