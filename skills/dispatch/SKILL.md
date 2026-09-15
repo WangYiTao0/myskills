@@ -11,7 +11,8 @@ disable-model-invocation: true
 
 > 用法：`/dispatch`（= start）· `/dispatch handoff`（本会话 context 大了，交给新会话）· `/dispatch resume`（新会话接手）
 >
-> 依赖机器上的 cmux / fish 函数 `cglm` `ckimi` / gh / 看板目录，换电脑照 [references/setup-new-machine.md](references/setup-new-machine.md) 装。
+> 依赖机器上的「开窗口」工具（macOS 用 cmux，Windows 用 PowerShell + Windows Terminal）、便宜后端函数 `cglm` `ckimi`（fish 版 / PowerShell 版各一份）、gh、看板目录。
+> 本文件里的 `cmux …` 命令都是 macOS 写法，**Windows 上换成 [references/setup-new-machine.md](references/setup-new-machine.md)「开窗口」表里的等价命令，动作和规矩一样**。
 
 ## 看板文件 = 唯一真源
 
@@ -23,7 +24,7 @@ handoff 时它就是全部交接材料，不用临时整理。格式见 [board-t
 1. 读本仓的进度文件（`HANDOFF.md` 之类）和票据契约（`docs/TRACKER-*.md` 之类，没有就按 GitHub issue 的 `Blocked by:` 行推依赖）。
 2. `ListAgents` 列同仓 peer 会话，逐个 `SendMessage` 问「做哪张票、到哪步、动了哪些目录、有没有未提交」，`notify_when_idle: true`。
 3. `gh issue list --state open` 拉票，算 **frontier**（open + 无 assignee + Blocked by 全 closed）。
-4. 写看板；给用户一张表：在做什么 → 状态 → 等谁。自己的窗口改名带编号：`cmux workspace rename <workspace:id> "调度台 #<n>"`（看板头记着上一个的编号）。**称呼用票号或段名，不用会话编号**（用户面前是窗口，窗口上没有编号）。
+4. 写看板；给用户一张表：在做什么 → 状态 → 等谁。自己的窗口改名带编号：`cmux workspace rename --workspace <workspace:id> --title "调度台 #<n>"`（看板头记着上一个的编号）。**称呼用票号或段名，不用会话编号**（用户面前是窗口，窗口上没有编号）。
 
 ## 派票
 
@@ -45,7 +46,7 @@ cmux read-screen --workspace workspace:<id>      # 起没起来
 拿不准就升一档；票里有「要用户定的点」一律 `fable`。**审核代理只用 `opus` / `fable`**（review-prompt.md 已钉死）。
 `sonnet` 不在表里：机械档的活 GLM / Kimi 接，不占 Anthropic 额度。⚠️ 两个都还没在真票上证明守规矩（出处标记 / 按文件 add / 红阶段停 / 报调度台），第一张真票跑完看这四样，不过关就退回 `opus`。
 
-**`cglm` / `ckimi` 怎么起**：都是 `~/.config/fish/functions/` 里的函数（换 `ANTHROPIC_BASE_URL` + 钉模型 `glm-5.3` / `k3[1m]`，再起 `claude`），
+**`cglm` / `ckimi` 怎么起**：macOS 上是 `~/.config/fish/functions/` 里的函数，Windows 上是 `$PROFILE` 挂的同名 PowerShell 函数（都在 skill 的 `assets/` 里）（换 `ANTHROPIC_BASE_URL` + 钉模型 `glm-5.3` / `k3[1m]`，再起 `claude`），
 `--command "cglm \"\$(cat <提示文件>)\""` 直接换掉 `claude --model …` 那段；起来的会话一样在 `ListAgents` 里、一样收发 `SendMessage`（2026-09-15 两个都验过双向）。
 限制：那种会话里 claude.ai 连接器（MCP connectors）不可用。看板窗口栏写 `(glm)` / `(kimi)`。
 同样的办法可以接别的后端：照 `ckimi.fish` 再写一个函数，表里加一行。
