@@ -59,13 +59,13 @@ cmux read-screen --workspace workspace:<id>      # 起没起来
 
 ## 窗口分组 = 状态看板的侧栏版（[用户 2026-09-16]「把正在执行的窗口放入执行组、待确认组，方便查看」）
 
-cmux 侧栏按状态分三组，**窗口状态一变就挪组**（和重写看板同一时机）：
+cmux 侧栏按状态分三组。**挪组的是窗口自己**（派票提示里写好命令，用 `$CMUX_WORKSPACE_ID` 定位自己），因为「用户在窗口里点头 → 转绿」这一步调度台看不见；调度台只在派票（进执行中）和收到「做完」（进待审核）时挪，并在收到报告时对一遍组。顺手 `cmux workspace status set working|needs-attention|review`，侧栏有对应徽章（lane 取值：todo / working / needs-attention / review / done / auto）：
 
 | 组 | 放什么 | 命令 |
 |---|---|---|
-| 🔧 执行中 | 刚派出、在写代码 / 文档的窗口 | 派票后 `cmux workspace-group add --group <执行中> --workspace workspace:N` |
-| ⏳ 待你确认 | 停在红阶段、等用户看红 / 拍板的窗口 | 窗口报「红阶段停下」→ 挪进来 |
-| 🔍 待审核 / 待关 | 报「做完」、调度台在核 / 审核代理在跑 / 等用户说「关」 | 窗口报「做完」→ 挪进来；关票关窗后自然离开 |
+| 🔧 执行中 | 刚派出、在写代码 / 文档、用户点头后转绿的窗口 | 调度台派票后 add；窗口转绿时自己 add |
+| ⏳ 待你确认 | 停在红阶段、等用户看红 / 拍板的窗口 | 窗口停下时自己 add |
+| 🔍 待审核 / 待关 | 报「做完」、调度台在核 / 审核代理在跑 / 等用户说「关」 | 窗口报「做完」时自己 add；关票关窗后自然离开 |
 
 建组：`cmux workspace-group create --name "🔧 执行中"`（不带 `--from`，cmux 会生成一个空的锚点窗口当组头，别关它）；查组号 `cmux workspace-group list`；挪组 = `add` 到新组（自动离开旧组）；排序 `cmux workspace-group move <组> --after <组>`。
 调度台自己留在用户原来的组里。Windows 没有 cmux 分组，用标签标题前缀 `[执行中]` / `[待确认]` / `[待审核]` 代替（改名 = 用户手动）。
