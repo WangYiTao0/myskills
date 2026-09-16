@@ -52,7 +52,7 @@ cmux read-screen --workspace workspace:<id>      # 起没起来
 同样的办法可以接别的后端：照 `ckimi.fish` 再写一个函数，表里加一行。
 
 提示按 [prompt-template.md](prompt-template.md) 写，五件必有：**票号 + 先读什么** · **只动哪个目录** ·
-**别碰谁的目录**（写出正在并行的票号和它们的目录）· **提交按文件 add，禁 `git add .`** · **做完不关票，`SendMessage` 报调度台**。
+**别碰谁的目录**（写出正在并行的票号和它们的目录）· **提交按文件 add，禁 `git add .`，禁 `--amend` / `reset` / `rebase`**（HEAD 随时是别的窗口的 commit）· **做完不关票，`SendMessage` 报调度台**。
 红阶段要停给用户看的写进去。默认 `--focus false`，不抢用户当前窗口。
 
 派之前查两件事：这张票在 frontier 上；它要动的文件没有别的窗口在动（看板「谁在动哪」一栏）。
