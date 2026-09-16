@@ -43,7 +43,7 @@ cmux read-screen --workspace workspace:<id>      # 起没起来
 | 有判据的实现 | 票面判据清楚、动一两个模块、/tdd 红绿闭环、要做变异 | `opus` |
 | 要拿主意 | 口径没定完（open_questions 多）、要读契约 / 旧线反推、跨段接口、spec / 学习票、要向用户提问 | `fable` |
 
-拿不准就升一档；票里有「要用户定的点」一律 `fable`。**审核代理只用 `opus` / `fable`**（review-prompt.md 已钉死）。
+拿不准就升一档；票里有「要用户定的点」一律 `fable`。**fable 额度紧时整表退一档**：「要拿主意」也派 `opus`，调度台 handoff 也起 `opus`；已开的 fable 窗口进实现阶段前可 `claude --model opus --resume <会话id>` 换模型续同一对话（[用户 2026-09-16]）。**审核代理只用 `opus` / `fable`**（review-prompt.md 已钉死）。
 `sonnet` 不在表里：机械档的活 GLM / Kimi 接，不占 Anthropic 额度。⚠️ 两个都还没在真票上证明守规矩（出处标记 / 按文件 add / 红阶段停 / 报调度台），第一张真票跑完看这四样，不过关就退回 `opus`。
 
 **`cglm` / `ckimi` 怎么起**：macOS 上是 `~/.config/fish/functions/` 里的函数，Windows 上是 `$PROFILE` 挂的同名 PowerShell 函数（都在 skill 的 `assets/` 里）（换 `ANTHROPIC_BASE_URL` + 钉模型 `glm-5.3` / `k3[1m]`，再起 `claude`），
