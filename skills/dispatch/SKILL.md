@@ -57,6 +57,19 @@ cmux read-screen --workspace workspace:<id>      # 起没起来
 
 派之前查两件事：这张票在 frontier 上；它要动的文件没有别的窗口在动（看板「谁在动哪」一栏）。
 
+## 窗口分组 = 状态看板的侧栏版（[用户 2026-09-16]「把正在执行的窗口放入执行组、待确认组，方便查看」）
+
+cmux 侧栏按状态分三组，**窗口状态一变就挪组**（和重写看板同一时机）：
+
+| 组 | 放什么 | 命令 |
+|---|---|---|
+| 🔧 执行中 | 刚派出、在写代码 / 文档的窗口 | 派票后 `cmux workspace-group add --group <执行中> --workspace workspace:N` |
+| ⏳ 待你确认 | 停在红阶段、等用户看红 / 拍板的窗口 | 窗口报「红阶段停下」→ 挪进来 |
+| 🔍 待审核 / 待关 | 报「做完」、调度台在核 / 审核代理在跑 / 等用户说「关」 | 窗口报「做完」→ 挪进来；关票关窗后自然离开 |
+
+建组：`cmux workspace-group create --name "🔧 执行中"`（不带 `--from`，cmux 会生成一个空的锚点窗口当组头，别关它）；查组号 `cmux workspace-group list`；挪组 = `add` 到新组（自动离开旧组）；排序 `cmux workspace-group move <组> --after <组>`。
+调度台自己留在用户原来的组里。Windows 没有 cmux 分组，用标签标题前缀 `[执行中]` / `[待确认]` / `[待审核]` 代替（改名 = 用户手动）。
+
 ## 收工
 
 窗口报「#N 做完，最后 commit x」之后，按顺序：
@@ -65,7 +78,7 @@ cmux read-screen --workspace workspace:<id>      # 起没起来
 2. **审**：派一个 Opus 只读审核代理（[review-prompt.md](review-prompt.md)）：对验收条、自己做变异并还原、结论「可关 / 需修补（哪条）」。审核必须 Opus 级，不用 Sonnet。
 3. **补**：一行字的出处 / 文案瑕疵调度台自己改、单独 commit；要动逻辑的发回原窗口或开新票。
 4. **问**：审核结论写进票评论，给用户一句「可关」，等他回「关」。**关票是用户的动作**。
-5. **关**：`gh issue close --reason completed` · 地图票 `Decisions so far` 加一行 gist · 路线树标已关 · `cmux close-workspace` 关窗口 · 看 frontier 有没有新解锁的票，有就开窗口。
+5. **关**：`gh issue close --reason completed` · 地图票 `Decisions so far` 加一行 gist · 路线树标已关 · `cmux close-workspace` 关窗口 · 看 frontier 有没有新解锁的票，有就开窗口（进「执行中」组）。
 
 关窗口前 `git status --short` 里不能有那个窗口的未提交改动。
 
