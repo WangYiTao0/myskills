@@ -1,6 +1,6 @@
 # 公司母版上的可编辑生成与跨平台方案
 
-研究日期：2026-10-08。研究票：[Question #5](https://github.com/WangYiTao0/myskills/issues/5)；上下文：[map #1](https://github.com/WangYiTao0/myskills/issues/1)。状态：**研究完成，待主助手独立审核；不是技术选型决议，未实现生成器。**
+研究日期：2026-10-08。研究票：[公司母版上的可编辑生成与跨平台方案](https://github.com/WangYiTao0/myskills/issues/5)；上下文：[公司母版 PPT skill：共用布局与项目汇报规则规划](https://github.com/WangYiTao0/myskills/issues/1)。状态：**研究完成，已通过独立内容审核；不是技术选型决议，未实现生成器。**
 
 ## 1. 结论与证据边界
 
@@ -163,7 +163,7 @@ Agent Skills 规格允许 `scripts/ references/ assets/` 与 `compatibility`，�
 
 以下关键来源均在研究日读取；源码链接固定到 tag（SDK README 为研究日 `main`，不把其滚动内容当作 3.0.1 的固定实现）。仓库引用固定到本票基准；在线 docs 会变化，升级版本应重查。
 
-- **R1**：[map #1 的 Destination/Notes](https://github.com/WangYiTao0/myskills/issues/1)；[研究 Question #5](https://github.com/WangYiTao0/myskills/issues/5)。是本任务第一方需求，不是第三方库技术证明。
+- **R1**：[公司母版 PPT skill：共用布局与项目汇报规则规划](https://github.com/WangYiTao0/myskills/issues/1)的 Destination/Notes；[公司母版上的可编辑生成与跨平台方案](https://github.com/WangYiTao0/myskills/issues/5)。是本任务第一方需求，不是第三方库技术证明。
 - **R2**：[仓库 `SKILL.md` §5.0](https://github.com/WangYiTao0/myskills/blob/5f8f4ce0b3a4f1ca7dc52527e0e865a0b08add7a/skills/milwaukee-ppt/SKILL.md#50-模板占位框契约生成-pptx-时必须遵守)，约 L168–196。
 - **R3**：[仓库 `references/layout-patterns.md`](https://github.com/WangYiTao0/myskills/blob/5f8f4ce0b3a4f1ca7dc52527e0e865a0b08add7a/skills/milwaukee-ppt/references/layout-patterns.md)，使用定位与选版速查。
 - **P1**：[python-pptx Working with Presentations](https://python-pptx.readthedocs.io/en/latest/user/presentations.html)，Opening/REALLY opening；已有文件与默认模板、保留未操作内容。
