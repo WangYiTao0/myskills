@@ -1,5 +1,7 @@
 # Before / After 模板使用
 
+用生成器出这一页时（`Layout: before-after`），文稿写法、报错与警告见 `layouts.md` 的 before-after 小节；本文件管槽位几何、事实对应和验收。
+
 ## 来源与边界
 
 - `assets/MS_Template.pptx` 保留原 3 页、原 3 个布局，追加 layout index `3`（`Before / After`）与第 4 页干净样例。
