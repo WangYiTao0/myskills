@@ -1,6 +1,7 @@
 """各版式共用的部件：Context、警告、图片加载、标题填充、底部红条、月份标识，
 以及画原生形状的小工具（取槽位、删形状、等比放图、写带中文字体的 run、去主题样式、
-估算文字宽度和行数）和品牌红、字体名常量。
+估算文字宽度和行数、写“大数字 + 缩小单位”）和品牌红、字体名常量；
+缩进子列表、时间线状态解析和状态色；未实现版式的占位解析 / 渲染。
 
 版式模块只从这里 import，互相之间不 import。"""
 import hashlib
@@ -258,6 +259,31 @@ def add_run(paragraph, text, pt, bold, color):
     return r
 
 
+UNIT_PT = 28                  # 数字后面的单位（件、%、秒…）：28pt 灰色、不加粗
+UNIT_COLOR = "6B6B6B"
+
+# 数值部分：可带 $ + - 前缀，数字、千分位逗号、小数点；后面的全部算单位
+_NUMBER = re.compile(r"^([$+\-]*\d[\d,]*(?:\.\d+)?)\s*(.*)$")
+
+
+def split_number(value):
+    """「120 件」→ ("120", "件")；「-40%」→ ("-40", "%")；不以数值开头 → (原串, "")。"""
+    m = _NUMBER.match(value.strip())
+    return (m.group(1), m.group(2)) if m else (value.strip(), "")
+
+
+def add_number(paragraph, value, pt, color, unit_pt=UNIT_PT, unit_color=UNIT_COLOR):
+    """在段落里写「大数字 + 缩小单位」：数值部分 pt 号加粗、color 色；单位 unit_pt 号灰色
+    不加粗，同一段落所以同一基线。单位前补一个空格（% 紧贴数字）。
+    字段不含数值时整串按大数字写。返回 (数字 run, 单位 run 或 None)。"""
+    number, unit = split_number(value)
+    num_run = add_run(paragraph, number, pt, True, color)
+    if not unit:
+        return num_run, None
+    sep = "" if unit.startswith("%") else " "
+    return num_run, add_run(paragraph, sep + unit, unit_pt, False, unit_color)
+
+
 def fit_picture(slide, path, left, top, width, height):
     """图在矩形内等比缩放、居中，完整显示不裁切（原生图片，不用 insert_picture）。"""
     pic = slide.shapes.add_picture(path, left, top)
@@ -287,3 +313,87 @@ def text_lines(text, pt, width_in):
     if not text:
         return 0
     return max(1, -(-text_width_in(text, pt) // width_in))
+
+
+# ---- 正文行：缩进子列表 ---------------------------------------------------------
+
+_SUB_ITEM = re.compile(r"^[-*+]\s+(.*)$")
+
+
+def sub_item(page, i):
+    """page.lines[i] 是缩进的列表行（`  - 文字`，缩进 ≥1 列）时返回去掉列表符号的文字，
+    否则 None。不缩进的 `- ` 行是本版式的条目行，不算子列表。"""
+    if page.indents[i] <= 0:
+        return None
+    m = _SUB_ITEM.match(page.lines[i])
+    return m.group(1).strip() if m else None
+
+
+# ---- 时间线状态（只用于时间线类版式）---------------------------------------------
+
+DONE, DOING, TODO = "done", "doing", "todo"
+DONE_GREEN = "2E7D32"         # 已完成：深绿，上面的字 / 对勾用白色
+DOING_AMBER = "F2A900"        # 进行中：琥珀，上面的字用深色 DOING_INK
+DOING_INK = "1A1A1A"
+STATUS_COLORS = {DONE: DONE_GREEN, DOING: DOING_AMBER, TODO: BRAND_RED}  # 未完成只描边
+STATUS_LABELS = {DONE: "已完成", DOING: "进行中", TODO: "未完成"}          # 图例文字
+
+_STATUS_WORDS = {"完成": DONE, "已完成": DONE, "done": DONE,
+                 "进行中": DOING, "doing": DOING,
+                 "未完成": TODO, "todo": TODO}
+
+
+def parse_status(text, page, n):
+    """一条的状态值 → DONE / DOING / TODO；空串 → None（没写）。不区分大小写。
+    认不出的值抛 DeckError（含页标题和第 n 条）。"""
+    text = text.strip()
+    if not text:
+        return None
+    st = _STATUS_WORDS.get(text.lower())
+    if st is None:
+        raise DeckError(f"页「{page.title}」第 {n} 条的状态写错了: {text!r}, "
+                        f"可选: 完成 / 进行中 / 未完成 (或 done / doing / todo)")
+    return st
+
+
+def parse_statuses(page, raws, required=False):
+    """一页各条的状态原文（没写为 ""）→ 状态列表；整页都没写且 required=False 时返回 None
+    （旧写法，按黑白灰画）。DeckError（均含页标题）：值写错、只有部分条写了、
+    required=True 却有条没写、“进行中”超过一个。"""
+    sts = [parse_status(raw, page, n) for n, raw in enumerate(raws, start=1)]
+    missing = [n for n, st in enumerate(sts, start=1) if st is None]
+    if len(missing) == len(sts) and not required:
+        return None
+    if missing:
+        need = "每条都必须写状态" if required else "状态要么全写、要么全不写 (部分写了)"
+        raise DeckError(f"页「{page.title}」{need}, 第 {' / '.join(map(str, missing))} 条没写")
+    doing = sts.count(DOING)
+    if doing > 1:
+        raise DeckError(f"页「{page.title}」“进行中”最多一个, 现在 {doing} 个")
+    return sts
+
+
+# ---- 占位实现（版式票落地前用；用它的版式都实现后可删）-----------------------------
+
+# 看起来是“版式内容”而不是一句话结论的行：列表、编号、重点、小节、Caption、
+# 结论要点（> ）、口径（口径： / Source:）
+_STRUCTURED = re.compile(
+    r"^([-*+]\s|\d+[.)、]\s*|!|>|#{3,}\s|caption\s*[:：]|口径\s*[:：]|source\s*[:：])", re.I)
+
+
+def default_parse(page):
+    """占位实现用的解析：结构化的行原样放进 fields["raw"]，其余普通文字行进红条结论。"""
+    raw = []
+    for line in page.lines:
+        if line:
+            (raw if _STRUCTURED.match(line) else page.conclusion).append(line)
+    page.fields = {"raw": raw}
+
+
+def render_stub(prs, page, ctx, layout_index):
+    """未实现版式的占位渲染：用模板对应 layout，只填 idx 0/10，打印“未实现”警告。"""
+    warn(f"页「{page.title}」的版式 {page.layout} 未实现, 只填了标题 (红条与 Tag 照常)")
+    slide = prs.slides.add_slide(prs.slide_layouts[layout_index])
+    fill_titles(slide, page)
+    add_page_chrome(slide, page, ctx)
+    return slide

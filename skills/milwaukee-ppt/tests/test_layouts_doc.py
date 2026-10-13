@@ -13,6 +13,8 @@ DOC = SKILL / "references" / "layouts.md"
 _BLOCK = re.compile(r"^```markdown\n(.*?)^```", re.S | re.M)
 _IMG = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
 _LAYOUT = re.compile(r"(?im)^layout\s*[:：]\s*(\S+)\s*$")
+# 已注册、文档还没写的版式（spec #20 的文档票 #27 补上后清空）
+NOT_YET_DOCUMENTED = {"stats-side", "timeline-phase"}
 
 
 def doc_blocks():
@@ -45,7 +47,8 @@ def test_doc_examples_generate():
     for page in re.split(r"(?m)^# ", md)[1:]:
         m = _LAYOUT.search(page)
         used.add(m.group(1).lower() if m else "evidence")
-    check("layouts.md：示例覆盖全部 6 个版式", used == set(LAYOUT_INDEX), used)
+    want = set(LAYOUT_INDEX) - NOT_YET_DOCUMENTED
+    check(f"layouts.md：示例覆盖全部 {len(want)} 个已写文档的版式", used == want, used)
 
 
 if __name__ == "__main__":
