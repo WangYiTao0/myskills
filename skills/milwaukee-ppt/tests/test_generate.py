@@ -1,51 +1,21 @@
-"""milwaukee-ppt 生成器测试：只走“md 进、pptx 出”这一个切入点。
+"""milwaukee-ppt 生成器整份文稿级测试：封面 / 收尾 / 月报回归 / 通用模式 / Layout 分派 / 报错。
 
+各版式自己的内容检查放在 test_<版式>.py。只走“md 进、pptx 出”这一个切入点。
 纯 Python 脚本，不用 pytest：python3 skills/milwaukee-ppt/tests/test_generate.py
 测试图片用 Pillow 现生成纯色图；文稿内容全部虚构。
 """
-import re
-import subprocess
-import sys
 import tempfile
-import textwrap
-import zipfile
 from pathlib import Path
 
-from pptx import Presentation
-
-SKILL = Path(__file__).resolve().parent.parent
-GENERATOR = SKILL / "scripts" / "generate_ppt.py"
-TEMPLATE = SKILL / "assets" / "MS_Template.pptx"
-EMU = 914400
-BANNER_BOTTOM = EMU          # 母版红 banner 占顶部 1.0"
-FOOTER_TOP = int(7.25 * EMU)  # 母版页脚文本框上沿
-
-FAILS = []
-
-
-def check(name, ok, detail=""):
-    print(("✓ " if ok else "✗ ") + name + ("" if ok else f"  —— {detail}"))
-    if not ok:
-        FAILS.append(name)
-
-
-def make_image(path, size, color):
-    from PIL import Image
-    Image.new("RGB", size, color).save(path)
+from deckcheck import (CAPTION_BOTTOM, CAPTION_MIN_CY, EMU,
+                       TEMPLATE, caption_bar, caption_style_problems,
+                       check, finish, generate, make_image, open_pptx,
+                       out_of_bounds, paragraphs, slide_parts, tag_texts, texts)
 
 
 def run(md_text, workdir, out_name="out.pptx", use_o=True):
-    """写文稿 → 调生成器 → 返回 (退出码, stdout, stderr, Presentation|None)。"""
-    md = Path(workdir) / "deck.md"
-    md.write_text(textwrap.dedent(md_text).lstrip(), encoding="utf-8")
-    cmd = [sys.executable, str(GENERATOR), str(md)]
-    out = Path(workdir) / out_name
-    if use_o:
-        cmd += ["-o", str(out)]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    prs = Presentation(str(out)) if use_o and out.exists() else None
-    return r.returncode, r.stdout, r.stderr, prs
-
+    r = generate(md_text, workdir, out_name=out_name, use_o=use_o)
+    return r.rc, r.stdout, r.stderr, r.prs
 
 # 虚构的旧格式月报（与原月报 md 写法一致，不改一字）
 MONTHLY_MD = """
@@ -78,10 +48,6 @@ First-draft review finished with sample stakeholders.
 Tag: Dec 2025
 Demo pages live; usage tracking enabled.
 """
-
-
-def texts(slide):
-    return [sh.text_frame.text for sh in slide.shapes if sh.has_text_frame]
 
 
 def test_monthly_regression():
@@ -158,25 +124,16 @@ def test_monthly_regression():
                   and badge[0].top >= EMU and badge[0].left > 9 * EMU,
                   (run_.font.color.rgb, run_.font.size, badge[0].top, badge[0].left))
 
-        bad = []
-        for n, s in enumerate(body, start=2):
-            for sh in s.shapes:
-                if sh.is_placeholder and sh.placeholder_format.idx in (0, 10):
-                    continue          # banner 里的标题占位框
-                if not (sh.left >= 0 and sh.left + sh.width <= prs.slide_width
-                        and sh.top >= BANNER_BOTTOM
-                        and sh.top + sh.height <= FOOTER_TOP):
-                    bad.append(f"第{n}页 {sh.name}")
+        bad = out_of_bounds(prs, list(enumerate(body, start=2)))
         check("所有形状在页面内、不压 banner 和页脚", not bad, bad)
-        sample_texts = {t for sl in Presentation(str(TEMPLATE)).slides
+        sample_texts = {t for sl in open_pptx(TEMPLATE).slides
                         for t in texts(sl) if t.strip()}
         leftover = [t for sl in slides for t in texts(sl) if t in sample_texts]
         check("没有残留模板样例页（样例文字不出现）", not leftover, leftover)
-        with zipfile.ZipFile(Path(tmp) / "out.pptx") as z:
-            parts = [n for n in z.namelist()
-                     if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)]
+        parts = slide_parts(Path(tmp) / "out.pptx")
         check("包里的 slide 部件数 = 页数（样例页部件已删）",
               len(parts) == len(slides), parts)
+
 
 def test_errors():
     with tempfile.TemporaryDirectory() as tmp:
@@ -251,58 +208,95 @@ def test_caption_grows_upward():
               (long_bar.top, long_bar.height))
 
 
-# 原月报红条：底边固定在 5379048 + 1097952 EMU，最小高度 1097952，左 155575，宽 11874874
-CAPTION_BOTTOM = 6477000
-CAPTION_MIN_CY = 1097952
-A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+GENERAL_MD = """
+---
+title: Sample Tooling Workshop
+subtitle: Internal Sharing (Mock)
+author: Alex.Sample
+date: 17 Oct 2026
+{closing}
+---
+
+# Why a Generator
+## Writing Slides by Hand Is Slow
+Mock conclusion for the general-mode deck.
+"""
 
 
-def caption_bar(slide):
-    for sh in slide.shapes:
-        if sh.name == "Caption Bar":
-            return sh
-    return None
+def test_general_mode():
+    r = generate(GENERAL_MD.format(closing=""))
+    check("通用模式：退出码 0", r.rc == 0, r.stderr)
+    slides = r.slides
+    check("通用模式无 closing：页数 = 封面 + 1 页（没有收尾页）", len(slides) == 2,
+          [texts(s) for s in slides])
+    if slides:
+        cover = slides[0]
+        check("通用模式封面用 Title Slide", cover.slide_layout.name == "Title Slide",
+              cover.slide_layout.name)
+        check("通用模式封面主标题 = title",
+              cover.placeholders[0].text == "Sample Tooling Workshop",
+              repr(cover.placeholders[0].text))
+        check("通用模式封面副标题 = subtitle 一行 + date author 一行",
+              paragraphs(cover.placeholders[1]) ==
+              ["Internal Sharing (Mock)", "17 Oct 2026   Alex.Sample"],
+              paragraphs(cover.placeholders[1]))
+
+    r = generate(GENERAL_MD.format(closing="closing: Questions?"))
+    slides = r.slides
+    check("通用模式有 closing：最后一页是收尾页、文字 = closing",
+          len(slides) == 3 and slides[-1].slide_layout.name == "Title Slide"
+          and slides[-1].placeholders[0].text == "Questions?",
+          (r.stderr, [texts(s) for s in slides]))
+
+    r = generate("""
+        ---
+        title: Only Title
+        ---
+        # Page
+        Conclusion.
+        """)
+    check("通用模式只写 title 也能生成，副标题为空",
+          r.rc == 0 and r.slides and r.slides[0].placeholders[1].text == "",
+          (r.stderr, [texts(s) for s in r.slides]))
+
+    r = generate("""
+        ---
+        title: Sample Tooling Workshop
+        ---
+        # Page
+        Conclusion.
+        """, use_o=False)
+    check("通用模式不写 -o：按 title 推导文件名",
+          r.rc == 0 and (r.workdir / "Sample Tooling Workshop.pptx").exists(),
+          (r.stderr, sorted(p.name for p in r.workdir.iterdir())))
+
+    r = generate("""
+        ---
+        author: Alex.Sample
+        ---
+        # Page
+        Conclusion.
+        """)
+    check("既没 title 也没 month：非零退出且提示两种模式",
+          r.rc != 0 and "title" in r.stderr and "month" in r.stderr, r.stderr)
 
 
-def tag_texts(slide):
-    """非占位框、非红条的文本框文字（证据页上只有月份标识会是这种）。"""
-    return [sh.text_frame.text for sh in slide.shapes
-            if sh.has_text_frame and not sh.is_placeholder
-            and sh.name != "Caption Bar" and sh.text_frame.text]
+def test_unknown_layout():
+    r = generate("""
+        ---
+        title: Mock Deck
+        ---
+        # Fine Page
+        Fine.
 
-
-def paragraphs(shape):
-    return [p.text for p in shape.text_frame.paragraphs if p.text]
-
-
-def caption_style_problems(sh):
-    el = sh._element
-    out = []
-    if sh.left != 155575 or sh.width != 11874874:
-        out.append(f"x/宽 {sh.left}/{sh.width}")
-    if sh.top + sh.height != CAPTION_BOTTOM:
-        out.append(f"底边 {sh.top + sh.height}")
-    if sh.height < CAPTION_MIN_CY:
-        out.append(f"高 {sh.height} 小于原版")
-    fill = el.find(f".//{{http://schemas.openxmlformats.org/presentationml/2006/main}}spPr/{A}solidFill/{A}srgbClr")
-    if fill is None or fill.get("val") != "DB011C":
-        out.append("底色不是 DB011C")
-    ln = el.find(f".//{A}ln")
-    if ln is None or ln.get("w") != "9525" or ln.find(f"{A}solidFill/{A}schemeClr").get("val") != "tx1":
-        out.append("描边不是 0.75pt 黑")
-    lvl1 = el.find(f".//{A}lstStyle/{A}lvl1pPr")
-    if lvl1 is None:
-        return out + ["缺 lvl1pPr"]
-    if lvl1.find(f"{A}lnSpc/{A}spcPct").get("val") != "150000":
-        out.append("行距不是 150%")
-    if lvl1.find(f"{A}buFont").get("typeface") != "Wingdings" or lvl1.find(f"{A}buChar").get("char") != "v":
-        out.append("项目符号不是 Wingdings ❖")
-    rpr = lvl1.find(f"{A}defRPr")
-    if rpr.get("sz") != "1400" or rpr.find(f"{A}solidFill/{A}schemeClr").get("val") != "bg1":
-        out.append("文字不是白色 14pt")
-    if el.find(f".//{A}bodyPr").get("anchor") != "ctr":
-        out.append("不是垂直居中")
-    return out
+        # Mystery Layout Page
+        Layout: pie-chart
+        Conclusion.
+        """)
+    check("未知 Layout：非零退出", r.rc != 0, r.rc)
+    check("未知 Layout：错误信息含页标题和版式名",
+          "Mystery Layout Page" in r.stderr and "pie-chart" in r.stderr, r.stderr)
+    check("未知 Layout：不生成文件", r.prs is None)
 
 
 def main():
@@ -310,11 +304,9 @@ def main():
     test_errors()
     test_default_output_name()
     test_caption_grows_upward()
-    print()
-    if FAILS:
-        print(f"{len(FAILS)} 项失败")
-        sys.exit(1)
-    print("全部通过")
+    test_general_mode()
+    test_unknown_layout()
+    finish()
 
 
 if __name__ == "__main__":

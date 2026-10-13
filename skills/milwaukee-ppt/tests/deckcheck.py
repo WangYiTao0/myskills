@@ -1,0 +1,215 @@
+"""milwaukee-ppt 测试共用辅助：所有测试只走“md 进、pptx 出”这一个切入点。
+
+各版式测试文件（test_<版式>.py）都 `from deckcheck import *` 后使用：
+
+- generate(md, images=...)      写文稿 + 现生成纯色图 → 调生成器 → Result
+- open_pptx(path)               打开生成结果
+- placeholder(slide, idx)       按 idx 取占位框（没有返回 None）
+- out_of_bounds(prs, slides)    超出页面 / 压 banner / 压页脚的形状
+- red_elements(slide)           用了红色（填充、描边、文字）的形状名
+- caption_bar / tag_texts / paragraphs / caption_style_problems / warnings
+- check(name, ok, detail) 记录结果；finish() 打印汇总并按结果退出
+"""
+import re
+import subprocess
+import sys
+import tempfile
+import textwrap
+from dataclasses import dataclass
+from pathlib import Path
+
+from pptx import Presentation
+
+SKILL = Path(__file__).resolve().parent.parent
+GENERATOR = SKILL / "scripts" / "generate_ppt.py"
+TEMPLATE = SKILL / "assets" / "MS_Template.pptx"
+
+EMU = 914400
+BANNER_BOTTOM = EMU            # 母版红 banner 占顶部 1.0"
+FOOTER_TOP = int(7.25 * EMU)   # 母版页脚文本框上沿
+
+# 原月报红条：底边固定在 5379048 + 1097952 EMU，最小高度 1097952，左 155575，宽 11874874
+CAPTION_BOTTOM = 6477000
+CAPTION_MIN_CY = 1097952
+
+BRAND_RED = "DB011C"
+# 视为“红色”的颜色：品牌红 + 常见纯红/深红，防止有人另起一个红
+RED_COLORS = {BRAND_RED, "FF0000", "C00000", "E3000F", "D0021B", "CC0000"}
+
+LAYOUT_INDEX = {"evidence": 0, "before-after": 3, "process": 4, "stats": 5,
+                "timeline": 6, "image-text": 7}
+
+A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+
+FAILS = []
+
+
+def check(name, ok, detail=""):
+    print(("✓ " if ok else "✗ ") + name + ("" if ok else f"  —— {detail}"))
+    if not ok:
+        FAILS.append(name)
+
+
+def finish():
+    print()
+    if FAILS:
+        print(f"{len(FAILS)} 项失败")
+        sys.exit(1)
+    print("全部通过")
+
+
+def make_image(path, size=(1600, 900), color=(120, 120, 120)):
+    from PIL import Image
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", size, color).save(path)
+
+
+@dataclass
+class Result:
+    rc: int
+    stdout: str
+    stderr: str
+    prs: object        # Presentation 或 None（失败 / 没指定 -o）
+    path: Path         # 输出文件路径（-o 时）
+    workdir: Path
+
+    @property
+    def slides(self):
+        return list(self.prs.slides) if self.prs is not None else []
+
+
+def generate(md_text, workdir=None, images=None, out_name="out.pptx", use_o=True):
+    """写文稿 deck.md → 调生成器 → Result。
+
+    images: {相对路径: (宽, 高)} 或 {相对路径: ((宽, 高), (r, g, b))}，现生成纯色图。
+    workdir 不传时用一个新临时目录（进程结束前不清理，便于调试）。
+    """
+    workdir = Path(workdir or tempfile.mkdtemp(prefix="mppt-test-"))
+    for rel, spec in (images or {}).items():
+        size, color = (spec if isinstance(spec[0], tuple)
+                       else (spec, (120, 120, 120)))
+        make_image(workdir / rel, size, color)
+    md = workdir / "deck.md"
+    md.write_text(textwrap.dedent(md_text).lstrip(), encoding="utf-8")
+    cmd = [sys.executable, str(GENERATOR), str(md)]
+    out = workdir / out_name
+    if use_o:
+        cmd += ["-o", str(out)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    prs = open_pptx(out) if use_o and out.exists() else None
+    return Result(r.returncode, r.stdout, r.stderr, prs, out, workdir)
+
+
+def open_pptx(path):
+    return Presentation(str(path))
+
+
+def placeholder(slide, idx):
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx == idx:
+            return ph
+    return None
+
+
+def texts(slide):
+    return [sh.text_frame.text for sh in slide.shapes if sh.has_text_frame]
+
+
+def warnings(stderr):
+    return [ln for ln in stderr.splitlines() if ln.startswith("警告")]
+
+
+def out_of_bounds(prs, slides, skip_title_placeholders=True):
+    """所有形状须在页面内、不压 banner（顶部 1.0"）和页脚。返回违规的 "第N页 形状名"。
+
+    slides 是 (页码, slide) 序列或 slide 列表；banner 里的 idx 0/10 标题占位框默认跳过。
+    """
+    bad = []
+    for n, s in (slides if slides and isinstance(slides[0], tuple)
+                 else enumerate(slides, start=1)):
+        for sh in s.shapes:
+            if (skip_title_placeholders and sh.is_placeholder
+                    and sh.placeholder_format.idx in (0, 10)):
+                continue
+            if not (sh.left >= 0 and sh.left + sh.width <= prs.slide_width
+                    and sh.top >= BANNER_BOTTOM
+                    and sh.top + sh.height <= FOOTER_TOP):
+                bad.append(f"第{n}页 {sh.name}")
+    return bad
+
+
+def red_elements(slide):
+    """用了红色的形状名（看形状自身 XML 里的 srgbClr：填充、描边、文字都算）。"""
+    out = []
+    for sh in slide.shapes:
+        vals = {e.get("val", "").upper() for e in sh._element.iter(f"{A}srgbClr")}
+        if vals & RED_COLORS:
+            out.append(sh.name)
+    return out
+
+
+def caption_bar(slide):
+    for sh in slide.shapes:
+        if sh.name == "Caption Bar":
+            return sh
+    return None
+
+
+def tag_shape(slide):
+    for sh in slide.shapes:
+        if sh.name == "Month Tag":
+            return sh
+    return None
+
+
+def tag_texts(slide):
+    """非占位框、非红条的文本框文字（证据页上只有月份标识会是这种）。"""
+    return [sh.text_frame.text for sh in slide.shapes
+            if sh.has_text_frame and not sh.is_placeholder
+            and sh.name != "Caption Bar" and sh.text_frame.text]
+
+
+def paragraphs(shape):
+    return [p.text for p in shape.text_frame.paragraphs if p.text]
+
+
+def caption_style_problems(sh):
+    """红条与月报模板固定样式的差异；空列表表示一致。"""
+    el = sh._element
+    out = []
+    if sh.left != 155575 or sh.width != 11874874:
+        out.append(f"x/宽 {sh.left}/{sh.width}")
+    if sh.top + sh.height != CAPTION_BOTTOM:
+        out.append(f"底边 {sh.top + sh.height}")
+    if sh.height < CAPTION_MIN_CY:
+        out.append(f"高 {sh.height} 小于原版")
+    fill = el.find(f".//{P}spPr/{A}solidFill/{A}srgbClr")
+    if fill is None or fill.get("val") != BRAND_RED:
+        out.append("底色不是 DB011C")
+    ln = el.find(f".//{A}ln")
+    if (ln is None or ln.get("w") != "9525"
+            or ln.find(f"{A}solidFill/{A}schemeClr").get("val") != "tx1"):
+        out.append("描边不是 0.75pt 黑")
+    lvl1 = el.find(f".//{A}lstStyle/{A}lvl1pPr")
+    if lvl1 is None:
+        return out + ["缺 lvl1pPr"]
+    if lvl1.find(f"{A}lnSpc/{A}spcPct").get("val") != "150000":
+        out.append("行距不是 150%")
+    if (lvl1.find(f"{A}buFont").get("typeface") != "Wingdings"
+            or lvl1.find(f"{A}buChar").get("char") != "v"):
+        out.append("项目符号不是 Wingdings ❖")
+    rpr = lvl1.find(f"{A}defRPr")
+    if (rpr.get("sz") != "1400"
+            or rpr.find(f"{A}solidFill/{A}schemeClr").get("val") != "bg1"):
+        out.append("文字不是白色 14pt")
+    if el.find(f".//{A}bodyPr").get("anchor") != "ctr":
+        out.append("不是垂直居中")
+    return out
+
+
+def slide_parts(pptx_path):
+    import zipfile
+    with zipfile.ZipFile(pptx_path) as z:
+        return [n for n in z.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)]

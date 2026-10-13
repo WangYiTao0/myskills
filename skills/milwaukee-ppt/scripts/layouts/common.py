@@ -1,4 +1,6 @@
-"""版式渲染层：每种版式一个渲染函数，签名统一为 fn(prs, page, ctx) -> slide。"""
+"""各版式共用的部件：Context、警告、图片加载、标题填充、底部红条、月份标识、占位实现。
+
+版式模块只从这里 import，互相之间不 import。"""
 import hashlib
 import os
 import re
@@ -16,12 +18,9 @@ from pptx.util import Inches, Pt
 
 from mdparse import DeckError
 
-LAYOUT_BODY = 0          # 模板 layout 0「Blank Slide」：idx 0 主标题、idx 10 action title
-
-# 证据页正文区几何（英寸）：banner 占顶部 1.0"，底部留给红条
+# 正文区几何（英寸）：banner 占顶部 1.0"，底部留给红条（各版式槽位见模板 layout 4–7）
 IMG_LEFT, IMG_TOP, IMG_W, IMG_H = 0.56, 1.3, 12.2, 4.3
 IMG_GAP = 0.3
-MAX_IMAGES = 3
 
 # 底部红条：月报模板固定样式，逐项复刻，不要改。
 # 品牌红 DB011C（与 banner 同色）+ 0.75pt 黑描边，白字 ❖（Wingdings）14pt，行距 150%，垂直居中。
@@ -79,7 +78,8 @@ class Context:
     year: str            # Tag 不含年份时补上的年份
 
 
-def _fill_titles(slide, page):
+def fill_titles(slide, page):
+    """主标题进 idx 0、action title 进 idx 10（所有正文版式都有这两个占位框）。"""
     slide.placeholders[0].text = page.title
     if page.action_title:
         slide.placeholders[10].text = page.action_title
@@ -116,56 +116,6 @@ def load_image(ref, ctx, page_title):
     if not os.path.exists(p):
         raise DeckError(f"页「{page_title}」引用的图片不存在: {ref}")
     return p
-
-
-def _cell_widths(files, usable):
-    """多图宽度分配：宽高比差异大时按比例分（宽图多占），否则等分。
-
-    需要 Pillow；没装就等分。下限防最窄图被挤没。"""
-    n = len(files)
-    widths = [usable / n] * n
-    if n < 2:
-        return widths
-    try:
-        from PIL import Image
-    except ImportError:
-        return widths
-    aspects = []
-    for p in files:
-        with Image.open(p) as im:
-            aspects.append(im.width / im.height)
-    if max(aspects) / min(aspects) <= 1.5:
-        return widths
-    floor = 0.28 if n == 2 else 0.22
-    shares = [max(a / sum(aspects), floor) for a in aspects]
-    total = sum(shares)
-    return [usable * s / total for s in shares]
-
-
-def place_images(slide, refs, ctx, page_title):
-    """1–3 张图：各自保持比例、在 cell 内居中；整行按最高图垂直居中。"""
-    if not refs:
-        return
-    if len(refs) > MAX_IMAGES:
-        warn(f"页「{page_title}」有 {len(refs)} 张图, 仅使用前 {MAX_IMAGES} 张")
-        refs = refs[:MAX_IMAGES]
-    files = [load_image(r, ctx, page_title) for r in refs]
-    widths = _cell_widths(files, IMG_W - IMG_GAP * (len(files) - 1))
-
-    placed = []
-    cell_left = IMG_LEFT
-    for p, cell_w in zip(files, widths):
-        pic = slide.shapes.add_picture(p, Inches(cell_left), Inches(IMG_TOP))
-        scale = min(Inches(cell_w) / pic.width, Inches(IMG_H) / pic.height)
-        pic.width = int(pic.width * scale)
-        pic.height = int(pic.height * scale)
-        pic.left = Inches(cell_left) + int((Inches(cell_w) - pic.width) / 2)
-        placed.append(pic)
-        cell_left += cell_w + IMG_GAP
-    row_h = max(pic.height for pic in placed)
-    row_top = Inches(IMG_TOP) + int((Inches(IMG_H) - row_h) / 2)
-    for pic in placed:
-        pic.top = row_top
 
 
 def _next_shape_id(slide):
@@ -242,19 +192,38 @@ def add_month_tag(slide, tag, year):
     return tb
 
 
-def render_evidence(prs, page, ctx):
-    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_BODY])
-    _fill_titles(slide, page)
-    place_images(slide, page.fields.get("images", []), ctx, page.title)
+def add_page_chrome(slide, page, ctx):
+    """所有版式通用的页面装饰：右上月份标识 + 底部红条（结论 / Next）。
+
+    版式渲染函数画完自己的内容后最后调用它，红条叠在最上层。"""
     add_month_tag(slide, page.tag, ctx.year)
     add_caption_bar(slide, page)
+
+
+# 看起来是“版式内容”而不是一句话结论的行：列表、编号、重点、小节、图片、Caption
+_STRUCTURED = re.compile(r"^([-*+]\s|\d+[.)、]\s*|!|#{3,}\s|caption\s*[:：])", re.I)
+
+
+def default_parse(page):
+    """占位实现用的解析：结构化的行原样放进 fields["raw"]，其余普通文字行进红条结论。
+
+    `### 小节` 从标题行起到下一个空行为止都算小节内容（不进红条）。"""
+    raw, in_section = [], False
+    for line in page.lines:
+        if not line:
+            in_section = False
+            continue
+        if line.startswith("###"):
+            in_section = True
+        (raw if in_section or _STRUCTURED.match(line)
+         else page.conclusion).append(line)
+    page.fields = {"raw": raw}
+
+
+def render_stub(prs, page, ctx, layout_index):
+    """未实现版式的占位渲染：用模板对应 layout，只填 idx 0/10，打印“未实现”警告。"""
+    warn(f"页「{page.title}」的版式 {page.layout} 未实现, 只填了标题 (红条与 Tag 照常)")
+    slide = prs.slides.add_slide(prs.slide_layouts[layout_index])
+    fill_titles(slide, page)
+    add_page_chrome(slide, page, ctx)
     return slide
-
-
-RENDERERS = {
-    "evidence": render_evidence,
-}
-
-
-def render(prs, page, ctx):
-    return RENDERERS[page.layout](prs, page, ctx)
