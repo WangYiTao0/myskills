@@ -1,7 +1,9 @@
 """解析层：md 文稿 → 文档模型（frontmatter + 页列表）。
 
-每页是一个 Page：通用字段（主标题、action title、版式名、Tag、结论、Next）
-加上 fields（各版式自己的字段；evidence 版式为 images）。
+本模块只切页、取通用字段（主标题 #、action title ##、Layout:、Tag:、Next:/下一步：），
+其余正文行原样放进 page.lines，再交给 layouts 里对应的版式模块解析成
+page.fields（本版式字段）和 page.conclusion（底部红条结论）。
+新增版式不用改这里。
 """
 import os
 import re
@@ -18,10 +20,11 @@ class Page:
     action_title: str = ""
     layout: str = "evidence"
     tag: str = ""
-    conclusion: list = field(default_factory=list)   # 普通文字行 → 底部红条
+    conclusion: list = field(default_factory=list)   # 普通文字行 → 底部红条（版式模块填）
     next: str = ""
     next_label: str = "Next"
-    fields: dict = field(default_factory=dict)
+    fields: dict = field(default_factory=dict)       # 本版式字段（版式模块填）
+    lines: list = field(default_factory=list)        # 通用字段以外的原始正文行，空行为 ""
 
 
 @dataclass
@@ -46,7 +49,17 @@ def _parse_frontmatter(text):
     return meta, text[m.end():]
 
 
+def is_monthly(meta):
+    """月报模式：有 month 且没有 title。写了 title 就是通用模式。"""
+    return not meta.get("title") and bool(meta.get("month"))
+
+
 def _validate_meta(meta):
+    if meta.get("title"):
+        return                                   # 通用模式：只要 title
+    if not meta.get("month"):
+        raise DeckError("frontmatter 缺少必填项: title（通用模式）"
+                        "或 month + author（月报模式）")
     for req in ("month", "author"):
         if not meta.get(req):
             raise DeckError(f"frontmatter 缺少必填项: {req}")
@@ -71,10 +84,8 @@ def parse(path):
     pages, cur = [], None
     for raw in _strip_comments(body).splitlines():
         line = raw.strip()
-        if not line:
-            continue
         if line.startswith("# "):
-            cur = Page(title=line[2:].strip(), fields={"images": []})
+            cur = Page(title=line[2:].strip())
             pages.append(cur)
             continue
         if cur is None:        # 第一个 # 之前的内容忽略
@@ -82,9 +93,9 @@ def parse(path):
         if line.startswith("## "):
             cur.action_title = line[3:].strip()
             continue
-        img = re.match(r"!\[[^\]]*\]\(([^)]+)\)", line)
-        if img:
-            cur.fields["images"].append(img.group(1).strip())
+        mlayout = re.match(r"(?i)^layout\s*[:：]\s*(.+)$", line)
+        if mlayout:
+            cur.layout = mlayout.group(1).strip().lower()
             continue
         mnext = re.match(r"(?i)^(next|下一步)\s*[:：]\s*(.+)$", line)
         if mnext:
@@ -96,9 +107,12 @@ def parse(path):
         if mtag:
             cur.tag = mtag.group(1).strip()
             continue
-        cur.conclusion.append(line)
+        cur.lines.append(line)
 
     if not pages:
         raise DeckError("md 中没有找到任何页 (以 '# ' 开头的标题)")
+    import layouts            # 延迟导入：layouts 依赖本模块的 Page / DeckError
+    for page in pages:
+        layouts.parse_page(page)
     return Document(meta=meta, pages=pages,
                     source_dir=os.path.dirname(os.path.abspath(path)))
