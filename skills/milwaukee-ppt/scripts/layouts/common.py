@@ -1,7 +1,7 @@
 """各版式共用的部件：Context、警告、图片加载、标题填充、底部红条、月份标识，
 以及画原生形状的小工具（取槽位、删形状、等比放图、写带中文字体的 run、去主题样式、
 估算文字宽度和行数、写“大数字 + 缩小单位”）和品牌红、字体名常量；
-缩进子列表、时间线状态解析和状态色；未实现版式的占位解析 / 渲染。
+缩进子列表、时间线状态解析和状态色。
 
 版式模块只从这里 import，互相之间不 import。"""
 import hashlib
@@ -16,7 +16,8 @@ from xml.sax.saxutils import escape
 from pptx.oxml import parse_xml
 from pptx.oxml.ns import qn
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.shapes import MSO_CONNECTOR
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
 from mdparse import DeckError
@@ -259,29 +260,98 @@ def add_run(paragraph, text, pt, bold, color):
     return r
 
 
-UNIT_PT = 28                  # 数字后面的单位（件、%、秒…）：28pt 灰色、不加粗
+def add_textbox(slide, name, x, y, w, h, anchor=MSO_ANCHOR.TOP, wrap=True):
+    """起好名字、四边内边距 0 的文本框，返回 text_frame（坐标 EMU，可为浮点）。"""
+    tb = slide.shapes.add_textbox(int(x), int(y), int(w), int(h))
+    tb.name = name
+    tf = tb.text_frame
+    tf.word_wrap = wrap
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    tf.vertical_anchor = anchor
+    return tf
+
+
+def add_shape(slide, kind, name, x, y, w, h, fill, line=None, line_pt=None):
+    """扁平自选图形：去主题样式、关阴影，填充 / 描边只用显式颜色（fill 为 None = 无填充，
+    line 为 None = 无描边）。坐标 EMU，可为浮点。"""
+    sp = slide.shapes.add_shape(kind, int(x), int(y), int(w), int(h))
+    sp.name = name
+    strip_theme_style(sp)
+    sp.shadow.inherit = False
+    if fill:
+        sp.fill.solid()
+        sp.fill.fore_color.rgb = RGBColor.from_string(fill)
+    else:
+        sp.fill.background()
+    if line:
+        sp.line.color.rgb = RGBColor.from_string(line)
+        sp.line.width = Pt(line_pt)
+    else:
+        sp.line.fill.background()
+    return sp
+
+
+def add_line(slide, name, x1, y1, x2, y2, color, pt, dash=None):
+    """直线连接线：去主题样式，颜色、线宽（pt）、虚线样式显式给。"""
+    c = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, int(x1), int(y1), int(x2), int(y2))
+    c.name = name
+    strip_theme_style(c)
+    c.line.color.rgb = RGBColor.from_string(color)
+    c.line.width = Pt(pt)
+    if dash is not None:
+        c.line.dash_style = dash
+    return c
+
+
+UNIT_PT = 28                  # 数字前后的小字（约、≥ 这类前缀和件、%、秒这类单位）：28pt 灰色、不加粗
 UNIT_COLOR = "6B6B6B"
 
-# 数值部分：可带 $ + - 前缀，数字、千分位逗号、小数点；后面的全部算单位
-_NUMBER = re.compile(r"^([$+\-]*\d[\d,]*(?:\.\d+)?)\s*(.*)$")
+# 大数字 = 可选的 $ + - 前缀、数字、千分位逗号、小数点，再接数量级后缀（K/M/B/k/m/b/x/X，
+# 后面不能紧跟字母）、+、/数字（24/7、3/5）；数字前可有一个前缀符号（约、~、≈、≥、≤、>、<、
+# +/-、±），连同其后的空白一起作前缀小字。
+_PREFIX = r"(?:约|~|～|≈|≥|≤|>|<|＞|＜|\+/-|±)\s*"
+_NUMBER = re.compile(r"^(" + _PREFIX + r")?"
+                     r"([$+\-]*\d[\d,]*(?:\.\d+)?(?:[KMBkmbxX](?![A-Za-z])|\+|/\d[\d,]*(?:\.\d+)?)*)"
+                     r"(.*)$", re.S)
+# 算单位的尾巴：% 或 CJK 开头（前面可有空白），或空白后面的英文单词；空白原样保留
+_UNIT = re.compile(r"^(\s*[%\u2E80-\uFFFF]|\s+[A-Za-z])")
 
 
 def split_number(value):
-    """「120 件」→ ("120", "件")；「-40%」→ ("-40", "%")；不以数值开头 → (原串, "")。"""
-    m = _NUMBER.match(value.strip())
-    return (m.group(1), m.group(2)) if m else (value.strip(), "")
+    """拆成 (前缀, 大数字, 单位)，三段拼起来等于去掉首尾空白的原文（不补、不删空白）：
+
+    「120 件」→ ("", "120", " 件")；「120件」→ ("", "120", "件")；「≥95%」→ ("≥", "95", "%")；
+    「约 5 天」→ ("约 ", "5", " 天")；「24/7」「12.3M」「1,000+」「5x」整个是大数字；
+    「Q3」「N/A」这类不以（前缀 +）数字开头的 → ("", 原文, "")。
+    数字后面的尾巴只有 % / CJK 开头、或空白 + 英文单词时才算单位，否则并进大数字。"""
+    v = value.strip()
+    m = _NUMBER.match(v)
+    if not m:
+        return "", v, ""
+    prefix, number, rest = m.group(1) or "", m.group(2), m.group(3)
+    if rest and not _UNIT.match(rest):
+        number, rest = number + rest, ""
+    return prefix, number, rest
+
+
+def number_width_in(value, pt, unit_pt=UNIT_PT, width=None):
+    """「前缀 + 大数字 + 单位」一行的宽度估算（英寸）：大数字按 pt、前缀和单位按 unit_pt 量。
+    width(text, pt) 是量宽函数，默认 text_width_in。"""
+    width = width or text_width_in
+    prefix, number, unit = split_number(value)
+    return width(number, pt) + (width(prefix + unit, unit_pt) if prefix or unit else 0)
 
 
 def add_number(paragraph, value, pt, color, unit_pt=UNIT_PT, unit_color=UNIT_COLOR):
-    """在段落里写「大数字 + 缩小单位」：数值部分 pt 号加粗、color 色；单位 unit_pt 号灰色
-    不加粗，同一段落所以同一基线。单位前补一个空格（% 紧贴数字）。
-    字段不含数值时整串按大数字写。返回 (数字 run, 单位 run 或 None)。"""
-    number, unit = split_number(value)
+    """在段落里写「前缀 + 大数字 + 单位」（拆法见 split_number）：大数字 pt 号加粗、color 色；
+    前缀和单位 unit_pt 号灰色不加粗；同一段落所以同一基线。空白照原文，不补空格。
+    返回 (数字 run, 单位 run 或 None)；有前缀时前缀 run 在数字 run 之前。"""
+    prefix, number, unit = split_number(value)
+    if prefix:
+        add_run(paragraph, prefix, unit_pt, False, unit_color)
     num_run = add_run(paragraph, number, pt, True, color)
-    if not unit:
-        return num_run, None
-    sep = "" if unit.startswith("%") else " "
-    return num_run, add_run(paragraph, sep + unit, unit_pt, False, unit_color)
+    unit_run = add_run(paragraph, unit, unit_pt, False, unit_color) if unit else None
+    return num_run, unit_run
 
 
 def fit_picture(slide, path, left, top, width, height):
@@ -329,6 +399,49 @@ def sub_item(page, i):
     return m.group(1).strip() if m else None
 
 
+# ---- 条目行：! 重点标记、数据卡片（stats 类版式）------------------------------------
+
+def key_mark(body, page):
+    """条目正文开头的 `!`（重点 / 关键里程碑）：`!文字` → (True, 文字)，没写 → (False, 原文)。
+    `!` 后的空白一并去掉；只认一个 `!`，写成 `!!` 抛 DeckError，不把多出来的 ! 当成文字。"""
+    if not body.startswith("!"):
+        return False, body
+    rest = body[1:].lstrip()
+    if rest.startswith("!"):
+        raise DeckError(f"页「{page.title}」的条目开头只写一个 ! 标重点, 现在写了多个: {body}")
+    return True, rest
+
+
+LIST_ITEM = re.compile(r"^[-*+]\s+(.*)$")         # 不缩进的列表行：条目
+SOURCE_LINE = re.compile(r"^(口径|source)\s*[:：]", re.I)   # 口径行
+
+
+def parse_stat_card(page, line):
+    """数据卡片行「- [!]标签 | 数字 | 一句说明」→ {"label", "value", "note", "key"}；
+    不是列表行返回 None（由版式决定进红条还是别的）。DeckError：三段不全；
+    重点条漏写列表符号（`!标签 | …`，别悄悄进红条）；`!!`。"""
+    m = LIST_ITEM.match(line)
+    if not m:
+        if line.startswith("!") and "|" in line:
+            raise DeckError(f"页「{page.title}」的重点数据条要以列表符号开头, "
+                            f"写成「- !标签 | 数字 | 一句说明」: {line}")
+        return None
+    key, body = key_mark(m.group(1), page)
+    parts = [x.strip() for x in body.split("|")]
+    if len(parts) != 3 or not all(parts):
+        raise DeckError(f"页「{page.title}」的数据条目要写成「标签 | 数字 | 一句说明」: {line}")
+    return {"label": parts[0], "value": parts[1], "note": parts[2], "key": key}
+
+
+def check_stat_cards(page, items, lo, hi):
+    """卡片条数在 lo–hi 之间、最多一条标 ! 重点，否则抛 DeckError。"""
+    if not lo <= len(items) <= hi:
+        raise DeckError(f"页「{page.title}」的数据条目要 {lo}–{hi} 条, 现在 {len(items)} 条")
+    keys = sum(it["key"] for it in items)
+    if keys > 1:
+        raise DeckError(f"页「{page.title}」最多一条数据标 ! 重点, 现在 {keys} 条")
+
+
 # ---- 时间线状态（只用于时间线类版式）---------------------------------------------
 
 DONE, DOING, TODO = "done", "doing", "todo"
@@ -337,6 +450,14 @@ DOING_AMBER = "F2A900"        # 进行中：琥珀，上面的字用深色 DOING
 DOING_INK = "1A1A1A"
 STATUS_COLORS = {DONE: DONE_GREEN, DOING: DOING_AMBER, TODO: BRAND_RED}  # 未完成只描边
 STATUS_LABELS = {DONE: "已完成", DOING: "进行中", TODO: "未完成"}          # 图例文字
+KEY_LABEL = "关键里程碑"                                                   # 图例第 4 项
+
+# 状态图例：一行右对齐，每项 = 图形 + 灰色小字
+LEGEND_H = 0.26               # 一行高
+LEGEND_GAP_IN = 0.08          # 图形 → 文字
+LEGEND_GAP_OUT = 0.3          # 项与项之间
+LEGEND_TEXT_PAD = 0.1         # 文字框比估算宽度多留的余量（默认），防止估算偏小时被裁
+LEGEND_STYLE = (12, False, "6B6B6B")
 
 _STATUS_WORDS = {"完成": DONE, "已完成": DONE, "done": DONE,
                  "进行中": DOING, "doing": DOING,
@@ -373,27 +494,22 @@ def parse_statuses(page, raws, required=False):
     return sts
 
 
-# ---- 占位实现（版式票落地前用；用它的版式都实现后可删）-----------------------------
+def add_legend(slide, right, top, entries, text_pad=LEGEND_TEXT_PAD):
+    """时间线类版式的状态图例：一行、右端对齐到 right，上沿 top（EMU）。
 
-# 看起来是“版式内容”而不是一句话结论的行：列表、编号、重点、小节、Caption、
-# 结论要点（> ）、口径（口径： / Source:）
-_STRUCTURED = re.compile(
-    r"^([-*+]\s|\d+[.)、]\s*|!|>|#{3,}\s|caption\s*[:：]|口径\s*[:：]|source\s*[:：])", re.I)
-
-
-def default_parse(page):
-    """占位实现用的解析：结构化的行原样放进 fields["raw"]，其余普通文字行进红条结论。"""
-    raw = []
-    for line in page.lines:
-        if line:
-            (raw if _STRUCTURED.match(line) else page.conclusion).append(line)
-    page.fields = {"raw": raw}
-
-
-def render_stub(prs, page, ctx, layout_index):
-    """未实现版式的占位渲染：用模板对应 layout，只填 idx 0/10，打印“未实现”警告。"""
-    warn(f"页「{page.title}」的版式 {page.layout} 未实现, 只填了标题 (红条与 Tag 照常)")
-    slide = prs.slides.add_slide(prs.slide_layouts[layout_index])
-    fill_titles(slide, page)
-    add_page_chrome(slide, page, ctx)
-    return slide
+    entries = [(图形占位宽（英寸）, draw, 文字)...]，draw(name, cx, cy) 以 (cx, cy) 为中心画图形；
+    第 n 项的图形叫 `Legend Icon n`（draw 收到这个名字；图形上另加的形状也带编号 n，
+    如 `Legend Check 1`），文字框叫 `Legend Label n`。text_pad：文字框比估算宽度多留的余量（英寸）。"""
+    gap_in, gap_out = Inches(LEGEND_GAP_IN), Inches(LEGEND_GAP_OUT)
+    slots = [Inches(w) for w, _, _ in entries]
+    text_w = [Inches(text_width_in(label, LEGEND_STYLE[0]) + text_pad)
+              for _, _, label in entries]
+    x = right - sum(sw + gap_in + tw for sw, tw in zip(slots, text_w)) - gap_out * (len(entries) - 1)
+    h = Inches(LEGEND_H)
+    cy = top + h // 2
+    for n, ((_, draw, label), sw, tw) in enumerate(zip(entries, slots, text_w), start=1):
+        draw(f"Legend Icon {n}", x + sw // 2, cy)
+        tf = add_textbox(slide, f"Legend Label {n}", x + sw + gap_in, top, tw, h,
+                         MSO_ANCHOR.MIDDLE, wrap=False)
+        add_run(tf.paragraphs[0], label, *LEGEND_STYLE)
+        x += sw + gap_in + tw + gap_out

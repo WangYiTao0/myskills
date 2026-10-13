@@ -13,13 +13,12 @@
 字段：fields = {"items": [{"label", "value", "note", "key"}...], "points": [...],
 "source": str 或 None, "heading": str}
 渲染：槽位 idx 18 左侧 6.0" 竖排横卡（浅灰底），卡内大数字（单位缩小）在左、标签和说明在右；
-右侧是结论区：小标题、细分隔线、编号要点，口径贴底。几何以原型第 3 页为参照。
+右侧是结论区：小标题、细分隔线、编号要点，口径贴底。几何见 Spec #20 和 references/layouts.md。
 形状名：Side Card N、Side Accent N（只有重点卡）、Side Number N、Side Text N、
 Side Conclusion Title、Side Conclusion Rule、Side Points、Stat Source。
 """
 import re
 
-from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
@@ -27,17 +26,18 @@ from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (BRAND_RED, UNIT_PT, add_number, add_page_chrome, add_run, fill_titles,
-                     split_number, strip_theme_style, sub_item, take_slot,
-                     text_lines, text_width_in, warn)
+from .common import (BRAND_RED, LATIN_FONT, add_number, add_page_chrome, add_run, add_shape,
+                     SOURCE_LINE, add_textbox, check_stat_cards, fill_titles, number_width_in,
+                     parse_stat_card, sub_item, take_slot, text_lines, warn)
 
 NAME = "stats-side"
 LAYOUT_INDEX = 5
+MARK_SHAPE = "Side Card 1"   # 和 stats 共用模板 layout 5：inspect_ppt 凭这个形状认出本版式
 SLOT_IDX = 18
 MIN_ITEMS, MAX_ITEMS = 2, 3
 MAX_POINTS = 4
 
-# 几何（英寸，原型第 3 页）
+# 几何（英寸，Spec #20 定稿，见 references/layouts.md「stats-side」）
 LEFT_W = 6.0              # 左侧卡片列宽
 CARD_GAP = 0.3            # 卡片竖向间距
 ACCENT_W = 0.06           # 重点卡左侧红竖条
@@ -65,10 +65,8 @@ POINT_SPACE_PT = 14       # 要点段前距
 POINT_LINE = 1.15         # 要点行距倍数
 SOURCE_H = 0.5            # 口径框高（文字贴底）
 
-_ITEM = re.compile(r"^[-*+]\s+(!?)\s*(.*)$")
 _POINT = re.compile(r"^>\s*(.*)$")
 _HEADING = re.compile(r"^###\s+(.*)$")
-_SOURCE = re.compile(r"^(口径|source)\s*[:：]", re.I)
 
 
 def parse(page):
@@ -88,25 +86,16 @@ def parse(page):
                 points.append(point.group(1).strip())
         elif heading:
             headings.append(heading.group(1).strip())
-        elif _SOURCE.match(line):
+        elif SOURCE_LINE.match(line):
             sources.append(line)
-        elif _ITEM.match(line):
-            m = _ITEM.match(line)
-            parts = [x.strip() for x in m.group(2).split("|")]
-            if len(parts) != 3 or not all(parts):
-                err(f"的数据条目要写成「标签 | 数字 | 一句说明」: {line}")
-            items.append({"label": parts[0], "value": parts[1], "note": parts[2],
-                          "key": bool(m.group(1))})
-        elif line.startswith("!") and "|" in line:     # 重点条漏写列表符号，别悄悄进红条
-            err(f"的重点数据条要以列表符号开头, 写成「- !标签 | 数字 | 一句说明」: {line}")
         else:
-            page.conclusion.append(line)
+            card = parse_stat_card(page, line)
+            if card is None:
+                page.conclusion.append(line)
+            else:
+                items.append(card)
 
-    if not MIN_ITEMS <= len(items) <= MAX_ITEMS:
-        err(f"的数据条目要 {MIN_ITEMS}–{MAX_ITEMS} 条, 现在 {len(items)} 条")
-    keys = sum(it["key"] for it in items)
-    if keys > 1:
-        err(f"最多一条数据标 ! 重点, 现在 {keys} 条")
+    check_stat_cards(page, items, MIN_ITEMS, MAX_ITEMS)
     if not points:
         err("缺少结论要点, 用 `> ` 开头的行写 1–4 条")
     if len(points) > MAX_POINTS:
@@ -121,42 +110,23 @@ def parse(page):
 
 
 def _shape(slide, name, x, y, w, h, fill):
-    sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Emu(x), Emu(y), Emu(w), Emu(h))
-    sp.name = name
-    strip_theme_style(sp)          # 去掉主题样式引用：LibreOffice 会按它补阴影
-    sp.shadow.inherit = False
-    sp.fill.solid()
-    sp.fill.fore_color.rgb = RGBColor.from_string(fill)
-    sp.line.fill.background()
+    sp = add_shape(slide, MSO_SHAPE.RECTANGLE, name, x, y, w, h, fill)
     sp.text_frame.paragraphs[0].alignment = PP_ALIGN.LEFT   # add_shape 默认居中
     return sp
 
 
-def _box(slide, name, x, y, w, h, anchor=MSO_ANCHOR.TOP, wrap=True):
-    tb = slide.shapes.add_textbox(Emu(x), Emu(y), Emu(w), Emu(h))
-    tb.name = name
-    tf = tb.text_frame
-    tf.word_wrap = wrap
-    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
-    tf.vertical_anchor = anchor
-    return tf
-
-
-def _number_width_in(value, pt):
-    number, unit = split_number(value)
-    return text_width_in(number, pt) + (text_width_in(" " + unit, UNIT_PT) if unit else 0)
-
-
 def _number_size(items, title):
-    """所有大数字共用一个字号：60pt 放不下最长的那个时统一缩小（整数 pt），并警告。"""
+    """所有大数字共用一个字号：60pt 放不下最长的那个时统一缩小（整数 pt），并警告。
+    宽度用 common.number_width_in（通用口径）。stats 的同名函数用自己的逐字宽表，
+    口径不同是有意的，原因见 scripts/README.md「估算」。"""
     def fits(pt):
-        return all(_number_width_in(it["value"], pt) <= NUM_W for it in items)
+        return all(number_width_in(it["value"], pt) <= NUM_W for it in items)
 
     pt = NUMBER_PT
     while pt > NUMBER_MIN_PT and not fits(pt):
         pt -= 1
     if pt < NUMBER_PT:
-        longest = max(items, key=lambda it: _number_width_in(it["value"], NUMBER_PT))["value"]
+        longest = max(items, key=lambda it: number_width_in(it["value"], NUMBER_PT))["value"]
         tail = "" if fits(pt) else " 仍可能放不下, 建议缩短数字"
         warn(f"页「{title}」数字「{longest}」在 {NUMBER_PT}pt 放不下, "
              f"大数字已统一缩小到 {pt}pt{tail}")
@@ -180,10 +150,10 @@ def _cards(slide, items, left, top, height, title):
         _shape(slide, f"Side Card {i}", left, y, card_w, card_h, CARD_FILL)
         if it["key"]:
             _shape(slide, f"Side Accent {i}", left, y, Inches(ACCENT_W), card_h, BRAND_RED)
-        tf = _box(slide, f"Side Number {i}", left + Inches(NUM_X), y, Inches(NUM_W), card_h,
+        tf = add_textbox(slide, f"Side Number {i}", left + Inches(NUM_X), y, Inches(NUM_W), card_h,
                   MSO_ANCHOR.MIDDLE, wrap=False)
         add_number(tf.paragraphs[0], it["value"], number_pt, BRAND_RED if it["key"] else INK)
-        tf = _box(slide, f"Side Text {i}", left + Inches(TEXT_X), y,
+        tf = add_textbox(slide, f"Side Text {i}", left + Inches(TEXT_X), y,
                   card_w - Inches(TEXT_X + TEXT_PAD_R), card_h, MSO_ANCHOR.MIDDLE)
         add_run(tf.paragraphs[0], it["label"], LABEL_PT, True, INK)
         p = tf.add_paragraph()
@@ -199,18 +169,18 @@ def _numbered(paragraph, pt):
     clr = pPr.makeelement(qn("a:buClr"), {})
     clr.append(clr.makeelement(qn("a:srgbClr"), {"val": GRAY}))
     pPr.append(clr)
-    pPr.append(pPr.makeelement(qn("a:buFont"), {"typeface": "Arial"}))
+    pPr.append(pPr.makeelement(qn("a:buFont"), {"typeface": LATIN_FONT}))
     pPr.append(pPr.makeelement(qn("a:buAutoNum"), {"type": "arabicPlain"}))
 
 
 def _conclusion(slide, fields, x, top, w, bottom, title):
-    tf = _box(slide, "Side Conclusion Title", x, top, w, Inches(HEADING_H))
+    tf = add_textbox(slide, "Side Conclusion Title", x, top, w, Inches(HEADING_H))
     add_run(tf.paragraphs[0], fields["heading"], HEADING_PT, True, INK)
     _shape(slide, "Side Conclusion Rule", x, top + Inches(RULE_Y), w, Pt(1), RULE_COLOR)
 
     points_top = top + Inches(POINTS_Y)
     points_bottom = bottom - (Inches(SOURCE_H) if fields["source"] else 0)
-    tf = _box(slide, "Side Points", x, points_top, w, points_bottom - points_top)
+    tf = add_textbox(slide, "Side Points", x, points_top, w, points_bottom - points_top)
     text_w_in = Emu(w).inches - POINT_PT * 1.4 / 72        # 去掉悬挂缩进
     need = (sum(text_lines(t, POINT_PT, text_w_in) for t in fields["points"])
             * POINT_PT * LINE * POINT_LINE
@@ -228,7 +198,7 @@ def _conclusion(slide, fields, x, top, w, bottom, title):
     if fields["source"]:
         if text_lines(fields["source"], SOURCE_PT, Emu(w).inches) * SOURCE_PT * LINE / 72 > SOURCE_H:
             warn(f"页「{title}」的口径估计放不下, 建议缩短到两行以内")
-        tf = _box(slide, "Stat Source", x, bottom - Inches(SOURCE_H), w, Inches(SOURCE_H),
+        tf = add_textbox(slide, "Stat Source", x, bottom - Inches(SOURCE_H), w, Inches(SOURCE_H),
                   MSO_ANCHOR.BOTTOM)
         add_run(tf.paragraphs[0], fields["source"], SOURCE_PT, False, GRAY)
 

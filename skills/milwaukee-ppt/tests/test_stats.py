@@ -120,7 +120,7 @@ def test_column_text_hierarchy():
 
 
 def test_number_unit_split():
-    """数值 60pt 加粗，后面的单位是独立 run：28pt 灰色不加粗；% 紧贴，其余单位前空一格。"""
+    """数值 60pt 加粗，后面的单位是独立 run：28pt 灰色不加粗；数值和单位之间的空白照原文。"""
     r = generate(stats_md(["- A | 120 件 | Mock", "- !B | 100% | Mock",
                            "- C | 15 秒 | Mock", "- D | 42 | Mock"]))
     s = body_slide(r)
@@ -181,6 +181,10 @@ def test_errors():
                            "  - P1", "  - P2", "  - P3", "  - P4"], title=bad_title))
     check("stats 报错（解读 4 条）：非零退出、含页标题和卡片标签、不出文件",
           deck_error(r, bad_title, "Busy card", "3") and not r.path.exists(), (r.rc, r.stderr))
+    # 写了两个 !：报错，不把多出来的 ! 当成标签文字
+    r = generate(stats_md(["- !!A | 1 | Mock", "- B | 2 | Mock"], title=bad_title))
+    check("stats 报错（!! 两个叹号）：非零退出、含页标题和 !!",
+          deck_error(r, bad_title, "!!") and not r.path.exists(), (r.rc, r.stderr))
     # 重点行漏写列表符号：不能悄悄当成红条结论
     r = generate(stats_md(["!Rework | -40% | Mock", "- B | 2 | Mock", "- C | 3 | Mock"],
                           title=bad_title))

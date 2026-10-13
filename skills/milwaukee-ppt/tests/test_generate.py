@@ -4,13 +4,14 @@
 纯 Python 脚本，不用 pytest：python3 skills/milwaukee-ppt/tests/test_generate.py
 测试图片用 Pillow 现生成纯色图；文稿内容全部虚构。
 """
+import hashlib
 import tempfile
 from pathlib import Path
 
 from deckcheck import (CAPTION_BOTTOM, CAPTION_MIN_CY, EMU,
                        TEMPLATE, caption_bar, caption_style_problems,
                        check, finish, generate, make_image, open_pptx,
-                       out_of_bounds, paragraphs, slide_parts, tag_texts, texts)
+                       out_of_bounds, paragraphs, slide_parts, slide_xmls, tag_texts, texts)
 
 
 def run(md_text, workdir, out_name="out.pptx", use_o=True):
@@ -50,6 +51,16 @@ Demo pages live; usage tracking enabled.
 """
 
 
+# master（e282570，spec #20 之前）生成的月报各页 slide XML 的 sha256：月报模式输出逐字节不变
+MONTHLY_SHA = {
+    "ppt/slides/slide1.xml": "43ca9a136863becb59a2fa62626f02d164562d73d271987f5a2cbd8cba1cce18",
+    "ppt/slides/slide2.xml": "8297b0099acca23a38f66b67321a6531ea0074a74f7c28a694404363a123852d",
+    "ppt/slides/slide3.xml": "db33c0fbbac2b9e2cb367187f816177008c19fc4b2a65e35867621ec84dfcc2e",
+    "ppt/slides/slide4.xml": "998adce441bae648cf59df78099275c22b821f8ad7fd678a87ea224765f63ccd",
+    "ppt/slides/slide5.xml": "c89c199746d67277afa243eb1dacce8f26093c0b3b40e070e0d1a869532e1f46",
+}
+
+
 def test_monthly_regression():
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "img").mkdir()
@@ -58,6 +69,11 @@ def test_monthly_regression():
         make_image(Path(tmp) / "img" / "square.png", (800, 800), (60, 60, 60))
         rc, _, err, prs = run(MONTHLY_MD, tmp)
         check("月报：退出码 0", rc == 0, err)
+        out = Path(tmp) / "out.pptx"
+        got = ({n: hashlib.sha256(x).hexdigest() for n, x in slide_xmls(out).items()}
+               if out.exists() else {})
+        check("月报：各页 slide XML 与 master 逐字节一致", got == MONTHLY_SHA,
+              sorted(n for n in set(got) | set(MONTHLY_SHA) if got.get(n) != MONTHLY_SHA.get(n)))
         if prs is None:
             check("月报：生成了 pptx", False, err)
             return

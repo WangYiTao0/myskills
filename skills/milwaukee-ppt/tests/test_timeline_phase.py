@@ -5,11 +5,11 @@
 日期在段上方、标记 / 说明在段下方；关键里程碑与普通节点标记不同；图例图形与段对应；
 缺状态 / 多个进行中 / 状态写错 / 条数超限报错；文字溢出警告；红色只在未完成段和红条。
 """
-from deckcheck import (CONTENT_SLOT_IN, DOING_AMBER, DOING_INK, DONE_GREEN, LAYOUT_INDEX,
-                       BRAND_RED, body_slide, caption_bar, caption_style_problems, check,
-                       deck_error, fill_color, finish, generate, geometry, inside,
-                       line_color, out_of_bounds, paragraphs, placeholder, red_elements,
-                       run_style, shapes_named, tag_shape, warnings)
+from deckcheck import (BRAND_RED, CONTENT_SLOT_IN, DOING_AMBER, DOING_INK, DONE_GREEN,
+                       LAYOUT_INDEX, body_slide, bottom, caption_bar, caption_style_problems,
+                       center_x, center_y, check, deck_error, fill_color, finish, generate,
+                       geometry, inside, line_color, out_of_bounds, paragraphs, placeholder,
+                       red_elements, run_style, shapes_named, tag_shape, warnings)
 
 NAME = "timeline-phase"
 TITLE = "Mock Timeline Phase Page"
@@ -54,18 +54,6 @@ Layout: timeline-phase
 {body}
 {extra}
 """
-
-
-def center_x(sh):
-    return sh.left + sh.width // 2
-
-
-def center_y(sh):
-    return sh.top + sh.height // 2
-
-
-def bottom(sh):
-    return sh.top + sh.height
 
 
 def test_chrome():
@@ -230,7 +218,7 @@ def test_legend():
     if s is None:
         check("timeline-phase：生成了正文页", False, r.stderr)
         return
-    sw = shapes_named(s, "Legend Swatch")
+    sw = shapes_named(s, "Legend Icon")
     lb = shapes_named(s, "Legend Label")
     check("timeline-phase 图例：四项文字",
           [x.text_frame.text for x in lb] == ["已完成", "进行中", "未完成", "关键里程碑"],
@@ -267,7 +255,7 @@ def test_red_discipline():
     s = body_slide(r)
     reds = red_elements(s) if s is not None else ["(没有正文页)"]
     check("timeline-phase：只有未完成段、未完成图例、红条用红",
-          sorted(reds) == sorted(["Phase Segment 3", "Legend Swatch 3", "Caption Bar"]), reds)
+          sorted(reds) == sorted(["Phase Segment 3", "Legend Icon 3", "Caption Bar"]), reds)
     todo = shapes_named(s, "Phase Segment")[2] if s is not None else None
     check("timeline-phase：未完成段没有实心红填充",
           todo is not None and fill_color(todo) != BRAND_RED, todo and fill_color(todo))
@@ -285,6 +273,7 @@ def test_errors():
         ("2 条", SIX[:2], ("2",)),
         ("7 条", SIX + ["04 Dec | Mock extra | Mock | todo"], ("7",)),
         ("条目缺标题", SIX[:2] + ["03 Nov"], ("03 Nov",)),
+        ("!! 两个叹号", SIX[:2] + ["!!03 Nov | Mock rollout | Mock second site | 未完成"], ("!!",)),
     ]
     for name, items, needles in cases:
         r = generate(deck(items, title="Mock Bad Phase"))

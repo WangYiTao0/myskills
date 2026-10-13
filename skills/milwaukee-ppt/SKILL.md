@@ -84,8 +84,29 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 
 生成器搭骨架：品牌、版式结构、间距、颜色规则都由它固定。用户在对话里要改某页细节（节点再大一点、多加一条标注）时，直接改生成好的 pptx：
 
-1. **检查**：`python3 scripts/inspect_ppt.py <输出.pptx>`，按页列出每个形状的名字、类型、位置和大小（英寸）、文字开头。对照 `references/layouts.md`「形状命名约定」找到要改的元素。
-2. **按名修改**：用 python-pptx 打开成稿，按 `shape.name` 取形状改位置、大小、字号、文字。新加的形状也起名，颜色显式给，用 `scripts/layouts/common.py` 的 `strip_theme_style` 去掉主题样式（否则会带阴影），仍守 §6。
+1. **检查**：`python3 scripts/inspect_ppt.py <输出.pptx>`。每页一个标题行 `== 第 N 页 | layout: <模板 layout> | 版式: <生成器版式>`，下面每个形状一行：名字、类型（占位框带 `idx=N`）、位置和大小（英寸）、文字开头。对照 `references/layouts.md`「形状命名约定」找到要改的元素。
+2. **按名修改**：用 python-pptx 打开成稿，按页码取页、按 `shape.name` 取形状，改完另存为新文件。最小示例（`<skill>` 换成本 skill 目录，在成稿所在目录运行）：
+
+   ```python
+   import sys; sys.path.insert(0, "<skill>/scripts")
+   from pptx import Presentation
+   from pptx.enum.shapes import MSO_SHAPE
+   from pptx.util import Inches
+   from layouts.common import strip_theme_style
+   prs = Presentation("deck.pptx")
+   slide = prs.slides[2 - 1]                                   # inspect 的「第 2 页」
+   shape = next(sh for sh in slide.shapes if sh.name == "Stat Number 2")
+   shape.text_frame.paragraphs[0].runs[0].text = "98"          # 改 run.text，字体字号保留
+   shape.top += Inches(0.1)                                    # 位置、大小用 Inches()
+   note = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(9), Inches(1.4), Inches(2), Inches(0.3))
+   note.name = "Note 1"; strip_theme_style(note)               # 新形状起名、去主题样式，颜色显式给
+   prs.save("deck-fine-tuned.pptx")                            # 另存新文件，不覆盖原稿
+   ```
+
+   - 改文字只改 `run.text`。直接赋值 `text_frame.text` 会把段落重建成一个没有字体、字号、颜色的 run，品牌样式全丢。
+   - 占位框（标题 idx 0、action title idx 10）用 `slide.placeholders[idx]` 取，idx 看 inspect 输出。
+   - 新加的形状颜色显式给（`fill.solid()` + `fill.fore_color.rgb`），仍守 §6。
+
 3. **转 PNG 确认**：同上面第 3 步，看改过的页：没越界、没压 banner 和页脚、红色纪律没破。
 4. **确认**：告诉用户改了哪些形状，并提醒下面这条覆盖规则。
 

@@ -4,8 +4,9 @@
 """
 from deckcheck import (CONTENT_SLOT_IN, EMU, LAYOUT_INDEX, body_slide, caption_bar,
                        caption_style_problems, check, deck_error, fill_color, finish, generate,
-                       inside, line_color, out_of_bounds, paragraphs, placeholder, red_elements,
-                       run_styles, runs, shapes_named, tag_shape, warnings)
+                       inside, inside_shape, line_color, one, out_of_bounds, paragraphs,
+                       placeholder, red_elements, run_styles, runs, shapes_named, tag_shape,
+                       warnings)
 
 NAME = "stats-side"
 TITLE = "Mock Stats Side Page"
@@ -117,12 +118,6 @@ def test_cards():
               [paragraphs(t) for t in textb])
 
 
-def inside_shape(inner, outer):
-    return (inner.left >= outer.left and inner.top >= outer.top
-            and inner.left + inner.width <= outer.left + outer.width
-            and inner.top + inner.height <= outer.top + outer.height)
-
-
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 
@@ -131,11 +126,6 @@ def autonum(paragraph):
     pPr = paragraph._p.find(f"{A}pPr")
     el = pPr.find(f"{A}buAutoNum") if pPr is not None else None
     return el.get("type") if el is not None else None
-
-
-def one(slide, name):
-    found = [sh for sh in slide.shapes if sh.name == name]
-    return found[0] if len(found) == 1 else None
 
 
 def test_conclusion_area():
@@ -234,6 +224,7 @@ def test_errors():
         ("没有结论要点", side_md(ok2, points=()), ("> ",)),
         ("5 条结论要点", side_md(ok2, points=["P1", "P2", "P3", "P4", "P5"]), ("4", "5")),
         ("两个 !", side_md(["- !A | 1 | n", "- !B | 2 | n"]), ("!",)),
+        ("!! 两个叹号", side_md(["- !!A | 1 | n", "- B | 2 | n"]), ("!!",)),
         ("条目缺字段", side_md(["- A | 1", "- B | 2 | n"]), ("标签 | 数字 | 一句说明",)),
         ("重点条漏写列表符号", side_md(["!A | 1 | n", "- B | 2 | n"]), ("- !",)),
         ("卡片下缩进解读", side_md(ok2[:1] + ["  - Mock reading"] + ok2[1:]), ("解读",)),
