@@ -1,15 +1,15 @@
 """before-after 版式测试（票 #14）：只走“md 进、pptx 出”。
 
 运行：python3 skills/milwaukee-ppt/tests/test_before_after.py
-覆盖：槽位 11–16 的文字 / 图片、lead 与结论条的切分、图在槽内等比居中、空槽位删除、
-缺小节等文稿错误、caption / lead / 短文 / 结论条的估算警告、红色纪律、
-底部结论条（caption 之下、页脚之上，不用证据页向上长高的红条）。
+覆盖：槽位 11–16 的文字 / 图片、lead 与红条结论的切分、图在槽内等比居中、
+缺小节等文稿错误、caption / lead / 短文的估算警告、红色纪律、红条不盖住 caption。
 """
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
-from deckcheck import (BRAND_RED, EMU, FOOTER_TOP, LAYOUT_INDEX, caption_bar, check,
+from deckcheck import (LAYOUT_INDEX, caption_bar, caption_style_problems, check,
                        finish, generate, out_of_bounds, paragraphs, placeholder,
-                       red_elements, tag_shape, warnings)
+                       red_elements,
+                       tag_shape, warnings)
 
 NAME = "before-after"
 TITLE = "Mock Before / After Page"
@@ -35,25 +35,6 @@ Next: Mock next step.
 """
 IMAGES = {"img/shot.png": (1600, 900)}
 
-# 底部结论条（英寸）：caption 之下单行红条；有 Next 时向下长，不过页脚
-BAR_LEFT, BAR_TOP, BAR_W, BAR_H = 0.56, 6.43, 12.21, 0.55
-CAPTION_TOP = 5.57                      # 模板 caption 槽顶边，有没有结论条都一样
-
-
-def near(emu, inches):
-    return abs(emu - inches * EMU) < 2000
-
-
-def conclusion_bar(slide):
-    for sh in slide.shapes:
-        if sh.name == "Conclusion Bar":
-            return sh
-    return None
-
-
-def layout_slot(slide, idx):
-    return placeholder(slide.slide_layout, idx)
-
 
 def body_slide(r):
     return r.slides[1] if len(r.slides) > 1 else None
@@ -74,20 +55,14 @@ def test_chrome():
           placeholder(s, 0).text == TITLE
           and placeholder(s, 10).text == "Mock Action Title",
           (placeholder(s, 0).text, placeholder(s, 10).text))
-    check("before-after：不用证据页那种向上长高的红条", caption_bar(s) is None)
-    bar = conclusion_bar(s)
-    check("before-after：底部结论条 = 结论 + Next",
+    bar = caption_bar(s)
+    check("before-after：底部红条 = 结论 + Next",
           bar is not None and paragraphs(bar) ==
           ["Mock one-line conclusion.", "Next: Mock next step."],
           bar and paragraphs(bar))
     if bar is not None:
-        fill = bar._element.find(".//{*}spPr/{*}solidFill/{*}srgbClr")
-        runs = [r for p in bar.text_frame.paragraphs for r in p.runs]
-        check("before-after：结论条品牌红底、白字 24pt",
-              fill is not None and fill.get("val") == BRAND_RED and runs
-              and all(r.font.size.pt == 24 and str(r.font.color.rgb) == "FFFFFF"
-                      for r in runs),
-              [(r.font.size, r.font.color.rgb) for r in runs])
+        problems = caption_style_problems(bar)
+        check("before-after：红条样式与月报一致", not problems, problems)
     tag = tag_shape(s)
     check("before-after：Tag 补年份显示", tag is not None and tag.text_frame.text == "Mar 2026",
           tag and tag.text_frame.text)
@@ -134,7 +109,7 @@ def pictures(slide):
 
 
 def test_image_slots():
-    """改前、改后都是图：空的内容槽删掉，图在模板槽矩形内、比例不变、居中。"""
+    """改前、改后都是图：槽内文字清空，图在槽矩形内、比例不变、居中。"""
     r = generate(IMG_MD, images=IMG_FILES)
     check("before-after（图）：退出码 0", r.rc == 0, r.stderr)
     s = body_slide(r)
@@ -147,9 +122,8 @@ def test_image_slots():
         return
     for idx, pic, aspect in ((13, min(pics, key=lambda p: p.left), 16 / 9),
                              (14, max(pics, key=lambda p: p.left), 0.5)):
-        check(f"before-after（图）：空的内容槽 {idx} 已删掉（编辑视图里不留提示文字）",
-              placeholder(s, idx) is None)
-        slot = layout_slot(s, idx)
+        slot = placeholder(s, idx)
+        check(f"before-after（图）：槽 {idx} 文字已清空", slot.text == "", slot.text)
         inside = (pic.left >= slot.left and pic.top >= slot.top
                   and pic.left + pic.width <= slot.left + slot.width
                   and pic.top + pic.height <= slot.top + slot.height)
@@ -215,12 +189,12 @@ def test_lead_and_conclusion():
         tag = tag_shape(s)
         check("before-after（lead）：Lead 不和 Tag 重叠",
               tag is not None and not overlaps(lead, tag))
-    bar = conclusion_bar(s)
-    check("before-after（lead）：最后小节之后的文字进结论条",
+    bar = caption_bar(s)
+    check("before-after（lead）：最后小节之后的文字进红条",
           bar is not None and paragraphs(bar) == ["Mock conclusion after the last section."],
           bar and paragraphs(bar))
-    check("before-after（lead）：改前是文字、改后是图（改后的空槽已删）",
-          placeholder(s, 13).text == "Mock old way." and placeholder(s, 14) is None
+    check("before-after（lead）：改前是文字、改后是图",
+          placeholder(s, 13).text == "Mock old way." and placeholder(s, 14).text == ""
           and len(pictures(s)) == 1)
 
 
@@ -250,105 +224,58 @@ def test_errors():
 
 
 def test_caption_too_long():
-    """caption 最多两行：超过两行（按字宽估算）只警告、照常生成；两行以内不警告。"""
-    long_cn = "改前需要在三张模拟表格之间来回复制粘贴并逐行人工核对结果，" * 2   # 58 个汉字
-    ok_cn = "改前需要在三张模拟表格之间来回复制粘贴并逐行人工核对结果"         # 28 字，两行
-    long_en = ("Every mock sheet is now refreshed from one shared form within seconds, "
-               "and nobody has to copy rows between the mock spreadsheets any more")
+    """caption 超过一行（按字宽估算）只警告、照常生成；中文 20 字左右不警告。"""
+    long_cn = "改前需要在三张模拟表格之间来回复制粘贴并逐行人工核对结果"   # 28 个汉字
+    ok_cn = "改后一张模拟表单自动同步到全部表格"                          # 17 个汉字
+    long_en = "Every mock sheet is now refreshed from one shared form within seconds"
     r = generate(deck(f"### Before\nOld.\nCaption: {long_cn}\n"
                       f"### After\nNew.\nCaption: {ok_cn}\n"), images=IMG_FILES)
     w = [x for x in warnings(r.stderr) if "Caption" in x or "caption" in x]
-    check("before-after（caption）：中文超过两行 → 一条警告，含页标题和 BEFORE，仍生成",
+    check("before-after（caption）：中文过长 → 一条警告，含页标题和 BEFORE，仍生成",
           r.rc == 0 and len(w) == 1 and "Mock Broken Page" in w[0] and "BEFORE" in w[0],
           r.stderr)
     r = generate(deck(f"### Before\nOld.\nCaption: Old\n"
                       f"### After\nNew.\nCaption: {long_en}\n"), images=IMG_FILES)
     w = [x for x in warnings(r.stderr) if "Caption" in x or "caption" in x]
-    check("before-after（caption）：英文超过两行 → 一条警告，含 AFTER",
+    check("before-after（caption）：英文过长 → 一条警告，含 AFTER",
           r.rc == 0 and len(w) == 1 and "AFTER" in w[0], r.stderr)
 
 
 def test_red_only_after_title_and_bar():
-    """红色只在 AFTER 标题（版式继承）和底部结论条上。"""
+    """红色只在 AFTER 标题（版式继承）和底部红条上。"""
     r = generate(LEAD_MD, images=IMG_FILES)
     s = body_slide(r)
     if s is None:
         return
-    check("before-after（红色）：页面上自带红色的只有底部结论条",
-          red_elements(s) == ["Conclusion Bar"], red_elements(s))
+    check("before-after（红色）：页面上自带红色的只有底部红条",
+          red_elements(s) == ["Caption Bar"], red_elements(s))
     check("before-after（红色）：版式里红的只有 AFTER 标题，且它填的是 AFTER",
           red_elements(s.slide_layout) == ["After Title"]
           and placeholder(s, 12).text == "AFTER", red_elements(s.slide_layout))
 
 
-def test_bar_below_captions():
-    """结论条在 caption 之下、页脚之上；有没有结论条 caption 都在模板位置 5.57"，不挪进框内。"""
+def test_bar_does_not_cover_content():
+    """有红条时，caption、内容区和图都在红条上方，不被盖住；没有红条时 caption 留在模板位置。"""
     for md, files in ((MD, IMAGES), (LEAD_MD, IMG_FILES)):
         r = generate(md, images=files)
         s = body_slide(r)
-        bar = conclusion_bar(s)
-        name = placeholder(s, 0).text
+        bar = caption_bar(s)
         if bar is None:
-            check(f"before-after（结论条）：{name} 有结论条", False, r.stderr)
+            check("before-after（红条）：有红条", False, r.stderr)
             continue
-        check(f"before-after（结论条）：{name} 左 / 顶 / 宽在约定位置",
-              near(bar.left, BAR_LEFT) and near(bar.top, BAR_TOP) and near(bar.width, BAR_W),
-              (bar.left / EMU, bar.top / EMU, bar.width / EMU))
-        check(f"before-after（结论条）：{name} 底边不压页脚", bar.top + bar.height <= FOOTER_TOP,
-              (bar.top + bar.height) / EMU)
         hidden = [sh.name for sh in s.shapes
-                  if sh.name not in ("Conclusion Bar", "Month Tag")
+                  if sh.name not in ("Caption Bar", "Month Tag")
                   and not (sh.is_placeholder and sh.placeholder_format.idx in (0, 10))
                   and sh.top + sh.height > bar.top]
-        check(f"before-after（结论条）：{name} 没有形状伸进结论条", not hidden, hidden)
-        check(f"before-after（结论条）：{name} caption 在模板位置",
-              near(placeholder(s, 15).top, CAPTION_TOP)
-              and near(placeholder(s, 16).top, CAPTION_TOP))
+        check(f"before-after（红条）：{placeholder(s, 0).text} 没有形状伸进红条", not hidden,
+              hidden)
     r = generate(deck("### Before\nOld.\nCaption: a\n### After\nNew.\nCaption: b\n"))
     s = body_slide(r)
-    check("before-after（结论条）：没有结论时不画结论条，caption 仍在模板位置",
-          conclusion_bar(s) is None and caption_bar(s) is None
-          and near(placeholder(s, 15).top, CAPTION_TOP)
-          and near(placeholder(s, 16).top, CAPTION_TOP),
-          placeholder(s, 15).top / EMU)
-
-
-def test_bar_height():
-    """只有结论：单行高 0.55"；加 Next 时顶边不动、向下长一行，仍在页脚之上。"""
-    one = generate(deck("### Before\nOld.\n### After\nNew.\n\nMock conclusion.\n"))
-    two = generate(deck("### Before\nOld.\n### After\nNew.\n\nMock conclusion.\n"
-                        "Next: Mock next step.\n"))
-    b1, b2 = conclusion_bar(body_slide(one)), conclusion_bar(body_slide(two))
-    check("before-after（结论条）：只有结论 → 单行高 0.55\"",
-          b1 is not None and near(b1.height, BAR_H) and not warnings(one.stderr),
-          (b1 and b1.height / EMU, one.stderr))
-    check("before-after（结论条）：有 Next → 顶边不动、向下加高、不压页脚",
-          b2 is not None and near(b2.top, BAR_TOP) and b2.height > b1.height
-          and b2.top + b2.height <= FOOTER_TOP and not warnings(two.stderr),
-          (b2 and b2.top / EMU, b2 and b2.height / EMU, two.stderr))
-
-
-def test_bar_too_long():
-    """结论超过一行（24pt 按字宽估算）只警告、照常生成，结论条不压页脚。"""
-    long = "这是一句很长很长的模拟结论，用来说明改前改后的差别以及证据来源和统计口径，" * 2
-    r = generate(deck(f"### Before\nOld.\n### After\nNew.\n\n{long}\nNext: Mock next.\n"))
-    s = body_slide(r)
-    bar = conclusion_bar(s) if s is not None else None
-    w = [x for x in warnings(r.stderr) if "结论条" in x]
-    check("before-after（结论条）：过长 → 一条警告，含页标题，仍生成",
-          r.rc == 0 and len(w) == 1 and "Mock Broken Page" in w[0], r.stderr)
-    check("before-after（结论条）：过长时也不压页脚",
-          bar is not None and bar.top + bar.height <= FOOTER_TOP,
-          bar and (bar.top + bar.height) / EMU)
-
-
-def test_empty_caption_slot_removed():
-    """没写 Caption 的一侧，caption 槽删掉，编辑视图里不留提示文字。"""
-    r = generate(deck("### Before\nOld.\n### After\nNew.\nCaption: b\n"))
-    s = body_slide(r)
-    check("before-after（空槽）：没写 Caption → 槽 15 已删、槽 16 保留",
-          s is not None and placeholder(s, 15) is None
-          and placeholder(s, 16) is not None and placeholder(s, 16).text == "b")
+    E = 914400
+    check("before-after（红条）：没有红条时 caption 在模板位置 6.12\"",
+          caption_bar(s) is None and abs(placeholder(s, 15).top - 6.12 * E) < 2000
+          and abs(placeholder(s, 16).top - 6.12 * E) < 2000,
+          placeholder(s, 15).top / E)
 
 
 def test_long_text_wraps_and_warns():
@@ -382,10 +309,7 @@ if __name__ == "__main__":
     test_errors()
     test_caption_too_long()
     test_red_only_after_title_and_bar()
-    test_bar_below_captions()
-    test_bar_height()
-    test_bar_too_long()
-    test_empty_caption_slot_removed()
+    test_bar_does_not_cover_content()
     test_long_text_wraps_and_warns()
     test_lead_too_long()
     finish()
