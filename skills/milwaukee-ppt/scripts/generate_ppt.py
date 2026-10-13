@@ -6,7 +6,7 @@
     python3 generate_ppt.py <文稿.md> -o out.pptx  # 指定输出
 
 frontmatter 两种模式：有 title 为通用模式（closing 决定收尾页）；
-有 month + author、没有 title 为月报模式（行为同旧月报脚本）。
+有 month + author、没有 title 为月报模式（封面、Tag 年份、Thank You 按月报模式约定）。
 
 三层：mdparse（md → 文档模型）、layouts/（每种版式一个模块，注册表分派）、
 本文件（装配：封面 → 各页 → 收尾，并清理模板样例页）。约定见 scripts/README.md。

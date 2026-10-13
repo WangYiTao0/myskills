@@ -7,9 +7,11 @@
 - placeholder(slide, idx)       按 idx 取占位框（没有返回 None）
 - out_of_bounds(prs, slides)    超出页面 / 压 banner / 压页脚的形状
 - red_elements(slide)           用了红色（填充、描边、文字）的形状名
+- body_slide / pictures / shapes_named / run_style / run_styles / emu_rect
 - caption_bar / tag_texts / paragraphs / caption_style_problems / warnings
 - check(name, ok, detail) 记录结果；finish() 打印汇总并按结果退出
 """
+import os
 import re
 import subprocess
 import sys
@@ -19,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 SKILL = Path(__file__).resolve().parent.parent
 GENERATOR = SKILL / "scripts" / "generate_ppt.py"
@@ -38,6 +41,10 @@ RED_COLORS = {BRAND_RED, "FF0000", "C00000", "E3000F", "D0021B", "CC0000"}
 
 LAYOUT_INDEX = {"evidence": 0, "before-after": 3, "process": 4, "stats": 5,
                 "timeline": 6, "image-text": 7}
+
+# 模板槽位（英寸，L / T / W / H；#13 定稿）
+CONTENT_SLOT_IN = (0.56, 1.30, 12.21, 4.30)   # process 17 / stats 18 / timeline 19
+IMAGE_FRAME_IN = (0.56, 1.30, 7.64, 4.30)     # image-text 20（16:9 图框）
 
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
@@ -79,11 +86,13 @@ class Result:
         return list(self.prs.slides) if self.prs is not None else []
 
 
-def generate(md_text, workdir=None, images=None, out_name="out.pptx", use_o=True):
+def generate(md_text, workdir=None, images=None, out_name="out.pptx", use_o=True,
+             env=None):
     """写文稿 deck.md → 调生成器 → Result。
 
     images: {相对路径: (宽, 高)} 或 {相对路径: ((宽, 高), (r, g, b))}，现生成纯色图。
     workdir 不传时用一个新临时目录（进程结束前不清理，便于调试）。
+    env: 追加给生成器进程的环境变量（如 MILWAUKEE_PPT_CACHE）。
     """
     workdir = Path(workdir or tempfile.mkdtemp(prefix="mppt-test-"))
     for rel, spec in (images or {}).items():
@@ -96,7 +105,8 @@ def generate(md_text, workdir=None, images=None, out_name="out.pptx", use_o=True
     out = workdir / out_name
     if use_o:
         cmd += ["-o", str(out)]
-    r = subprocess.run(cmd, capture_output=True, text=True)
+    r = subprocess.run(cmd, capture_output=True, text=True,
+                       env={**os.environ, **env} if env else None)
     prs = open_pptx(out) if use_o and out.exists() else None
     return Result(r.returncode, r.stdout, r.stderr, prs, out, workdir)
 
@@ -110,6 +120,46 @@ def placeholder(slide, idx):
         if ph.placeholder_format.idx == idx:
             return ph
     return None
+
+
+def body_slide(r, n=1):
+    """第 n 页（默认封面后的第一页正文）；没有就返回 None。"""
+    return r.slides[n] if len(r.slides) > n else None
+
+
+def pictures(slide):
+    return [sh for sh in slide.shapes if sh.shape_type == MSO_SHAPE_TYPE.PICTURE]
+
+
+def shapes_named(slide, prefix):
+    """名字为「prefix N」的形状，按 N 排序（如 "Stat Card" → Stat Card 1, 2, …）。"""
+    found = []
+    for sh in slide.shapes:
+        m = re.fullmatch(re.escape(prefix) + r" (\d+)", sh.name)
+        if m:
+            found.append((int(m.group(1)), sh))
+    return [sh for _, sh in sorted(found, key=lambda x: x[0])]
+
+
+def emu_rect(rect_in):
+    """英寸的 (L, T, W, H) → EMU 整数。"""
+    return tuple(int(v * EMU) for v in rect_in)
+
+
+def _font_style(run):
+    f = run.font
+    color = str(f.color.rgb) if f.color and f.color.type is not None else None
+    return (f.size.pt if f.size else None, bool(f.bold), color)
+
+
+def run_style(shape, para=0):
+    """第 para 段第一个 run 的 (字号 pt, 是否粗体, 颜色 hex)。"""
+    return _font_style(shape.text_frame.paragraphs[para].runs[0])
+
+
+def run_styles(shape):
+    """文本框里所有 run 的 (字号 pt, 是否粗体, 颜色 hex) 集合，便于断言“全部一致”。"""
+    return {_font_style(r) for p in shape.text_frame.paragraphs for r in p.runs}
 
 
 def texts(slide):

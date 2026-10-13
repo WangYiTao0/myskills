@@ -14,15 +14,13 @@ Side = {"title", "image", "text": [段落], "caption"}。
 """
 import re
 
-from pptx.dml.color import RGBColor
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
-from pptx.oxml.ns import qn
-from pptx.util import Inches, Pt
+from pptx.util import Emu, Inches
 
 from mdparse import DeckError
 
-from .common import (IMG_LEFT, IMG_W, add_page_chrome, caption_lines, fill_titles,
-                     load_image, warn)
+from .common import (IMG_LEFT, IMG_W, add_page_chrome, add_run, caption_lines, fill_titles,
+                     fit_picture, load_image, text_lines, text_width_in, warn)
 
 NAME = "before-after"
 LAYOUT_INDEX = 3
@@ -35,6 +33,7 @@ SLOTS = {"before": {"title": 11, "content": 13, "caption": 15},
 LEAD_LEFT, LEAD_TOP, LEAD_W, LEAD_H = 0.56, 1.30, 11.90, 0.42
 TAG_LEFT = IMG_LEFT + IMG_W - 1.7          # common.add_month_tag 的文本框左缘
 LEAD_PT = 20
+INK = "1A1A1A"
 CAPTION_PT = 16                            # 模板 caption 槽：16pt bold、不换行
 CAPTION_INSET = 0.06 * 2                   # 槽的左右内边距（英寸）
 CONTENT_PT = 18                            # 模板内容槽：18pt、居中
@@ -106,33 +105,17 @@ def parse(page):
     page.fields = {"lead": " ".join(lead), **sides}
 
 
-def _place_image(slide, slot, path):
-    """图在槽矩形内等比缩放、居中；用 add_picture 画原生图片，不用 insert_picture。"""
-    pic = slide.shapes.add_picture(path, slot.left, slot.top)
-    scale = min(slot.width / pic.width, slot.height / pic.height)
-    pic.width, pic.height = int(pic.width * scale), int(pic.height * scale)
-    pic.left = slot.left + (slot.width - pic.width) // 2
-    pic.top = slot.top + (slot.height - pic.height) // 2
-    return pic
-
-
-def text_width_in(text, pt):
-    """按字宽估算单行文字宽度（英寸）：CJK / 全角 1em，其余按 0.6em（粗体 Arial 偏保守）。"""
-    em = sum(1.0 if ord(ch) > 0x2E7F else 0.6 for ch in text)
-    return em * pt / 72
-
-
 def _check_caption(page, side, slot):
-    avail = slot.width / 914400 - CAPTION_INSET
+    avail = Emu(slot.width).inches - CAPTION_INSET
     if side["caption"] and text_width_in(side["caption"], CAPTION_PT) > avail:
         warn(f"页「{page.title}」{side['title']} 的 Caption 估计超过一行, "
              f"建议精简到约 {int(avail * 72 / CAPTION_PT)} 个汉字以内: {side['caption']}")
 
 
 def _check_text(page, side, slot):
-    avail_w = slot.width / 914400 - CAPTION_INSET
-    lines = sum(max(1, -(-text_width_in(t, CONTENT_PT) // avail_w)) for t in side["text"])
-    if lines * CONTENT_PT * LINE_SPACING / 72 > slot.height / 914400:
+    avail_w = Emu(slot.width).inches - CAPTION_INSET
+    lines = sum(text_lines(t, CONTENT_PT, avail_w) for t in side["text"])
+    if lines * CONTENT_PT * LINE_SPACING / 72 > Emu(slot.height).inches:
         warn(f"页「{page.title}」{side['title']} 的短文估计溢出内容区 (约 {int(lines)} 行), "
              f"建议精简")
 
@@ -154,12 +137,7 @@ def _add_lead(slide, page):
     tf.margin_top = tf.margin_bottom = 0
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.LEFT
-    r = p.add_run()
-    r.text = text
-    r.font.size, r.font.bold, r.font.name = Pt(LEAD_PT), True, "Arial"
-    r.font.color.rgb = RGBColor(0x1A, 0x1A, 0x1A)
-    rpr = r._r.get_or_add_rPr()                 # 中文字体与模板一致（latin 之后追加 ea）
-    rpr.append(rpr.makeelement(qn("a:ea"), {"typeface": "PingFang SC"}))
+    add_run(p, text, LEAD_PT, True, INK)
     return tb
 
 
@@ -188,7 +166,8 @@ def render(prs, page, ctx):
         content.text_frame.word_wrap = True            # 模板槽是不换行的，短文要在槽宽内换行
         _check_text(page, side, content)
         if side["image"]:
-            _place_image(slide, content, load_image(side["image"], ctx, page.title))
+            fit_picture(slide, load_image(side["image"], ctx, page.title),
+                        content.left, content.top, content.width, content.height)
         caption.text = side["caption"]
         _check_caption(page, side, caption)
     _add_lead(slide, page)

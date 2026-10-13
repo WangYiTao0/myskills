@@ -5,9 +5,9 @@
 ## 来源与边界
 
 - `assets/MS_Template.pptx` 保留原 3 页、原 3 个布局，追加 layout index `3`（`Before / After`）与第 4 页干净样例。
-- 版式参考 MyDoc2026 的 boss-monthly 月报及 Before After 示例：左右对置框，框下各一句 caption。
-- 仅借用版式关系；没有引入报告的业务图、部门/负责人表、业务数字、状态角标、链接或底部全红结论条。
-- 通用页仍用 Milwaukee 原母版、logo、页脚；不是 boss-monthly 专用英文汇报格式。
+- 版式：左右对置框，框下各一句 caption。
+- 只定义版式关系；不带业务图、部门/负责人表、业务数字、状态角标或链接。
+- 通用页仍用 Milwaukee 原母版、logo、页脚。
 - 此页可用于流程、系统或实景对比；先确认两侧事实可以按同一问题对应，再选它。
 
 ## Slot 契约

@@ -1,4 +1,6 @@
-"""各版式共用的部件：Context、警告、图片加载、标题填充、底部红条、月份标识、占位实现。
+"""各版式共用的部件：Context、警告、图片加载、标题填充、底部红条、月份标识，
+以及画原生形状的小工具（取槽位、删形状、等比放图、写带中文字体的 run、去主题样式、
+估算文字宽度和行数）和品牌红、字体名常量。
 
 版式模块只从这里 import，互相之间不 import。"""
 import hashlib
@@ -17,6 +19,10 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 from mdparse import DeckError
+
+BRAND_RED = "DB011C"          # Milwaukee Red（与 banner 同色）
+LATIN_FONT = "Arial"
+EA_FONT = "PingFang SC"       # 中文字体（a:ea）
 
 # 正文区几何（英寸）：banner 占顶部 1.0"，底部留给红条（各版式槽位见模板 layout 4–7）
 IMG_LEFT, IMG_TOP, IMG_W, IMG_H = 0.56, 1.3, 12.2, 4.3
@@ -41,7 +47,7 @@ CAPTION_SP_XML = """<p:sp xmlns:p="http://schemas.openxmlformats.org/presentatio
   <p:spPr bwMode="auto">
     <a:xfrm><a:off x="155575" y="{y}"/><a:ext cx="11874874" cy="{cy}"/></a:xfrm>
     <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
-    <a:solidFill><a:srgbClr val="DB011C"/></a:solidFill>
+    <a:solidFill><a:srgbClr val="{red}"/></a:solidFill>
     <a:ln w="9525" cap="flat" cmpd="sng" algn="ctr">
       <a:solidFill><a:schemeClr val="tx1"/></a:solidFill>
       <a:prstDash val="solid"/><a:round/>
@@ -125,7 +131,10 @@ def _next_shape_id(slide):
 
 
 def _caption_geometry(lines, page_title):
-    """底边固定，按估算行数向上加高（CJK 宽字符按 2 计，额外半行余量防贴框）。"""
+    """底边固定，按估算行数向上加高（CJK 宽字符按 2 计，额外半行余量防贴框）。
+
+    这是月报红条固定的算法（几何直接决定输出），不改用下面的 text_lines，
+    以保证月报模式的输出不变。"""
     rows = 0
     for text in lines:
         w = sum(2 if ord(ch) > 0x2E7F else 1 for ch in text)
@@ -159,7 +168,8 @@ def add_caption_bar(slide, page):
     if not lines:
         return None
     y, cy = _caption_geometry(lines, page.title)
-    sp = parse_xml(CAPTION_SP_XML.format(id=_next_shape_id(slide), y=y, cy=cy))
+    sp = parse_xml(CAPTION_SP_XML.format(id=_next_shape_id(slide), y=y, cy=cy,
+                                         red=BRAND_RED))
     tx_body = sp.find(qn("p:txBody"))
     for text in lines:
         tx_body.append(parse_xml(CAPTION_P_XML.format(text=escape(text))))
@@ -187,7 +197,7 @@ def add_month_tag(slide, tag, year):
     r.text = text
     r.font.size = Pt(11)
     r.font.bold = False
-    r.font.name = "Arial"
+    r.font.name = LATIN_FONT
     r.font.color.rgb = RGBColor(0x6E, 0x6E, 0x74)
     return tb
 
@@ -200,30 +210,80 @@ def add_page_chrome(slide, page, ctx):
     add_caption_bar(slide, page)
 
 
-# 看起来是“版式内容”而不是一句话结论的行：列表、编号、重点、小节、图片、Caption
-_STRUCTURED = re.compile(r"^([-*+]\s|\d+[.)、]\s*|!|#{3,}\s|caption\s*[:：])", re.I)
+# ---- 画原生形状的小工具 ---------------------------------------------------------
+
+def slot(slide, idx):
+    """按 idx 取占位框（槽位）；没有返回 None。按 idx 找，不按名字找。"""
+    for ph in slide.placeholders:
+        if ph.placeholder_format.idx == idx:
+            return ph
+    return None
 
 
-def default_parse(page):
-    """占位实现用的解析：结构化的行原样放进 fields["raw"]，其余普通文字行进红条结论。
-
-    `### 小节` 从标题行起到下一个空行为止都算小节内容（不进红条）。"""
-    raw, in_section = [], False
-    for line in page.lines:
-        if not line:
-            in_section = False
-            continue
-        if line.startswith("###"):
-            in_section = True
-        (raw if in_section or _STRUCTURED.match(line)
-         else page.conclusion).append(line)
-    page.fields = {"raw": raw}
+def remove_shape(shape):
+    """从页面上删掉形状（空槽位画完就删，免得编辑视图里露出提示文字）。"""
+    shape._element.getparent().remove(shape._element)
 
 
-def render_stub(prs, page, ctx, layout_index):
-    """未实现版式的占位渲染：用模板对应 layout，只填 idx 0/10，打印“未实现”警告。"""
-    warn(f"页「{page.title}」的版式 {page.layout} 未实现, 只填了标题 (红条与 Tag 照常)")
-    slide = prs.slides.add_slide(prs.slide_layouts[layout_index])
-    fill_titles(slide, page)
-    add_page_chrome(slide, page, ctx)
-    return slide
+def take_slot(slide, idx):
+    """取出槽位矩形 (left, top, width, height)（EMU）并删掉槽位占位框。"""
+    ph = slot(slide, idx)
+    rect = (ph.left, ph.top, ph.width, ph.height)
+    remove_shape(ph)
+    return rect
+
+
+def strip_theme_style(shape):
+    """去掉自选图形自带的主题样式引用（p:style 会带出主题阴影和 accent 色）；
+    填充、描边、文字颜色全部由调用方显式给。"""
+    style = shape._element.find(qn("p:style"))
+    if style is not None:
+        shape._element.remove(style)
+    return shape
+
+
+def add_run(paragraph, text, pt, bold, color):
+    """追加一个 run：Arial + 中文 PingFang SC（latin 之后写 a:ea），字号、粗细、颜色显式给。
+
+    color 是 6 位十六进制字符串，如 "1A1A1A"。"""
+    r = paragraph.add_run()
+    r.text = text
+    f = r.font
+    f.size = Pt(pt)
+    f.bold = bold
+    f.name = LATIN_FONT
+    f.color.rgb = RGBColor.from_string(color)
+    latin = r._r.get_or_add_rPr().find(qn("a:latin"))
+    latin.addnext(latin.makeelement(qn("a:ea"), {"typeface": EA_FONT}))
+    return r
+
+
+def fit_picture(slide, path, left, top, width, height):
+    """图在矩形内等比缩放、居中，完整显示不裁切（原生图片，不用 insert_picture）。"""
+    pic = slide.shapes.add_picture(path, left, top)
+    scale = min(width / pic.width, height / pic.height)
+    pic.width, pic.height = int(pic.width * scale), int(pic.height * scale)
+    pic.left = left + (width - pic.width) // 2
+    pic.top = top + (height - pic.height) // 2
+    return pic
+
+
+# ---- 文字估算（只用于判断放不放得下 / 是否警告，统一一个口径）-------------------
+
+CJK_EM, LATIN_EM = 1.0, 0.55     # CJK / 全角按 1em，拉丁字符按约 0.55em
+
+
+def _is_wide(ch):
+    return ord(ch) > 0x2E7F
+
+
+def text_width_in(text, pt):
+    """单行文字宽度估算（英寸）。"""
+    return sum(CJK_EM if _is_wide(ch) else LATIN_EM for ch in text) * pt / 72
+
+
+def text_lines(text, pt, width_in):
+    """text 在 width_in 宽、pt 号字下约占几行；空文字 0 行。"""
+    if not text:
+        return 0
+    return max(1, -(-text_width_in(text, pt) // width_in))

@@ -8,7 +8,8 @@ import re
 
 from mdparse import DeckError
 
-from .common import add_page_chrome, fill_titles, load_image, warn
+from .common import (add_page_chrome, fill_titles, fit_picture, load_image, remove_shape,
+                     slot, take_slot, warn)
 
 NAME = "image-text"
 LAYOUT_INDEX = 7
@@ -44,24 +45,10 @@ def parse(page):
     page.fields = {"image": images[0], "points": points}
 
 
-def _slot(slide, idx):
-    for ph in slide.placeholders:
-        if ph.placeholder_format.idx == idx:
-            return ph
-    return None
-
-
 def _place_image(slide, ref, ctx, page_title):
-    """按图框矩形等比缩放、居中，然后删掉图框占位框。"""
-    frame = _slot(slide, IMAGE_FRAME_IDX)
-    fl, ft, fw, fh = frame.left, frame.top, frame.width, frame.height
-    frame._element.getparent().remove(frame._element)
-    pic = slide.shapes.add_picture(load_image(ref, ctx, page_title), fl, ft)
-    scale = min(fw / pic.width, fh / pic.height)
-    pic.width = int(pic.width * scale)
-    pic.height = int(pic.height * scale)
-    pic.left = fl + int((fw - pic.width) / 2)
-    pic.top = ft + int((fh - pic.height) / 2)
+    """删掉图框占位框，在它的矩形里等比缩放、居中放图。"""
+    rect = take_slot(slide, IMAGE_FRAME_IDX)
+    pic = fit_picture(slide, load_image(ref, ctx, page_title), *rect)
     pic.name = "Image"
     return pic
 
@@ -70,11 +57,11 @@ def _fill_points(slide, points):
     """每条要点一段，只写文字，字号/颜色/圆点/段距全部继承槽位的 lstStyle。
 
     没有要点时删掉槽位，免得 PowerPoint 里露出提示文字。"""
-    slot = _slot(slide, TEXT_AREA_IDX)
+    area = slot(slide, TEXT_AREA_IDX)
     if not points:
-        slot._element.getparent().remove(slot._element)
+        remove_shape(area)
         return
-    tf = slot.text_frame
+    tf = area.text_frame
     tf.text = points[0]
     for text in points[1:]:
         tf.add_paragraph().text = text

@@ -15,12 +15,12 @@ import re
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
-from pptx.oxml.ns import qn
-from pptx.util import Emu, Inches, Pt
+from pptx.util import Emu, Inches
 
 from mdparse import DeckError
 
-from .common import add_page_chrome, fill_titles, warn
+from .common import (BRAND_RED, add_page_chrome, add_run, fill_titles, strip_theme_style,
+                     take_slot, warn)
 
 NAME = "stats"
 LAYOUT_INDEX = 5
@@ -35,9 +35,8 @@ LINE = 1.2                # 行高 = 字号 × 1.2
 # #13 字号阶梯
 LABEL_PT, NUMBER_PT, NOTE_PT = 12, 60, 14
 NUMBER_MIN_PT = 28        # 数字长时统一缩小，最低到这里（说明字号的 2 倍）
-INK, GRAY, BRAND_RED = "1A1A1A", "6B6B6B", "DB011C"
+INK, GRAY = "1A1A1A", "6B6B6B"
 CARD_FILL = "F5F5F5"
-LATIN, EAST_ASIAN = "Arial", "PingFang SC"
 
 _ITEM = re.compile(r"^[-*+]\s+(!?)\s*(.*)$")
 
@@ -49,6 +48,9 @@ def parse(page):
             continue
         m = _ITEM.match(line)
         if not m:
+            if line.startswith("!") and "|" in line:     # 重点条漏写列表符号，别悄悄进红条
+                raise DeckError(f"页「{page.title}」的重点数据条要以列表符号开头，"
+                                f"写成「- !标签 | 数字 | 一句说明」: {line}")
             page.conclusion.append(line)
             continue
         parts = [x.strip() for x in m.group(2).split("|")]
@@ -66,8 +68,11 @@ def parse(page):
     page.fields = {"items": items}
 
 
-def _char_em(ch):
-    """Arial 粗体的字宽估算（单位：em），只用于判断放不放得下。"""
+def _glyph_em(ch):
+    """逐字宽（Arial，单位 em），用来定卡片几何：大数字字号、标签 / 说明行数 → 卡片高度。
+
+    这些估算直接决定形状尺寸，按字形细分比通用口径（common.text_width_in，
+    拉丁一律 0.55em）准，所以本版式保留这张表；别处的溢出警告一律用 common 的口径。"""
     if ord(ch) > 0x2E7F:
         return 1.0
     if ch in " .,:;'!|iljtfrI()[]":
@@ -79,18 +84,18 @@ def _char_em(ch):
     return 0.58
 
 
-def text_width_in(text, pt):
-    return sum(_char_em(ch) for ch in text) * pt / 72
+def _glyph_width_in(text, pt):
+    return sum(_glyph_em(ch) for ch in text) * pt / 72
 
 
-def lines_needed(text, pt, width_in):
-    return max(1, -(-text_width_in(text, pt) // width_in))
+def _glyph_lines(text, pt, width_in):
+    return max(1, -(-_glyph_width_in(text, pt) // width_in))
 
 
 def _number_size(items, inner_w_in, page_title):
     """所有数字共用一个字号：60pt 放不下最长的那个时统一缩小（整数 pt），并警告。"""
-    longest = max(items, key=lambda it: text_width_in(it["value"], NUMBER_PT))["value"]
-    fit = int(inner_w_in / text_width_in(longest, 1))   # 1pt 时的宽度 → 放得下的最大字号
+    longest = max(items, key=lambda it: _glyph_width_in(it["value"], NUMBER_PT))["value"]
+    fit = int(inner_w_in / _glyph_width_in(longest, 1))   # 1pt 时的宽度 → 放得下的最大字号
     if fit >= NUMBER_PT:
         return NUMBER_PT
     size = max(fit, NUMBER_MIN_PT)
@@ -103,13 +108,6 @@ def _number_size(items, inner_w_in, page_title):
     return size
 
 
-def _slot(slide):
-    for ph in slide.placeholders:
-        if ph.placeholder_format.idx == SLOT_IDX:
-            return ph
-    return None
-
-
 def _text_box(slide, name, x, y, w, h, text, pt, bold, color, wrap=True):
     tb = slide.shapes.add_textbox(Emu(x), Emu(y), Emu(w), Emu(h))
     tb.name = name
@@ -119,36 +117,24 @@ def _text_box(slide, name, x, y, w, h, text, pt, bold, color, wrap=True):
     tf.vertical_anchor = MSO_ANCHOR.TOP
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.LEFT
-    r = p.add_run()
-    r.text = text
-    f = r.font
-    f.size = Pt(pt)
-    f.bold = bold
-    f.name = LATIN
-    f.color.rgb = RGBColor.from_string(color)
-    rpr = r._r.get_or_add_rPr()
-    latin = rpr.find(qn("a:latin"))
-    ea = latin.makeelement(qn("a:ea"), {"typeface": EAST_ASIAN})
-    latin.addnext(ea)
+    add_run(p, text, pt, bold, color)
     return tb
 
 
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    slot = _slot(slide)
-    left, top, width, height = slot.left, slot.top, slot.width, slot.height
-    slot._element.getparent().remove(slot._element)
+    left, top, width, height = take_slot(slide, SLOT_IDX)
 
     items = page.fields["items"]
     n = len(items)
     gap = Inches(GAP)
     card_w = (width - gap * (n - 1)) // n
-    inner_w_in = card_w / 914400 - 2 * PAD
+    inner_w_in = Emu(card_w).inches - 2 * PAD
 
     number_pt = _number_size(items, inner_w_in, page.title)
-    label_lines = max(lines_needed(it["label"], LABEL_PT, inner_w_in) for it in items)
-    note_lines = max(lines_needed(it["note"], NOTE_PT, inner_w_in) for it in items)
+    label_lines = max(_glyph_lines(it["label"], LABEL_PT, inner_w_in) for it in items)
+    note_lines = max(_glyph_lines(it["note"], NOTE_PT, inner_w_in) for it in items)
 
     label_h = label_lines * LABEL_PT * LINE / 72
     number_h = number_pt * LINE / 72
@@ -166,9 +152,7 @@ def render(prs, page, ctx):
         card.fill.fore_color.rgb = RGBColor.from_string(CARD_FILL)
         card.line.fill.background()
         card.shadow.inherit = False
-        style = card._element.find(qn("p:style"))     # 去掉主题样式引用：LibreOffice 会按它补阴影
-        if style is not None:
-            card._element.remove(style)
+        strip_theme_style(card)          # 去掉主题样式引用：LibreOffice 会按它补阴影
         card.text_frame.paragraphs[0].alignment = PP_ALIGN.LEFT   # add_shape 默认居中
 
         ix, iw = x + Inches(PAD), w - Inches(2 * PAD)
