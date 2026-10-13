@@ -13,3 +13,13 @@
 - 注册表在 `layouts/__init__.py`，已登记全部 6 个版式。
 - 测试：每个版式一个 `tests/test_<版式>.py`，只走“md 进、pptx 出”；辅助函数（`generate`、`body_slide`、`pictures`、`shapes_named`、`run_style` 等）和模板槽位常量都在 `tests/deckcheck.py`，测试文件里不要再各写一份。`python3 tests/run_all.py` 跑全部。
 - 新增或修改一个版式时，通常只动 `layouts/<版式>.py` + `tests/test_<版式>.py`；需要新的共用部件时再动 `common.py` / `deckcheck.py`。
+
+## 检查命令 `inspect_ppt.py`
+
+生成后细调时用它定位元素：
+
+```
+python3 scripts/inspect_ppt.py deck.pptx
+```
+
+每页一个标题行 `== 第 N 页 | layout: <名>`，下面每个形状一行：`名字 | 类型 | L= T= W= H=（英寸，两位小数） | 文字前约 30 字`（换行替换成空格）。文件不存在或不是 pptx 时，错误信息写到 stderr，退出码非零。
