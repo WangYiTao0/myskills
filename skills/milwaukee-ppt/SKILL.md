@@ -1,12 +1,11 @@
 ---
 name: milwaukee-ppt
-description: Milwaukee Tool 工作汇报 PPT 的格式与视觉规范。当用户撰写任何 Milwaukee 内部汇报类 PPT（项目汇报、月报、阶段汇报、客户简报、复盘、展会/外出参观汇报、培训分享等），或提到"Milwaukee 汇报格式 / MS 汇报模板 / 工作汇报 / 项目总结 / 月报"时使用。本 skill 分两层：①【始终生效】PPT 视觉与排版规范（品牌锚点、设计系统、标题结构、内容硬约束）；②【仅项目汇报生效】固定 Agenda 顺序 + PDCA 标注 + "已落地 vs 未来"分离 —— 仅当任务是"项目汇报 / 项目总结 / 月报"，或用户明确要求 Agenda/PDCA 时才套用，其他汇报场景不强制。本 skill 只规范"写什么 / 怎么布局"，不生成 PPT 文件。
+description: Milwaukee Tool 工作汇报 PPT 的格式、视觉规范与 pptx 生成器。当用户撰写或生成任何 Milwaukee 内部汇报类 PPT（项目汇报、月报、阶段汇报、客户简报、复盘、展会/外出参观汇报、培训分享等），或提到"Milwaukee 汇报格式 / MS 汇报模板 / 工作汇报 / 项目总结 / 月报"时使用。本 skill 分两层：①【始终生效】PPT 视觉与排版规范（品牌锚点、设计系统、标题结构、内容硬约束）；②【仅项目汇报生效】固定 Agenda 顺序 + PDCA 标注 + "已落地 vs 未来"分离 —— 仅当任务是"项目汇报 / 项目总结 / 月报"，或用户明确要求 Agenda/PDCA 时才套用，其他汇报场景不强制。附带 md → pptx 生成器：把带 Layout 标记的 md 文稿按 Milwaukee 模板生成可编辑 pptx（封面、6 种正文版式、收尾页）；用户要直接出 pptx 文件时也用它。
 ---
 
 # Milwaukee Tool 工作汇报格式规范
 
-为 Milwaukee Tool 内部汇报类 PPT 定义**统一格式**。
-本 skill 只定义"写什么 / 怎么布局"，不负责生成 PPT 文件。
+为 Milwaukee Tool 内部汇报类 PPT 定义**统一格式**，并附带生成器：带 Layout 标记的 md 文稿 → Milwaukee 格式 pptx（全部原生可编辑）。
 
 ---
 
@@ -44,6 +43,40 @@ description: Milwaukee Tool 工作汇报 PPT 的格式与视觉规范。当用�
 > - "用 Agenda + PDCA 给我做这次外出参观汇报" → 走 A + B（用户明确要求）
 
 非项目汇报场景（展会汇报、培训、分享、综述等）**鼓励**按内容自然组织章节，并且**允许写后续建议 / 行动项 / Next Step** —— §3 的"不写未来"约束此时不生效。
+
+---
+
+## 生成 pptx
+
+生成器在 `scripts/generate_ppt.py`（本节路径都相对本 skill 目录），只依赖 python-pptx（装了 Pillow 时多图宽度按比例分），默认用 `assets/MS_Template.pptx`：
+
+```bash
+python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
+```
+
+用户要出 pptx 时按这四步走：
+
+1. **整理文稿**：把用户的自由文稿整理成带 Layout 标记的 md——每个 `#` 一页，`##` 是 action title，一行 `Layout: <版式名>` 选版式（不写 = evidence），普通文字行是底部红条的一句话结论，`Next:` 是下一步。版式字段、选版依据、反例都在 `references/layouts.md`，整理前先读；内容仍守本文件 §4、§6、§7（项目汇报再加 §1–§3）。完整示例：`examples/demo/deck.md`。
+2. **生成**：跑上面的命令。退出码非 0 = 文稿有错，按错误信息里的「页「标题」」改 md 再跑；`警告:` 行不中止，但对应那页在第 3 步必看。
+3. **转 PNG 逐页检查**：`soffice --headless --convert-to pdf --outdir <目录> <输出.pptx>`，再 `pdftoppm -png -r 80 <输出.pdf> page`。逐页看单行、溢出、对齐、图片边界、页脚间距，有问题回第 1 步精简文字或换版式。
+4. **交付**：把 pptx 交给用户，说明哪些页有警告、哪些地方建议在 PowerPoint 里人工微调。
+
+文稿格式：
+
+- frontmatter 写 `title` = 通用模式：封面主标题 title，副标题由 `subtitle` 和「`date`   `author`」两行组成；写了 `closing` 才加收尾页。
+- frontmatter 不写 title、写 `month: YYYY-MM` + `author` = 月报模式：封面「<Mon>. YYYY Working Summary」、结尾 Thank You，与原月报脚本输出一致。
+- 页面通用字段：`Tag:`（正文区右上角月份标识）、`Next:` / `下一步：`；所有版式都支持。
+
+| `Layout:` | 用途 | 模板 layout | 字段 |
+| --- | --- | --- | --- |
+| `evidence`（默认） | 截图 / 实物证据 + 底部红条 | 0 | 0–3 张图 |
+| `before-after` | 改前改后对比 | 3 | lead + `### Before` / `### After`（各一张图或一段短文 + `Caption:`）+ 底部结论 |
+| `process` | 3–5 步流程 | 4 | `1. 步骤名 \| 一句说明` |
+| `stats` | 2–4 个结果数字 | 5 | `- 标签 \| 数字 \| 一句说明`，最多一条 `- !…` 标红 |
+| `timeline` | 3–6 个时间节点 | 6 | `- 日期 \| 标题 \| 说明` |
+| `image-text` | 左图右文 | 7 | 一张图 + ≤5 条 `- 要点` |
+
+生成器不做的事：Agenda 顺序、PDCA 图标、上表以外的版式（Agenda 八宫格、团队、表格等）。这些在生成后的 pptx 里按 §1–§2、§6 和 `references/layout-patterns.md` 手工补。
 
 ---
 
@@ -167,16 +200,22 @@ description: Milwaukee Tool 工作汇报 PPT 的格式与视觉规范。当用�
 
 ### 5.0 模板占位框契约（生成 pptx 时必须遵守）
 
-> ⚠️ **本 skill 不生成 pptx，但下游用 `MS_Template.pptx` 生成时，主标题 / 副标题必须填进模板已有的占位框（placeholder），禁止为它们另建 text box。** 另建文本框会导致位置飘、与 banner 不对齐、跨页不一致——这正是本节要杜绝的问题。
+> ⚠️ **用 `MS_Template.pptx` 生成或手工改 pptx 时，主标题 / 副标题必须填进模板已有的占位框（placeholder），禁止为它们另建 text box。** 另建文本框会导致位置飘、与 banner 不对齐、跨页不一致——这正是本节要杜绝的问题。`scripts/generate_ppt.py` 已按本契约填充；下表也是自己写代码生成时的依据。
 
-模板 16:9（13.33″ × 7.5″）。红 banner（顶部 0–1.0″ 全宽 `#DB011C`）、左上 logo、底部页脚都在 **母版** 里，生成时不用画、不要动。四个版式各自的占位框如下（`idx` = `slide.placeholders[idx]` 的键，位置单位：英寸）：
+模板 16:9（13.33″ × 7.5″）。红 banner（顶部 0–1.0″ 全宽 `#DB011C`）、左上 logo、底部页脚都在 **母版** 里，生成时不用画、不要动。8 个版式各自的占位框如下（`idx` = `slide.placeholders[idx]` 的键，位置单位：英寸）：
 
 | 版式 index | 版式名 | 用途 | 占位框（idx → 角色，位置 L/T/W/H） |
 | --- | --- | --- | --- |
 | 1 | `Title Slide` | 封面 | `0` 主标题（居中，1.0 / 4.83 / 11.33 / 0.5）；`1` 副标题（2.0 / 5.42 / 9.33 / 0.5） |
 | 0 | `Blank  Slide` | 正文页（默认） | `0` 主标题（banner 右上，5.08 / 0.1 / 8.25 / 0.4）；`10` 副标题（紧贴主标题下，5.08 / 0.5 / 8.25 / 0.42） |
 | 2 | `Blank  Slide WITH BULLETS` | 带正文框的正文页 | 同上两个 + `1` 大正文框（0.56 / 1.42 / 12.44 / 5.75） |
-| 3 | `Before / After` | 双框对比页（新增） | `0/10` 沿用正文页；`11/12` 左右标题、`13/14` BODY 内容区、`15/16` 单句 caption，详见 `references/before-after.md` |
+| 3 | `Before / After` | 双框对比页 | `0/10` 沿用正文页；`11/12` 左右标题（2.035 / 1.80、8.395 / 1.80，2.90 × 0.42）、`13/14` BODY 内容区（0.66 / 2.42、7.02 / 2.42，5.65 × 2.99，在对比框内）、`15/16` caption 一句话，最多两行（0.61 / 5.57、6.97 / 5.57，5.80 × 0.58，紧贴框下）；底部结论条由生成器画在 6.43″，详见 `references/before-after.md` |
+| 4 | `Process` | 流程页 | `0/10` 沿用正文页；`17` 流程区（0.56 / 1.30 / 12.21 / 4.30） |
+| 5 | `Stats` | 数据对比页 | `0/10` 沿用正文页；`18` 数据区（0.56 / 1.30 / 12.21 / 4.30） |
+| 6 | `Timeline` | 时间线页 | `0/10` 沿用正文页；`19` 时间线区（0.56 / 1.30 / 12.21 / 4.30） |
+| 7 | `Image + Text` | 左图右文页 | `0/10` 沿用正文页；`20` 图框 16:9（0.56 / 1.30 / 7.64 / 4.30）、`21` 文字区（8.50 / 1.30 / 4.27 / 4.30） |
+
+layout 4–7 的槽位只是定位用的 BODY 占位框：生成器在槽位矩形内画原生形状，画完删掉空槽位。按 `idx` 找槽位，不按名字找（落到页面上名字会变成 "Text Placeholder N"）。
 
 **填充规则（生成时照做）**：
 
@@ -227,8 +266,8 @@ slide.placeholders[10].text = '报表分散已成为扩展瓶颈'   # 副标题�
 
 - 使用模板新增 layout index `3`（`Before / After`）；制作对应事实对比页前，读取 `references/before-after.md` 的 slot 契约、事实对应与重渲验收。
 
-- 左 BEFORE / 右 AFTER 对置，中间放转换指示（箭头 / "→"）
-- AFTER 侧用 Milwaukee Red `#DB011C` 做强调锚点，**红色只标 AFTER，不给 BEFORE**
+- 左 BEFORE / 右 AFTER 对置，中间是模板自带的灰色箭头；caption 紧贴对比框下，底部一条单行红色结论条
+- 红色只用在 AFTER 标题和底部结论条，**BEFORE 不用红**
 
 ---
 
@@ -298,7 +337,7 @@ banner 以下的正文区用色遵循 §6.2 色板。
 | --------------------------- | ------------- | ------------------------------------------------------------------------ |
 | Cover / Closing             | ≤ 8%          | 模板自带全红 Cover 已足,不再叠加                                         |
 | 标准正文页                  | ≤ 5%          | 1 个关键数字 + 锚点条 + PDCA 图标                                        |
-| BEFORE / AFTER 对比页       | ≤ 5%          | AFTER 顶条 + 描边 + 箭头                                                 |
+| BEFORE / AFTER 对比页       | ≤ 5%          | AFTER 标题;底部结论条同月报红条,不计入配额                               |
 | 多 stat 并列页(3+ 个大数字) | ≤ 5%          | **只让 1 个用红,其余用 `#1A1A1A` 深灰** —— 大小造对比而非颜色            |
 | 月报正文页                  | 豁免          | 底部红条为版式自带(见 §5 Page 3),正文区内仍按 ≤5% 执行                   |
 
@@ -311,6 +350,8 @@ banner 以下的正文区用色遵循 §6.2 色板。
 - ❌ 给 BEFORE 加红色 —— 红色锚点专属 AFTER
 
 ### 6.4 三个高频组合（实战沉淀的视觉模式）
+
+> 下面是手工排版的实战数值。生成器各版式的字号与间距是定稿值（如标签 12pt、说明 14pt、块间距 0.3″），以 `references/layouts.md` 为准。
 
 整套 PPT 反复使用这三种组合,形成"重复"原则下的视觉特征:
 
@@ -385,8 +426,15 @@ banner 以下的正文区用色遵循 §6.2 色板。
 milwaukee-ppt/
 ├── SKILL.md                      # 本文件
 ├── references/
+│   ├── layouts.md                # 生成器 6 个版式的字段写法、适用场景、反例、报错与警告
 │   ├── layout-patterns.md        # 已验证案例参考(项目汇报 15 种 + 月报 5 种),非版式白名单
-│   └── before-after.md           # 新增双框布局的 slot 契约与事实对比验收
+│   └── before-after.md           # Before/After 布局的 slot 契约与事实对比验收
+├── scripts/
+│   ├── generate_ppt.py           # 生成器入口:<文稿.md> [-o 输出.pptx]
+│   ├── mdparse.py / layouts/     # 解析层 / 每个版式一个渲染模块
+│   └── README.md                 # 改生成器代码时的约定
+├── examples/demo/                # 虚构示例文稿 deck.md(覆盖全部版式)+ 示意图与其生成脚本
+├── tests/                        # python3 tests/run_all.py 跑全部
 └── assets/
     ├── MS_Template.pptx          # 官方模板(顶部红 banner + 左上 logo + 底部页脚)
     ├── logo.png                  # Milwaukee Logo(白色版,用于 banner)
