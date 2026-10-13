@@ -13,12 +13,12 @@ import re
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
-from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import add_page_chrome, fill_titles, warn
+from .common import (add_page_chrome, add_run, fill_titles, strip_theme_style, take_slot,
+                     text_lines, warn)
 
 NAME = "process"
 LAYOUT_INDEX = 4
@@ -31,10 +31,9 @@ CIRCLE = Inches(0.5)
 MIN_CARD_H = Inches(2.0)    # 内容少时卡片也不低于这个高度，免得显得单薄
 
 NAME_PT, DESC_PT, NUM_PT = 18, 14, 16
-INK, MUTED, CARD_FILL, CARD_LINE, CIRCLE_FILL = (
-    RGBColor(0x1A, 0x1A, 0x1A), RGBColor(0x6B, 0x6B, 0x6B),
-    RGBColor(0xF5, 0xF5, 0xF5), RGBColor(0xE5, 0xE5, 0xE5),
-    RGBColor(0x33, 0x33, 0x33))
+INK, MUTED, WHITE = "1A1A1A", "6B6B6B", "FFFFFF"
+CARD_FILL, CARD_LINE, CIRCLE_FILL = (
+    RGBColor(0xF5, 0xF5, 0xF5), RGBColor(0xE5, 0xE5, 0xE5), RGBColor(0x33, 0x33, 0x33))
 LINE_SPACING = 1.2          # 行高 ≈ 字号 × 1.2（估算溢出用）
 NAME_SPACE_AFTER = Pt(6)
 
@@ -61,9 +60,7 @@ def parse(page):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    slot = slide.placeholders[SLOT_IDX]
-    left, top, width, height = slot.left, slot.top, slot.width, slot.height
-    slot._element.getparent().remove(slot._element)
+    left, top, width, height = take_slot(slide, SLOT_IDX)
 
     steps = page.fields["steps"]
     n = len(steps)
@@ -88,7 +85,7 @@ def render(prs, page, ctx):
 def _add_card(slide, i, name, desc, x, y, w, h):
     card = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, y, w, h)
     card.name = f"Process Card {i}"
-    _plain(card)
+    strip_theme_style(card)
     card.fill.solid()
     card.fill.fore_color.rgb = CARD_FILL
     card.line.color.rgb = CARD_LINE
@@ -101,17 +98,17 @@ def _add_card(slide, i, name, desc, x, y, w, h):
     head = tf.paragraphs[0]
     head.alignment = PP_ALIGN.LEFT        # 自选图形默认居中，正文一律左对齐
     head.space_after = NAME_SPACE_AFTER
-    _run(head, name, NAME_PT, True, INK)
+    add_run(head, name, NAME_PT, True, INK)
     if desc:
         body = tf.add_paragraph()
         body.alignment = PP_ALIGN.LEFT
-        _run(body, desc, DESC_PT, False, MUTED)
+        add_run(body, desc, DESC_PT, False, MUTED)
 
 
 def _add_number(slide, i, x, y):
     c = slide.shapes.add_shape(MSO_SHAPE.OVAL, x, y, CIRCLE, CIRCLE)
     c.name = f"Process Number {i}"
-    _plain(c)
+    strip_theme_style(c)
     c.fill.solid()
     c.fill.fore_color.rgb = CIRCLE_FILL
     c.line.fill.background()
@@ -120,42 +117,13 @@ def _add_number(slide, i, x, y):
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
     tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-    _run(tf.paragraphs[0], str(i), NUM_PT, True, RGBColor(0xFF, 0xFF, 0xFF))
-
-
-def _plain(shape):
-    """去掉自选图形自带的主题样式（p:style 会带出阴影和主题色字），颜色全部显式给。"""
-    style = shape._element.find(qn("p:style"))
-    if style is not None:
-        shape._element.remove(style)
-
-
-def _run(p, text, size, bold, color):
-    r = p.add_run()
-    r.text = text
-    f = r.font
-    f.size = Pt(size)
-    f.bold = bold
-    f.name = "Arial"
-    f.color.rgb = color
-    rpr = r._r.get_or_add_rPr()
-    ea = rpr.makeelement(qn("a:ea"), {"typeface": "PingFang SC"})
-    rpr.append(ea)
-
-
-def _lines(text, size_pt, width_emu):
-    """估算行数：拉丁字符按 0.55 em、CJK 宽字符按 1 em。"""
-    if not text:
-        return 0
-    per_line = max(1.0, Emu(width_emu).pt / size_pt)     # 一行能放多少个 em
-    ems = sum(1.0 if ord(ch) > 0x2E7F else 0.55 for ch in text)
-    return max(1, -(-ems // per_line))
+    add_run(tf.paragraphs[0], str(i), NUM_PT, True, WHITE)
 
 
 def _card_height(name, desc, card_w):
     """估算卡片需要的高度（EMU）：上内边距（含半个序号圆）+ 文字 + 下内边距。"""
-    text_w = card_w - 2 * PAD
-    text_pt = (_lines(name, NAME_PT, text_w) * NAME_PT * LINE_SPACING
+    text_w = Emu(card_w - 2 * PAD).inches
+    text_pt = (text_lines(name, NAME_PT, text_w) * NAME_PT * LINE_SPACING
                + NAME_SPACE_AFTER.pt
-               + _lines(desc, DESC_PT, text_w) * DESC_PT * LINE_SPACING)
+               + text_lines(desc, DESC_PT, text_w) * DESC_PT * LINE_SPACING)
     return CIRCLE // 2 + 2 * PAD + Pt(text_pt)

@@ -5,9 +5,10 @@
 """
 import re
 
-from deckcheck import (EMU, LAYOUT_INDEX, red_elements, caption_bar, caption_style_problems, check,
-                       finish, generate, out_of_bounds, paragraphs, placeholder,
-                       tag_shape, warnings)
+from deckcheck import (CONTENT_SLOT_IN, EMU, LAYOUT_INDEX, body_slide, caption_bar,
+                       caption_style_problems, check, finish, generate, out_of_bounds,
+                       paragraphs, placeholder, red_elements, shapes_named, tag_shape,
+                       warnings)
 
 NAME = "process"
 TITLE = "Mock Process Page"
@@ -28,10 +29,6 @@ Mock one-line conclusion.
 Next: Mock next step.
 """
 IMAGES = {"img/shot.png": (1600, 900)}
-
-
-def body_slide(r):
-    return r.slides[1] if len(r.slides) > 1 else None
 
 
 def test_chrome():
@@ -80,21 +77,11 @@ Mock one-line conclusion.
 """
 
 
-def named(slide, prefix):
-    """名字为「prefix N」的形状，按 N 排序。"""
-    out = []
-    for sh in slide.shapes:
-        m = re.fullmatch(re.escape(prefix) + r" (\d+)", sh.name)
-        if m:
-            out.append((int(m.group(1)), sh))
-    return [sh for _, sh in sorted(out, key=lambda x: x[0])]
-
-
 def test_cards_text():
-    """每张卡片里是步骤名 + 说明，序号圆从 1 开始连续，没有“未实现”警告。"""
+    """每张卡片里是步骤名 + 说明，序号圆从 1 开始连续。"""
     r = generate(MD, images=IMAGES)
     s = body_slide(r)
-    cards = named(s, "Process Card") if s else []
+    cards = shapes_named(s, "Process Card") if s else []
     check("process：3 步 → 3 张卡片", len(cards) == 3, [c.name for c in cards])
     check("process：卡片文字 = 步骤名 + 说明",
           [paragraphs(c) for c in cards] == [
@@ -102,16 +89,13 @@ def test_cards_text():
               ["Review", "Weekly triage of sample items"],
               ["Ship", "Publish the mock result"]],
           [paragraphs(c) for c in cards])
-    nums = named(s, "Process Number") if s else []
+    nums = shapes_named(s, "Process Number") if s else []
     check("process：序号圆 1、2、3",
           [n.text_frame.text for n in nums] == ["1", "2", "3"],
           [n.text_frame.text for n in nums])
-    check("process：没有“未实现”警告",
-          not [x for x in warnings(r.stderr) if "未实现" in x], r.stderr)
 
 
-# 槽位 idx 17「Process Area」（#13 定稿）：L / T / W / H 英寸
-SLOT = (0.56, 1.30, 12.21, 4.30)
+SLOT = CONTENT_SLOT_IN     # 槽位 idx 17「Process Area」
 FIVE = ["Plan | Mock plan", "Build | Mock build", "Test | Mock test",
         "Ship | Mock ship", "Learn | Mock learn"]
 
@@ -127,8 +111,8 @@ def test_geometry():
         n = len(steps)
         r = generate(steps_md(steps))
         s = body_slide(r)
-        cards = named(s, "Process Card") if s else []
-        nums = named(s, "Process Number") if s else []
+        cards = shapes_named(s, "Process Card") if s else []
+        nums = shapes_named(s, "Process Number") if s else []
         check(f"process {n} 步：{n} 张卡片、{n} 个序号圆",
               len(cards) == n and len(nums) == n, (len(cards), len(nums)))
         if len(cards) != n or len(nums) != n:

@@ -2,9 +2,10 @@
 
 运行：python3 skills/milwaukee-ppt/tests/test_image_text.py
 """
-from deckcheck import (LAYOUT_INDEX, caption_bar, caption_style_problems, check,
-                       finish, generate, out_of_bounds, paragraphs, placeholder,
-                       tag_shape, warnings)
+from deckcheck import (EMU, IMAGE_FRAME_IN, LAYOUT_INDEX, body_slide, caption_bar,
+                       caption_style_problems, check, emu_rect, finish, generate,
+                       out_of_bounds, paragraphs, pictures, placeholder, tag_shape,
+                       warnings)
 
 NAME = "image-text"
 TITLE = "Mock Image + Text Page"
@@ -25,10 +26,6 @@ Mock one-line conclusion.
 Next: Mock next step.
 """
 IMAGES = {"img/shot.png": (1600, 900)}
-
-
-def body_slide(r):
-    return r.slides[1] if len(r.slides) > 1 else None
 
 
 def test_chrome():
@@ -61,14 +58,6 @@ def test_chrome():
     check("image-text：形状在页面内、不压 banner 和页脚", not bad, bad)
 
 
-EMU = 914400
-FRAME = (0.56, 1.30, 7.64, 4.30)   # 模板 layout 7 idx 20 图框（英寸）
-
-
-def pictures(slide):
-    return [sh for sh in slide.shapes if sh.shape_type == 13]
-
-
 def check_fitted(label, slide, src_w, src_h):
     """图在图框内完整显示：比例不变、贴住一边、两个方向居中。"""
     pics = pictures(slide)
@@ -76,7 +65,7 @@ def check_fitted(label, slide, src_w, src_h):
         check(f"{label}：页上正好一张图", False, len(pics))
         return
     pic = pics[0]
-    fl, ft, fw, fh = (int(v * EMU) for v in FRAME)
+    fl, ft, fw, fh = emu_rect(IMAGE_FRAME_IN)
     tol = EMU // 100
     inside = (pic.left >= fl - tol and pic.top >= ft - tol
               and pic.left + pic.width <= fl + fw + tol
@@ -137,8 +126,6 @@ def test_points_in_text_area():
         runs = [r_ for p in slot.text_frame.paragraphs for r_ in p.runs]
         local = [r_.font.size for r_ in runs if r_.font.size is not None]
         check("image-text：要点沿用槽位样式（不另设字号）", not local, local)
-    check("image-text：没有“未实现”警告",
-          not [w for w in warnings(r.stderr) if "未实现" in w], r.stderr)
 
 
 def test_no_image_is_error():

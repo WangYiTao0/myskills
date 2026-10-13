@@ -5,10 +5,10 @@
 日期在线上、标题说明在线下且文字正确；字号阶梯；槽位占位框已删；条数 / 条目格式报错；
 文字估计溢出警告；banner 以外只有红条用红。
 """
-from deckcheck import (EMU, LAYOUT_INDEX, caption_bar, caption_style_problems, check,
-                       finish, generate, out_of_bounds, paragraphs, placeholder,
-                       red_elements,
-                       tag_shape, warnings)
+from deckcheck import (CONTENT_SLOT_IN, LAYOUT_INDEX, body_slide, caption_bar,
+                       caption_style_problems, check, emu_rect, finish, generate,
+                       out_of_bounds, paragraphs, placeholder, red_elements, run_style,
+                       shapes_named, tag_shape, warnings)
 
 NAME = "timeline"
 TITLE = "Mock Timeline Page"
@@ -29,10 +29,6 @@ Mock one-line conclusion.
 Next: Mock next step.
 """
 IMAGES = {"img/shot.png": (1600, 900)}
-
-
-def body_slide(r):
-    return r.slides[1] if len(r.slides) > 1 else None
 
 
 def test_chrome():
@@ -66,13 +62,7 @@ def test_chrome():
 
 
 # 模板 layout 6 的槽位 idx 19「Timeline Area」：0.56 / 1.30 / 12.21 / 4.30 英寸
-SLOT = (int(0.56 * EMU), int(1.30 * EMU), int(12.21 * EMU), int(4.30 * EMU))
-
-
-def shapes_named(slide, prefix):
-    """名字以 prefix 开头的形状，按名字末尾的序号排序。"""
-    found = [sh for sh in slide.shapes if sh.name.startswith(prefix)]
-    return sorted(found, key=lambda sh: int(sh.name.rsplit(" ", 1)[-1]))
+SLOT = emu_rect(CONTENT_SLOT_IN)
 
 
 def center_x(sh):
@@ -134,13 +124,6 @@ SIX = ["Jan | Kick-off | Mock scope agreed",
        "Jun | Rollout | Mock company-wide release"]
 
 
-def run_style(sh, para):
-    """第 para 段第一个 run 的 (字号 pt, 粗体, 颜色 hex)。"""
-    r = sh.text_frame.paragraphs[para].runs[0]
-    color = str(r.font.color.rgb) if r.font.color and r.font.color.type else None
-    return (r.font.size.pt if r.font.size else None, r.font.bold, color)
-
-
 def test_text_positions():
     """每个节点：日期在线上方，标题 + 说明在线下方，与节点居中对齐，文字正确。"""
     for items in (SIX[:3], SIX):
@@ -182,8 +165,6 @@ def test_text_positions():
               all(inside_slot(sh) for sh in s.shapes if sh.name.startswith("Timeline")))
         check(f"timeline {n} 条：空的槽位占位框（idx 19）已删掉",
               placeholder(s, 19) is None)
-        check(f"timeline {n} 条：没有“未实现”警告",
-              not [w for w in warnings(r.stderr) if "未实现" in w], r.stderr)
     if not (dates and bodies):
         check("timeline：有日期和正文可查字号", False)
         return

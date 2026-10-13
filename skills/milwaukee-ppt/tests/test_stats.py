@@ -2,9 +2,10 @@
 
 运行：python3 skills/milwaukee-ppt/tests/test_stats.py
 """
-from deckcheck import (LAYOUT_INDEX, caption_bar, caption_style_problems, check,
-                       finish, generate, out_of_bounds, paragraphs, placeholder,
-                       red_elements, tag_shape, warnings)
+from deckcheck import (CONTENT_SLOT_IN, EMU, LAYOUT_INDEX, body_slide, caption_bar,
+                       caption_style_problems, check, finish, generate, out_of_bounds,
+                       paragraphs, placeholder, red_elements, run_styles, shapes_named,
+                       tag_shape, warnings)
 
 NAME = "stats"
 TITLE = "Mock Stats Page"
@@ -25,10 +26,6 @@ Mock one-line conclusion.
 Next: Mock next step.
 """
 IMAGES = {"img/shot.png": (1600, 900)}
-
-
-def body_slide(r):
-    return r.slides[1] if len(r.slides) > 1 else None
 
 
 def test_chrome():
@@ -61,15 +58,7 @@ def test_chrome():
     check("stats：形状在页面内、不压 banner 和页脚", not bad, bad)
 
 
-EMU = 914400
-# 模板 layout 5 槽位 idx 18「Stats Area」（#13 定稿，英寸）
-SLOT_L, SLOT_T, SLOT_W, SLOT_H = 0.56, 1.30, 12.21, 4.30
-
-
-def shapes_named(slide, prefix):
-    """按名字前缀取形状（如 "Stat Card"），按序号排好。"""
-    found = [sh for sh in slide.shapes if sh.name.startswith(prefix + " ")]
-    return sorted(found, key=lambda sh: int(sh.name.rsplit(" ", 1)[1]))
+SLOT_L, SLOT_T, SLOT_W, SLOT_H = CONTENT_SLOT_IN     # 槽位 idx 18「Stats Area」
 
 
 def stats_md(items, title=TITLE):
@@ -86,17 +75,6 @@ Layout: stats
 {body}
 Mock conclusion.
 """
-
-
-def run_style(shape):
-    """文本框里所有 run 的 (字号pt, 加粗, 颜色)；集合，便于断言“全部一致”。"""
-    out = set()
-    for para in shape.text_frame.paragraphs:
-        for run in para.runs:
-            f = run.font
-            color = str(f.color.rgb) if f.color and f.color.type is not None else None
-            out.add((f.size.pt if f.size else None, bool(f.bold), color))
-    return out
 
 
 def test_card_text_hierarchy():
@@ -139,15 +117,15 @@ def test_card_text_hierarchy():
           all(lb.top + lb.height <= nb.top and nb.top + nb.height <= nt.top
               for lb, nb, nt in zip(labels, numbers, notes)))
     check("stats：标签 12pt 加粗 #6B6B6B",
-          all(run_style(x) == {(12.0, True, "6B6B6B")} for x in labels),
-          [run_style(x) for x in labels])
+          all(run_styles(x) == {(12.0, True, "6B6B6B")} for x in labels),
+          [run_styles(x) for x in labels])
     check("stats：说明 14pt 不加粗 #6B6B6B",
-          all(run_style(x) == {(14.0, False, "6B6B6B")} for x in notes),
-          [run_style(x) for x in notes])
-    sizes = {st[0] for x in numbers for st in run_style(x)}
+          all(run_styles(x) == {(14.0, False, "6B6B6B")} for x in notes),
+          [run_styles(x) for x in notes])
+    sizes = {st[0] for x in numbers for st in run_styles(x)}
     check("stats：大数字 60pt 加粗（数字都放得下时）",
-          sizes == {60.0} and all(st[1] for x in numbers for st in run_style(x)),
-          [run_style(x) for x in numbers])
+          sizes == {60.0} and all(st[1] for x in numbers for st in run_styles(x)),
+          [run_styles(x) for x in numbers])
     P_STYLE = "{http://schemas.openxmlformats.org/presentationml/2006/main}style"
     check("stats：卡片扁平（浅灰底、无描边、不引用主题样式，渲染器不会补阴影）",
           all(c._element.find(P_STYLE) is None and str(c.fill.fore_color.rgb) == "F5F5F5"
@@ -167,12 +145,12 @@ def test_red_discipline():
     check("stats：标了 ! 的只有第 2 个数字是红色", red == ["Stat Number 2"], red)
     num2 = shapes_named(s, "Stat Number")[1:2]
     check("stats：重点数字用品牌红 DB011C",
-          num2 and {st[2] for st in run_style(num2[0])} == {"DB011C"},
-          num2 and run_style(num2[0]))
+          num2 and {st[2] for st in run_styles(num2[0])} == {"DB011C"},
+          num2 and run_styles(num2[0]))
     others = [x for i, x in enumerate(shapes_named(s, "Stat Number")) if i != 1]
     check("stats：其余数字 #1A1A1A",
-          all({st[2] for st in run_style(x)} == {"1A1A1A"} for x in others),
-          [run_style(x) for x in others])
+          all({st[2] for st in run_styles(x)} == {"1A1A1A"} for x in others),
+          [run_styles(x) for x in others])
 
     r = generate(stats_md(["- A | 1 | Mock note", "- B | 2 | Mock note"]))
     s = body_slide(r)
@@ -194,6 +172,12 @@ def test_errors():
         check(f"stats 报错（{name}）：非零退出、信息含页标题、不出文件",
               r.rc != 0 and bad_title in r.stderr and not r.path.exists(),
               (r.rc, r.stderr))
+    # 重点行漏写列表符号：不能悄悄当成红条结论
+    r = generate(stats_md(["!Rework | -40% | Mock", "- B | 2 | Mock", "- C | 3 | Mock"],
+                          title=bad_title))
+    check("stats 报错（! 行没写列表符号）：非零退出、含页标题和原行、提示加列表符号",
+          r.rc != 0 and bad_title in r.stderr and "!Rework" in r.stderr
+          and "- !" in r.stderr and not r.path.exists(), (r.rc, r.stderr))
 
 
 def test_long_numbers_shrink_together():
@@ -207,7 +191,7 @@ def test_long_numbers_shrink_together():
     if s is None:
         check("stats 长数字：生成了正文页", False, r.stderr)
         return
-    sizes = {st[0] for x in shapes_named(s, "Stat Number") for st in run_style(x)}
+    sizes = {st[0] for x in shapes_named(s, "Stat Number") for st in run_styles(x)}
     check("stats 长数字：所有数字字号相同", len(sizes) == 1, sizes)
     size = next(iter(sizes)) if len(sizes) == 1 else None
     check("stats 长数字：缩到 60pt 以下但仍明显大于说明（≥ 28pt）",
@@ -246,8 +230,6 @@ def test_cards_fill_slot():
         check(f"stats {n} 条：卡片间距统一 0.3\"",
               all(abs(g - 0.3) < tol for g in gaps), gaps)
         check(f"stats {n} 条：空的槽位占位框已清掉", placeholder(s, 18) is None)
-        check(f"stats {n} 条：没有“未实现”警告",
-              not [w for w in warnings(r.stderr) if "未实现" in w], r.stderr)
 
 
 if __name__ == "__main__":

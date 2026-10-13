@@ -20,7 +20,7 @@ def test_demo_deck():
     r = subprocess.run([sys.executable, str(GENERATOR), str(DECK), "-o", str(out)],
                        capture_output=True, text=True)
     check("示例文稿：退出码 0", r.returncode == 0, r.stderr)
-    check("示例文稿：没有“未实现”警告", "未实现" not in r.stderr, r.stderr)
+    check("示例文稿：没有警告", "警告" not in r.stderr, r.stderr)
     if not out.exists():
         check("示例文稿：生成了 pptx", False, r.stderr)
         return

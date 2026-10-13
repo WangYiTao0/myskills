@@ -4,12 +4,9 @@
 覆盖：槽位 11–16 的文字 / 图片、lead 与红条结论的切分、图在槽内等比居中、
 缺小节等文稿错误、caption / lead / 短文的估算警告、红色纪律、红条不盖住 caption。
 """
-from pptx.enum.shapes import MSO_SHAPE_TYPE
-
-from deckcheck import (LAYOUT_INDEX, caption_bar, caption_style_problems, check,
-                       finish, generate, out_of_bounds, paragraphs, placeholder,
-                       red_elements,
-                       tag_shape, warnings)
+from deckcheck import (EMU, LAYOUT_INDEX, body_slide, caption_bar, caption_style_problems,
+                       check, finish, generate, out_of_bounds, paragraphs, pictures,
+                       placeholder, red_elements, tag_shape, warnings)
 
 NAME = "before-after"
 TITLE = "Mock Before / After Page"
@@ -35,9 +32,10 @@ Next: Mock next step.
 """
 IMAGES = {"img/shot.png": (1600, 900)}
 
-
-def body_slide(r):
-    return r.slides[1] if len(r.slides) > 1 else None
+# 模板 layout 3 的约定位置（英寸）：lead 文本框、没有红条时的 caption 槽上沿
+LEAD_LEFT_IN, LEAD_TOP_IN, LEAD_H_IN = 0.56, 1.30, 0.42
+CAPTION_TOP_IN = 6.12
+POS_TOL = 2000            # EMU，约 0.002"
 
 
 def test_chrome():
@@ -102,10 +100,6 @@ Caption: Old mock screen
 Caption: New mock screen
 """
 IMG_FILES = {"img/wide.png": (1600, 900), "img/tall.png": (600, 1200)}
-
-
-def pictures(slide):
-    return [sh for sh in slide.shapes if sh.shape_type == MSO_SHAPE_TYPE.PICTURE]
 
 
 def test_image_slots():
@@ -181,11 +175,11 @@ def test_lead_and_conclusion():
           == "Mock lead sentence about the change.", [x.name for x in s.shapes])
     if leads:
         lead = leads[0]
-        E = 914400
         check("before-after（lead）：位置在模板约定的 0.56 / 1.30，高 0.42",
-              abs(lead.left - 0.56 * E) < 2000 and abs(lead.top - 1.30 * E) < 2000
-              and abs(lead.height - 0.42 * E) < 2000,
-              (lead.left / E, lead.top / E, lead.height / E))
+              abs(lead.left - LEAD_LEFT_IN * EMU) < POS_TOL
+              and abs(lead.top - LEAD_TOP_IN * EMU) < POS_TOL
+              and abs(lead.height - LEAD_H_IN * EMU) < POS_TOL,
+              (lead.left / EMU, lead.top / EMU, lead.height / EMU))
         tag = tag_shape(s)
         check("before-after（lead）：Lead 不和 Tag 重叠",
               tag is not None and not overlaps(lead, tag))
@@ -271,11 +265,11 @@ def test_bar_does_not_cover_content():
               hidden)
     r = generate(deck("### Before\nOld.\nCaption: a\n### After\nNew.\nCaption: b\n"))
     s = body_slide(r)
-    E = 914400
     check("before-after（红条）：没有红条时 caption 在模板位置 6.12\"",
-          caption_bar(s) is None and abs(placeholder(s, 15).top - 6.12 * E) < 2000
-          and abs(placeholder(s, 16).top - 6.12 * E) < 2000,
-          placeholder(s, 15).top / E)
+          caption_bar(s) is None
+          and abs(placeholder(s, 15).top - CAPTION_TOP_IN * EMU) < POS_TOL
+          and abs(placeholder(s, 16).top - CAPTION_TOP_IN * EMU) < POS_TOL,
+          placeholder(s, 15).top / EMU)
 
 
 def test_long_text_wraps_and_warns():

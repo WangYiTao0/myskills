@@ -12,12 +12,12 @@ import re
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
-from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import add_page_chrome, fill_titles, warn
+from .common import (add_page_chrome, add_run, fill_titles, strip_theme_style, take_slot,
+                     text_lines, warn)
 
 NAME = "timeline"
 LAYOUT_INDEX = 6
@@ -33,8 +33,10 @@ TEXT_GAP = 0.2        # 日期 / 正文与节点之间的空隙
 
 LINE_COLOR = (0xBF, 0xBF, 0xBF)
 NODE_COLOR = (0x33, 0x33, 0x33)
-INK = (0x1A, 0x1A, 0x1A)       # 标题
-MUTED = (0x6B, 0x6B, 0x6B)     # 日期、说明
+INK = "1A1A1A"        # 标题
+MUTED = "6B6B6B"      # 日期、说明
+LINE_SPACING = 1.2    # 行高 ≈ 字号 × 1.2（估算溢出用）
+DESC_SPACE_BEFORE = 6  # 说明段前（pt）
 
 # (字号 pt, 粗体, 颜色)：#13 字号阶梯
 DATE_STYLE = (12, True, MUTED)
@@ -69,23 +71,6 @@ def _rgb(shape_fill, rgb):
     shape_fill.fore_color.rgb = RGBColor(*rgb)
 
 
-def _run(paragraph, text, style):
-    size, bold, color = style
-    r = paragraph.add_run()
-    r.text = text
-    r.font.size = Pt(size)
-    r.font.bold = bold
-    r.font.name = "Arial"
-    r.font.color.rgb = RGBColor(*color)
-    rpr = r._r.get_or_add_rPr()          # 中文字体：latin 之后追加 ea
-    ea = rpr.find(qn("a:ea"))
-    if ea is None:
-        ea = rpr.makeelement(qn("a:ea"), {})
-        rpr.append(ea)
-    ea.set("typeface", "PingFang SC")
-    return r
-
-
 def _textbox(slide, name, left, top, width, height, anchor):
     tb = slide.shapes.add_textbox(left, top, width, height)
     tb.name = name
@@ -97,47 +82,33 @@ def _textbox(slide, name, left, top, width, height, anchor):
     return tf
 
 
-def _lines(text, size, width_emu):
-    """估计 text 在 width 宽、size 号字下占几行（拉丁字符按 0.55em、中文按 1.1em 估）。"""
-    per_line = max(1, int(width_emu / 12700 / (size * 0.55)))
-    units = sum(2 if ord(ch) > 0x2E7F else 1 for ch in text)
-    return max(1, -(-units // per_line))
-
-
 def _overflow_warnings(page, items, col_w, date_h, body_h):
     """日期超过一行、标题 + 说明估计超出线下区域时警告（不中止）。"""
+    width_in = Emu(col_w).inches
+
+    def height_pt(text, style):
+        return text_lines(text, style[0], width_in) * style[0] * LINE_SPACING
+
     for i, (date, title, desc) in enumerate(items, start=1):
-        date_pt = _lines(date, DATE_STYLE[0], col_w) * DATE_STYLE[0] * 1.2
-        body_pt = _lines(title, TITLE_STYLE[0], col_w) * TITLE_STYLE[0] * 1.2
+        date_pt = height_pt(date, DATE_STYLE)
+        body_pt = height_pt(title, TITLE_STYLE)
         if desc:
-            body_pt += 6 + _lines(desc, DESC_STYLE[0], col_w) * DESC_STYLE[0] * 1.2
-        if date_pt > date_h / 12700 or body_pt > body_h / 12700:
+            body_pt += DESC_SPACE_BEFORE + height_pt(desc, DESC_STYLE)
+        if date_pt > Emu(date_h).pt or body_pt > Emu(body_h).pt:
             warn(f"页「{page.title}」时间线第 {i} 条文字估计溢出, 建议精简日期 / 标题 / 说明")
 
 
 def _plain(shape):
-    """去掉 python-pptx 自动加的主题样式引用（p:style）：主题阴影、accent 色都不继承，
-    填充和描边只用显式写的黑白灰。"""
-    style = shape._element.find(qn("p:style"))
-    if style is not None:
-        shape._element.remove(style)
+    """去掉主题样式引用、关掉继承阴影：填充和描边只用显式写的黑白灰。"""
+    strip_theme_style(shape)
     shape.shadow.inherit = False
     return shape
-
-
-def _slot(slide):
-    for ph in slide.placeholders:
-        if ph.placeholder_format.idx == SLOT_IDX:
-            return ph
-    return None
 
 
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    slot = _slot(slide)
-    left, top, width, slot_h = slot.left, slot.top, slot.width, slot.height
-    slot._element.getparent().remove(slot._element)   # 空槽位不留在页面上
+    left, top, width, slot_h = take_slot(slide, SLOT_IDX)   # 空槽位不留在页面上
 
     items = page.fields["items"]
     n = len(items)
@@ -172,18 +143,18 @@ def render(prs, page, ctx):
         tf = _textbox(slide, f"Timeline Date {i}", x, date_top, col_w, date_h,
                       MSO_ANCHOR.BOTTOM)
         tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-        _run(tf.paragraphs[0], date, DATE_STYLE)
+        add_run(tf.paragraphs[0], date, *DATE_STYLE)
 
         tf = _textbox(slide, f"Timeline Text {i}", x, body_top, col_w, body_h,
                       MSO_ANCHOR.TOP)
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
-        _run(p, title, TITLE_STYLE)
+        add_run(p, title, *TITLE_STYLE)
         if desc:
             p = tf.add_paragraph()
             p.alignment = PP_ALIGN.CENTER
-            p.space_before = Pt(6)
-            _run(p, desc, DESC_STYLE)
+            p.space_before = Pt(DESC_SPACE_BEFORE)
+            add_run(p, desc, *DESC_STYLE)
 
     add_page_chrome(slide, page, ctx)
     return slide

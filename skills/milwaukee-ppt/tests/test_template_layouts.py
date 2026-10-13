@@ -1,27 +1,55 @@
 """验证模板 assets/MS_Template.pptx 的版式契约（票 #13）。
 
-- 共 8 个 layout；0–3 与基线（git e2cbdea，追加新版式之前）逐项一致；4 张样例页不动。
+- 共 8 个 layout；0–3 与基线逐项一致；4 张样例页不动。
+  基线写死在本文件里（取自提交 702cd8a 的模板，即 10-08 的 Before/After 几何），
+  不依赖 git，单独拷出 skill 目录也能跑。
 - 4–7 是 Process / Stats / Timeline / Image + Text：idx 0/10 与 layout 0 同位置，
   命名 BODY 槽位在 banner 以下、红条最高位以上，左右边距不小于 0.5 英寸。
 - 新 layout 不预画形状（只有占位框），banner 以外没有新增红色。
 
 运行：python3 skills/milwaukee-ppt/tests/test_template_layouts.py
 """
-import io
+import hashlib
 import re
-import subprocess
 import sys
 from pathlib import Path
 
 from pptx import Presentation
 from pptx.enum.shapes import PP_PLACEHOLDER
-from pptx.util import Emu
 
 SKILL = Path(__file__).resolve().parent.parent
 TEMPLATE = SKILL / "assets" / "MS_Template.pptx"
-REPO = SKILL.parent.parent
-BASELINE_REV = "e2cbdea"
-BASELINE_PATH = "skills/milwaukee-ppt/assets/MS_Template.pptx"
+
+# 基线（EMU）：layout 0–3 的 (版式名, [(idx, 占位框名, (L, T, W, H))])
+_BANNER_TITLES = [(0, "Title 1", (4644601, 87850, 7543800, 369350)),
+                  (10, "Text Placeholder 13", (4644601, 457200, 7543800, 381000))]
+BASELINE_LAYOUTS = [
+    ("Blank  Slide", _BANNER_TITLES),
+    ("Title Slide", [(0, "Rectangle 3", (914400, 4419600, 10363200, 457200)),
+                     (1, "Rectangle 4", (1828800, 4953000, 8534400, 457200))]),
+    ("Blank  Slide WITH BULLETS",
+     [_BANNER_TITLES[0], (1, "Content Placeholder 2", (508000, 1295400, 11379200, 5257800)),
+      _BANNER_TITLES[1]]),
+    ("Before / After", _BANNER_TITLES + [
+        (11, "Before Title", (1860804, 1792224, 2651760, 393192)),
+        (12, "After Title", (7676388, 1792224, 2651760, 393192)),
+        (13, "Before Content", (713232, 2542032, 4946904, 2660904)),
+        (14, "After Content", (6528816, 2542032, 4946904, 2660904)),
+        (15, "Before Caption", (512064, 5596128, 5349240, 320040)),
+        (16, "After Caption", (6327648, 5596128, 5349240, 320040))]),
+]
+# layout 3 上的原生形状（对比框和中间箭头）
+BASELINE_BA_SHAPES = [("Before Frame", (512064, 2331720, 5349240, 3081528)),
+                      ("After Frame", (6327648, 2331720, 5349240, 3081528)),
+                      ("Conversion", (5879592, 3584448, 429768, 457200))]
+# 4 张样例页：(版式名, slide XML 的 sha256)
+BASELINE_SLIDES = [
+    ("Title Slide", "8808d2c1fc8060e1399a572aa9d347d0693c87ca15ecea5de52ef6d7a119e12f"),
+    ("Blank  Slide", "1217054dea7395fd41f10d197e79249c43ab84021fc81fc0566055c503e1fdaa"),
+    ("Blank  Slide WITH BULLETS",
+     "0443c02ee03c6d8ea3394352a63dbd1b9a81f64dff9e2392cd1b6253e466e10c"),
+    ("Before / After", "d41a8be7e5a3add9a1a02d6840345a15d6194988d986982b4c6334278bbe7fcc"),
+]
 
 EMU_IN = 914400
 SLIDE_W_IN = 13.333
@@ -54,19 +82,11 @@ def describe_layout(layout):
         (ph.placeholder_format.idx, ph.name, geom(ph)) for ph in layout.placeholders))
 
 
-def load_baseline():
-    blob = subprocess.run(
-        ["git", "-C", str(REPO), "show", f"{BASELINE_REV}:{BASELINE_PATH}"],
-        check=True, capture_output=True).stdout
-    return Presentation(io.BytesIO(blob))
-
-
 def is_grey(hex6):
     r, g, b = hex6[0:2], hex6[2:4], hex6[4:6]
     return r == g == b
 
 
-base = load_baseline()
 prs = Presentation(str(TEMPLATE))
 layouts = list(prs.slide_layouts)
 
@@ -74,17 +94,21 @@ layouts = list(prs.slide_layouts)
 check(len(layouts) == 8, f"layout 数应为 8，实际 {len(layouts)}")
 
 # 2. layout 0–3 与基线一致
-for i, old in enumerate(base.slide_layouts):
+for i, want in enumerate(BASELINE_LAYOUTS):
     if i >= len(layouts):
         break
-    check(describe_layout(layouts[i]) == describe_layout(old),
-          f"layout {i} 与基线不一致：{describe_layout(layouts[i])} != {describe_layout(old)}")
+    got = describe_layout(layouts[i])
+    check(got == (want[0], sorted(want[1])), f"layout {i} 与基线不一致：{got} != {want}")
+if len(layouts) > 3:
+    got = [(s.name, geom(s)) for s in layouts[3].shapes if not s.is_placeholder]
+    check(got == BASELINE_BA_SHAPES, f"layout 3 的对比框 / 箭头与基线不一致：{got}")
 
 # 3. 4 张样例页不动（版式名与 XML 完全一致）
-check(len(prs.slides) == len(base.slides), f"样例页数应为 {len(base.slides)}，实际 {len(prs.slides)}")
-for i, (new_s, old_s) in enumerate(zip(prs.slides, base.slides)):
-    check(new_s.slide_layout.name == old_s.slide_layout.name, f"样例页 {i} 版式变了")
-    check(new_s.part.blob == old_s.part.blob, f"样例页 {i} 内容变了")
+check(len(prs.slides) == len(BASELINE_SLIDES),
+      f"样例页数应为 {len(BASELINE_SLIDES)}，实际 {len(prs.slides)}")
+for i, (slide, (layout_name, digest)) in enumerate(zip(prs.slides, BASELINE_SLIDES)):
+    check(slide.slide_layout.name == layout_name, f"样例页 {i} 版式变了")
+    check(hashlib.sha256(slide.part.blob).hexdigest() == digest, f"样例页 {i} 内容变了")
 
 # 4. 新 layout
 ref = {ph.placeholder_format.idx: geom(ph) for ph in layouts[0].placeholders}
