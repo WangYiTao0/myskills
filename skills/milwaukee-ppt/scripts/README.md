@@ -26,3 +26,13 @@
   - 新增辅助：`runs(shape, para=0)` 返回一段里每个 run 的 `(文字, 字号, 粗体, 颜色)`，查单位拆分；`fill_color` / `line_color` 取形状纯色填充 / 描边 hex（没有为 `None`）；`geometry(shape)` 取预设几何名（`ellipse`、`diamond`、`homePlate`、`chevron`…）；`inside(shape, rect_in)` 判断形状落在英寸矩形内（如 `CONTENT_SLOT_IN`）；`slide_xmls(path)` 取各页 slide XML 字节，用于和改动前逐字节比较；`deck_error(r, title, *needles)` 判断报错退出且信息含页标题。常量 `STATUS_COLORS`、`DONE_GREEN`、`DOING_AMBER`、`DOING_INK`、`UNIT_PT`、`UNIT_COLOR`。
   - 共用部件本身由 `tests/test_common_parts.py` 测：`generate(md, probe=True)` 时额外注册测试专用版式 `_probe`（`tests/probe_layout.py`），不进正式注册表，版式票不用动它。
 - 新增或修改一个版式时，通常只动 `layouts/<版式>.py` + `tests/test_<版式>.py`；需要新的共用部件时再动 `common.py` / `deckcheck.py`。
+
+## 检查命令 `inspect_ppt.py`
+
+生成后细调时用它定位元素：
+
+```
+python3 scripts/inspect_ppt.py deck.pptx
+```
+
+每页一个标题行 `== 第 N 页 | layout: <名>`，下面每个形状一行：`名字 | 类型 | L= T= W= H=（英寸，两位小数） | 文字前约 30 字`（换行替换成空格）。文件不存在或不是 pptx 时，错误信息写到 stderr，退出码非零。
