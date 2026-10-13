@@ -6,8 +6,12 @@
         一张图 ![](...) 或一段短文  → 内容区 idx 13
         Caption: 一句说明           → idx 15
     ### After[: 自定义标题]         → 改后小节，同上（idx 12 / 14 / 16）
-    最后一个小节之后的普通文字      → 底部红条结论
+    最后一个小节之后的普通文字      → 底部结论条（Next 也进结论条）
 小节在 Caption: 行或空行处结束；两个小节之间不能有普通文字。
+
+底部结论条：caption 之下单行品牌红条（白字 24pt），不用证据页那种向上长高的红条。
+有 Next 时作为第二行、结论条顶边不动向下长，最低到页脚之上；超过两行或单项超过一行就警告。
+图片 / 短文为空的内容槽和没写的 caption 槽都删掉，编辑视图里不留提示文字。
 
 字段：fields = {"lead": str, "before": Side, "after": Side}，
 Side = {"title", "image", "text": [段落], "caption"}。
@@ -21,7 +25,7 @@ from pptx.util import Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (IMG_LEFT, IMG_W, add_page_chrome, caption_lines, fill_titles,
+from .common import (IMG_LEFT, IMG_W, add_month_tag, caption_lines, fill_titles,
                      load_image, warn)
 
 NAME = "before-after"
@@ -35,16 +39,21 @@ SLOTS = {"before": {"title": 11, "content": 13, "caption": 15},
 LEAD_LEFT, LEAD_TOP, LEAD_W, LEAD_H = 0.56, 1.30, 11.90, 0.42
 TAG_LEFT = IMG_LEFT + IMG_W - 1.7          # common.add_month_tag 的文本框左缘
 LEAD_PT = 20
-CAPTION_PT = 16                            # 模板 caption 槽：16pt bold、不换行
+CAPTION_PT = 16                            # 模板 caption 槽：16pt bold、槽内换行、最多两行
+CAPTION_MAX_LINES = 2
 CAPTION_INSET = 0.06 * 2                   # 槽的左右内边距（英寸）
 CONTENT_PT = 18                            # 模板内容槽：18pt、居中
 LINE_SPACING = 1.2
 
-# 有底部红条时（红条最低从 5.88" 起、最高可长到 5.60"），模板 6.12" 的 caption 槽会被盖住：
-# caption 收进对比框底部（与内容区同宽），内容区相应变矮。框本身是 layout 形状，位置不变。
-BAR_SAFE_BOTTOM = 5.55
-CAPTION_IN_FRAME_H = 0.35
-CONTENT_CAPTION_GAP = 0.10
+# 底部结论条（英寸）：在 caption 槽（5.57–6.15"）之下、页脚（7.25"）之上。
+# 品牌红底、白字 24pt、单行；有 Next 时第二行，顶边不动向下长，底边不超过 BAR_MAX_BOTTOM。
+BAR_LEFT, BAR_TOP, BAR_W, BAR_MIN_H = 0.56, 6.43, 12.21, 0.55
+BAR_MAX_BOTTOM = 7.22
+BAR_PT = 24
+BAR_LINE_H = 0.36                          # 24pt 单倍行距的一行（英寸，含字体行高余量）
+BAR_INSET_X, BAR_INSET_Y = 0.1, 0.03
+BAR_MAX_LINES = 2
+BRAND_RED = RGBColor(0xDB, 0x01, 0x1C)
 
 _IMG = re.compile(r"^!\[[^\]]*\]\(([^)]+)\)$")
 _SECTION = re.compile(r"^###\s+(\S+?)\s*(?:[:：]\s*(.*))?$")
@@ -122,16 +131,21 @@ def text_width_in(text, pt):
     return em * pt / 72
 
 
+def _lines(text, pt, avail_w):
+    return max(1, -(-text_width_in(text, pt) // avail_w))
+
+
 def _check_caption(page, side, slot):
     avail = slot.width / 914400 - CAPTION_INSET
-    if side["caption"] and text_width_in(side["caption"], CAPTION_PT) > avail:
-        warn(f"页「{page.title}」{side['title']} 的 Caption 估计超过一行, "
-             f"建议精简到约 {int(avail * 72 / CAPTION_PT)} 个汉字以内: {side['caption']}")
+    if side["caption"] and _lines(side["caption"], CAPTION_PT, avail) > CAPTION_MAX_LINES:
+        warn(f"页「{page.title}」{side['title']} 的 Caption 估计超过两行, "
+             f"建议精简到约 {int(avail * 72 / CAPTION_PT) * CAPTION_MAX_LINES} 个汉字以内: "
+             f"{side['caption']}")
 
 
 def _check_text(page, side, slot):
     avail_w = slot.width / 914400 - CAPTION_INSET
-    lines = sum(max(1, -(-text_width_in(t, CONTENT_PT) // avail_w)) for t in side["text"])
+    lines = sum(_lines(t, CONTENT_PT, avail_w) for t in side["text"])
     if lines * CONTENT_PT * LINE_SPACING / 72 > slot.height / 914400:
         warn(f"页「{page.title}」{side['title']} 的短文估计溢出内容区 (约 {int(lines)} 行), "
              f"建议精简")
@@ -154,43 +168,74 @@ def _add_lead(slide, page):
     tf.margin_top = tf.margin_bottom = 0
     p = tf.paragraphs[0]
     p.alignment = PP_ALIGN.LEFT
-    r = p.add_run()
-    r.text = text
-    r.font.size, r.font.bold, r.font.name = Pt(LEAD_PT), True, "Arial"
-    r.font.color.rgb = RGBColor(0x1A, 0x1A, 0x1A)
-    rpr = r._r.get_or_add_rPr()                 # 中文字体与模板一致（latin 之后追加 ea）
-    rpr.append(rpr.makeelement(qn("a:ea"), {"typeface": "PingFang SC"}))
+    _set_run(p.add_run(), text, LEAD_PT, True, RGBColor(0x1A, 0x1A, 0x1A))
     return tb
 
 
-def _fit_above_bar(content, caption):
-    """把 caption 槽挪进对比框底部，内容区缩到 caption 上方（都在红条可能的最高位置之上）。"""
-    cap_top = Inches(BAR_SAFE_BOTTOM - CAPTION_IN_FRAME_H)
-    left, top, width = content.left, content.top, content.width
-    caption.left, caption.top = left, cap_top
-    caption.width, caption.height = width, Inches(CAPTION_IN_FRAME_H)
-    content.left, content.top, content.width = left, top, width
-    content.height = cap_top - Inches(CONTENT_CAPTION_GAP) - top
+def _set_run(r, text, pt, bold, rgb):
+    r.text = text
+    r.font.size, r.font.bold, r.font.name = Pt(pt), bold, "Arial"
+    r.font.color.rgb = rgb
+    rpr = r._r.get_or_add_rPr()                 # 中文字体与模板一致（latin 之后追加 ea）
+    rpr.append(rpr.makeelement(qn("a:ea"), {"typeface": "PingFang SC"}))
+
+
+def _add_conclusion_bar(slide, page):
+    """caption 之下的单行红色结论条；有 Next 时第二行，向下长到页脚之上为止。"""
+    lines = caption_lines(page)
+    if not lines:
+        return None
+    avail = BAR_W - 2 * BAR_INSET_X
+    rows = [_lines(t, BAR_PT, avail) for t in lines]
+    h = max(BAR_MIN_H, sum(rows) * BAR_LINE_H + 2 * BAR_INSET_Y)
+    if max(rows) > 1 or sum(rows) > BAR_MAX_LINES:
+        warn(f"页「{page.title}」的结论条估计放不下 (结论和 Next 各应单行), "
+             f"建议精简到约 {int(avail * 72 / BAR_PT)} 个汉字以内: {' / '.join(lines)}")
+    h = min(h, BAR_MAX_BOTTOM - BAR_TOP)
+    tb = slide.shapes.add_textbox(Inches(BAR_LEFT), Inches(BAR_TOP), Inches(BAR_W), Inches(h))
+    tb.name = "Conclusion Bar"
+    tb.fill.solid()
+    tb.fill.fore_color.rgb = BRAND_RED
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf.margin_left = tf.margin_right = Inches(BAR_INSET_X)
+    tf.margin_top = tf.margin_bottom = Inches(BAR_INSET_Y)
+    for i, text in enumerate(lines):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.alignment = PP_ALIGN.CENTER
+        p.line_spacing = 1.0
+        _set_run(p.add_run(), text, BAR_PT, False, RGBColor(0xFF, 0xFF, 0xFF))
+    return tb
+
+
+def _drop(shape):
+    """删掉空槽位：页面上不留占位框，编辑视图里就不会出现提示文字。"""
+    shape._element.getparent().remove(shape._element)
 
 
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    has_bar = bool(caption_lines(page))
     for key in SIDES:
         side, slots = page.fields[key], SLOTS[key]
         slide.placeholders[slots["title"]].text = side["title"]
         content = slide.placeholders[slots["content"]]
         caption = slide.placeholders[slots["caption"]]
-        if has_bar:
-            _fit_above_bar(content, caption)
-        content.text = "\n".join(side["text"])     # 放图时为空：先清空槽内文字
-        content.text_frame.word_wrap = True            # 模板槽是不换行的，短文要在槽宽内换行
-        _check_text(page, side, content)
         if side["image"]:
             _place_image(slide, content, load_image(side["image"], ctx, page.title))
-        caption.text = side["caption"]
-        _check_caption(page, side, caption)
+            _drop(content)
+        else:
+            content.text = "\n".join(side["text"])
+            content.text_frame.word_wrap = True        # 模板槽是不换行的，短文要在槽宽内换行
+            _check_text(page, side, content)
+        if side["caption"]:
+            caption.text = side["caption"]
+            caption.text_frame.word_wrap = True
+            _check_caption(page, side, caption)
+        else:
+            _drop(caption)
     _add_lead(slide, page)
-    add_page_chrome(slide, page, ctx)
+    add_month_tag(slide, page.tag, ctx.year)
+    _add_conclusion_bar(slide, page)
     return slide
