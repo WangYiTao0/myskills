@@ -169,13 +169,14 @@ description: Milwaukee Tool 工作汇报 PPT 的格式与视觉规范。当用�
 
 > ⚠️ **本 skill 不生成 pptx，但下游用 `MS_Template.pptx` 生成时，主标题 / 副标题必须填进模板已有的占位框（placeholder），禁止为它们另建 text box。** 另建文本框会导致位置飘、与 banner 不对齐、跨页不一致——这正是本节要杜绝的问题。
 
-模板 16:9（13.33″ × 7.5″）。红 banner（顶部 0–1.0″ 全宽 `#DB011C`）、左上 logo、底部页脚都在 **母版** 里，生成时不用画、不要动。三个版式各自的占位框如下（`idx` = `slide.placeholders[idx]` 的键，位置单位：英寸）：
+模板 16:9（13.33″ × 7.5″）。红 banner（顶部 0–1.0″ 全宽 `#DB011C`）、左上 logo、底部页脚都在 **母版** 里，生成时不用画、不要动。四个版式各自的占位框如下（`idx` = `slide.placeholders[idx]` 的键，位置单位：英寸）：
 
 | 版式 index | 版式名 | 用途 | 占位框（idx → 角色，位置 L/T/W/H） |
 | --- | --- | --- | --- |
 | 1 | `Title Slide` | 封面 | `0` 主标题（居中，1.0 / 4.83 / 11.33 / 0.5）；`1` 副标题（2.0 / 5.42 / 9.33 / 0.5） |
 | 0 | `Blank  Slide` | 正文页（默认） | `0` 主标题（banner 右上，5.08 / 0.1 / 8.25 / 0.4）；`10` 副标题（紧贴主标题下，5.08 / 0.5 / 8.25 / 0.42） |
 | 2 | `Blank  Slide WITH BULLETS` | 带正文框的正文页 | 同上两个 + `1` 大正文框（0.56 / 1.42 / 12.44 / 5.75） |
+| 3 | `Before / After` | 双框对比页（新增） | `0/10` 沿用正文页；`11/12` 左右标题、`13/14` BODY 内容区、`15/16` 单句 caption，详见 `references/before-after.md` |
 
 **填充规则（生成时照做）**：
 
@@ -223,6 +224,8 @@ slide.placeholders[10].text = '报表分散已成为扩展瓶颈'   # 副标题�
 月报因每页底部红条，红色面积天然高于 §6.3 配额 —— **月报场景豁免面积配额**，但红条只承载"结论 + Next"，不做装饰。
 
 ### Before / After 布局（用于 §06 成果展示）
+
+- 使用模板新增 layout index `3`（`Before / After`）；制作对应事实对比页前，读取 `references/before-after.md` 的 slot 契约、事实对应与重渲验收。
 
 - 左 BEFORE / 右 AFTER 对置，中间放转换指示（箭头 / "→"）
 - AFTER 侧用 Milwaukee Red `#DB011C` 做强调锚点，**红色只标 AFTER，不给 BEFORE**
@@ -382,7 +385,8 @@ banner 以下的正文区用色遵循 §6.2 色板。
 milwaukee-ppt/
 ├── SKILL.md                      # 本文件
 ├── references/
-│   └── layout-patterns.md        # 已验证案例参考(项目汇报 15 种 + 月报 5 种),非版式白名单
+│   ├── layout-patterns.md        # 已验证案例参考(项目汇报 15 种 + 月报 5 种),非版式白名单
+│   └── before-after.md           # 新增双框布局的 slot 契约与事实对比验收
 └── assets/
     ├── MS_Template.pptx          # 官方模板(顶部红 banner + 左上 logo + 底部页脚)
     ├── logo.png                  # Milwaukee Logo(白色版,用于 banner)
