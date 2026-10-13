@@ -25,6 +25,7 @@ class Page:
     next_label: str = "Next"
     fields: dict = field(default_factory=dict)       # 本版式字段（版式模块填）
     lines: list = field(default_factory=list)        # 通用字段以外的原始正文行，空行为 ""
+    indents: list = field(default_factory=list)      # 与 lines 一一对应：行首缩进宽度（tab 算 4）
 
 
 @dataclass
@@ -69,6 +70,12 @@ def _validate_meta(meta):
         raise DeckError(f"month 月份应为 01-12, 实际: {meta['month']!r}")
 
 
+def _indent(raw):
+    """行首空白的宽度：空格算 1，tab 按 4 列对齐（markdown 习惯）。"""
+    expanded = raw.expandtabs(4)
+    return len(expanded) - len(expanded.lstrip())
+
+
 def _strip_comments(text):
     return re.sub(r"<!--.*?-->", "", text, flags=re.S)
 
@@ -108,6 +115,7 @@ def parse(path):
             cur.tag = mtag.group(1).strip()
             continue
         cur.lines.append(line)
+        cur.indents.append(_indent(raw) if line else 0)
 
     if not pages:
         raise DeckError("md 中没有找到任何页 (以 '# ' 开头的标题)")

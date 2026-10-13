@@ -5,10 +5,13 @@
 日期在线上、标题说明在线下且文字正确；字号阶梯；槽位占位框已删；条数 / 条目格式报错；
 文字估计溢出警告；banner 以外只有红条用红。
 """
-from deckcheck import (CONTENT_SLOT_IN, LAYOUT_INDEX, body_slide, caption_bar,
-                       caption_style_problems, check, emu_rect, finish, generate,
-                       out_of_bounds, paragraphs, placeholder, red_elements, run_style,
-                       shapes_named, tag_shape, warnings)
+import hashlib
+
+from deckcheck import (BRAND_RED, CONTENT_SLOT_IN, DOING_AMBER, DONE_GREEN, EMU, LAYOUT_INDEX,
+                       body_slide, caption_bar, caption_style_problems, center_x, center_y,
+                       check, deck_error, emu_rect, fill_color, finish, generate, geometry,
+                       inside, line_color, named, out_of_bounds, paragraphs, placeholder,
+                       red_elements, run_style, shapes_named, slide_xmls, tag_shape, warnings)
 
 NAME = "timeline"
 TITLE = "Mock Timeline Page"
@@ -63,14 +66,6 @@ def test_chrome():
 
 # 模板 layout 6 的槽位 idx 19「Timeline Area」：0.56 / 1.30 / 12.21 / 4.30 英寸
 SLOT = emu_rect(CONTENT_SLOT_IN)
-
-
-def center_x(sh):
-    return sh.left + sh.width // 2
-
-
-def center_y(sh):
-    return sh.top + sh.height // 2
 
 
 def inside_slot(sh):
@@ -185,6 +180,9 @@ def test_errors():
         check(f"timeline {name}：非零退出", r.rc != 0, r.rc)
         check(f"timeline {name}：错误信息含页标题和条数",
               "Mock Bad Count" in r.stderr and str(len(items)) in r.stderr, r.stderr)
+    r = generate(deck(["!!" + SIX[0]] + SIX[1:3], title="Mock Double Key"))
+    check("timeline !! 两个叹号：报错含页标题和 !!", deck_error(r, "Mock Double Key", "!!"),
+          r.stderr)
     r = generate(deck(SIX[:2] + ["Mar | Pilot only"], title="Mock Bad Item"))
     check("timeline 条目缺说明：非零退出", r.rc != 0, r.rc)
     check("timeline 条目缺说明：错误信息含页标题和该行",
@@ -211,6 +209,288 @@ def test_red_discipline():
     check("timeline：只有底部红条用红", reds == ["Caption Bar"], reds)
 
 
+# ---- 旧写法兼容：不写状态时与 #24 改动前的输出逐字节一致 ----------------------------
+
+# 改动前（集成分支 d046835）生成的正文页 slide2.xml 的 sha256
+LEGACY_SHA = {
+    "MD": "87a0dcae31ea19eca85a4df75fc1e2f4edc2d9ef975db5d4e81373584ff4cb6c",
+    "SIX": "b4663faad56844ea1ce6fe8c5d3fb69f9955a1bff35018ed69c3c4520d6da00b",
+}
+
+
+def test_legacy_bytes():
+    """不写状态的旧写法：正文页 slide XML 与改动前逐字节一致（只用黑白灰）。"""
+    for name, md in (("MD", MD), ("SIX", deck(SIX))):
+        r = generate(md, images=IMAGES)
+        xml = slide_xmls(r.path).get("ppt/slides/slide2.xml", b"") if r.rc == 0 else b""
+        check(f"timeline 旧写法 {name}：slide XML 与改动前逐字节一致",
+              hashlib.sha256(xml).hexdigest() == LEGACY_SHA[name], r.stderr)
+
+
+# ---- 状态着色（spec #20 / #24）----------------------------------------------------
+
+# 6 条：3 个关键里程碑（!）、第 5 条进行中
+STATUS6 = ["Jul | Kick-off | Mock scope agreed | 完成",
+           "!Aug | Form live | Mock form opened | done",
+           "Aug | Codes on | One week late | 已完成",
+           "!Sep | Pilot | Mock workshop switched | DONE",
+           "Oct | Review | Mock data collecting | 进行中",
+           "!Nov | Rollout | Mock second site | 未完成"]
+STATUS6_ST = ["done", "done", "done", "done", "doing", "todo"]
+STATUS6_KEY = [False, True, False, True, False, True]
+
+
+def status_slide(items=STATUS6, title=TITLE):
+    r = generate(deck(items, title=title))
+    s = body_slide(r)
+    check(f"timeline 状态 {len(items)} 条：生成了正文页", r.rc == 0 and s is not None, r.stderr)
+    return r, s
+
+
+def test_status_nodes():
+    """每条一个节点：已完成实心绿、进行中实心琥珀、未完成白底红描边（不实心填红）。"""
+    r, s = status_slide()
+    if s is None:
+        return
+    nodes = shapes_named(s, "Milestone Node")
+    check("timeline 状态：6 条 → 6 个节点", len(nodes) == 6, [n.name for n in nodes])
+    if len(nodes) != 6:
+        return
+    want_fill = {"done": DONE_GREEN, "doing": DOING_AMBER, "todo": "FFFFFF"}
+    got = [(fill_color(n), line_color(n)) for n in nodes]
+    check("timeline 状态：节点填充按状态（未完成白底）",
+          [g[0] for g in got] == [want_fill[st] for st in STATUS6_ST], got)
+    check("timeline 状态：未完成节点红描边",
+          all(g[1] == BRAND_RED for g, st in zip(got, STATUS6_ST) if st == "todo"), got)
+    check("timeline 状态：整页没有实心红填充（红条除外）",
+          not [sh.name for sh in s.shapes
+               if sh.name != "Caption Bar" and fill_color(sh) == BRAND_RED])
+    check("timeline 状态：不再画旧的黑白灰节点", not shapes_named(s, "Timeline Node"))
+
+
+def test_status_emphasis():
+    """关键里程碑是菱形且比普通节点大；进行中比普通节点大、带外圈和“当前”标签，日期加粗放大。"""
+    r, s = status_slide()
+    if s is None:
+        return
+    nodes = shapes_named(s, "Milestone Node")
+    if len(nodes) != 6:
+        check("timeline 状态：6 个节点", False, len(nodes))
+        return
+    geo = [geometry(n) for n in nodes]
+    check("timeline 状态：关键里程碑是菱形、其余是圆",
+          geo == ["diamond" if k else "ellipse" for k in STATUS6_KEY], geo)
+    plain = nodes[0].width     # 第 1 条：普通、已完成
+    check("timeline 状态：关键里程碑比普通节点大",
+          all(n.width > plain for n, k in zip(nodes, STATUS6_KEY) if k),
+          [n.width for n in nodes])
+    check("timeline 状态：进行中节点比普通节点大", nodes[4].width > plain,
+          (nodes[4].width, plain))
+    check("timeline 状态：节点都以横线为中心",
+          len({n.top + n.height // 2 for n in nodes}) == 1)
+    ring = [sh for sh in s.shapes if sh.name == "Current Ring"]
+    check("timeline 状态：进行中带一个外圈（琥珀描边、比节点大、同心）",
+          len(ring) == 1 and line_color(ring[0]) == DOING_AMBER
+          and ring[0].width > nodes[4].width
+          and abs(center_x(ring[0]) - center_x(nodes[4])) <= 2, [sh.name for sh in ring])
+    tag = [sh for sh in s.shapes if sh.name == "Current Tag"]
+    check("timeline 状态：一个“当前”标签，在进行中节点正上方、日期之上",
+          len(tag) == 1 and tag[0].text_frame.text == "当前"
+          and abs(center_x(tag[0]) - center_x(nodes[4])) <= 2
+          and tag[0].top + tag[0].height <= shapes_named(s, "Milestone Date")[4].top,
+          [(sh.name, sh.text_frame.text) for sh in tag])
+    dates = shapes_named(s, "Milestone Date")
+    check("timeline 状态：日期 6 个、文字去掉了 !",
+          [d.text_frame.text for d in dates] == ["Jul", "Aug", "Aug", "Sep", "Oct", "Nov"],
+          [d.text_frame.text for d in dates])
+    if len(dates) == 6:
+        cur, other = run_style(dates[4]), run_style(dates[0])
+        check("timeline 状态：进行中日期加粗、近黑、比普通日期大",
+              cur[1] and cur[2] == "1A1A1A" and cur[0] > other[0], (cur, other))
+    r, s = status_slide([x.replace("进行中", "未完成") for x in STATUS6])
+    if s is not None:
+        check("timeline 没有进行中：不画外圈和“当前”标签",
+              not [sh.name for sh in s.shapes if sh.name.startswith("Current")])
+
+
+def dash(shape):
+    el = shape._element.find(".//{http://schemas.openxmlformats.org/drawingml/2006/main}"
+                             "prstDash")
+    return el.get("val") if el is not None else None
+
+
+def test_status_lines():
+    """已完成的那段线绿色实线（首节点 → 进行中），后面灰色虚线；已完成节点上有白色对勾。"""
+    r, s = status_slide()
+    if s is None:
+        return
+    nodes = shapes_named(s, "Milestone Node")
+    prog, rest = named(s, "Progress Line"), named(s, "Remaining Line")
+    check("timeline 状态：一条绿色进度线、一条剩余虚线", len(prog) == len(rest) == 1,
+          (len(prog), len(rest)))
+    if len(prog) == len(rest) == 1 and len(nodes) == 6:
+        p, q = prog[0], rest[0]
+        check("timeline 状态：进度线绿色实线，从首节点到进行中节点",
+              line_color(p) == DONE_GREEN and dash(p) is None
+              and abs(p.left - center_x(nodes[0])) <= 2
+              and abs(p.left + p.width - center_x(nodes[4])) <= 2,
+              (line_color(p), dash(p)))
+        check("timeline 状态：剩余线灰色虚线，从进行中节点到末节点",
+              line_color(q) == "BFBFBF" and dash(q) not in (None, "solid")
+              and abs(q.left - center_x(nodes[4])) <= 2
+              and abs(q.left + q.width - center_x(nodes[5])) <= 2,
+              (line_color(q), dash(q)))
+        check("timeline 状态：线在节点下层",
+              list(s.shapes).index(q) < list(s.shapes).index(nodes[0]))
+    marks = shapes_named(s, "Milestone Check")
+    check("timeline 状态：4 个已完成节点各有白色对勾",
+          len(marks) == 4 and all(line_color(m) == "FFFFFF" for m in marks),
+          [m.name for m in marks])
+    check("timeline 状态：对勾编号对应节点、落在节点内",
+          [m.name for m in marks] == [f"Milestone Check {i}" for i in (1, 2, 3, 4)]
+          and all(nodes[i].left <= m.left and m.left + m.width <= nodes[i].left + nodes[i].width
+                  for i, m in enumerate(marks)), [m.name for m in marks])
+    # 全部完成：整条绿线，没有虚线；全部未完成：整条虚线，没有绿线
+    for label, st, want in (("全部完成", "完成", (1, 0)), ("全部未完成", "未完成", (0, 1))):
+        items = [x.rsplit("|", 1)[0] + "| " + st for x in STATUS6]
+        r, s = status_slide(items)
+        if s is not None:
+            got = (len(named(s, "Progress Line")), len(named(s, "Remaining Line")))
+            check(f"timeline {label}：进度线 / 剩余线 = {want}", got == want, got)
+
+
+def test_status_text_and_legend():
+    """标题 + 说明在节点下方居中；右上角图例 4 项；所有形状在槽位内、不越界。"""
+    r, s = status_slide()
+    if s is None:
+        return
+    nodes = shapes_named(s, "Milestone Node")
+    bodies = shapes_named(s, "Milestone Text")
+    want = [[x.split("|")[1].strip(), x.split("|")[2].strip()] for x in STATUS6]
+    check("timeline 状态：标题 + 说明文字正确", [paragraphs(b) for b in bodies] == want,
+          [paragraphs(b) for b in bodies])
+    if len(bodies) == len(nodes) == 6:
+        ring = named(s, "Current Ring")
+        lowest = max(sh.top + sh.height for sh in nodes + ring)
+        check("timeline 状态：正文在所有节点和外圈下方、与节点居中",
+              all(b.top >= lowest and abs(center_x(b) - center_x(nd)) <= 2
+                  for b, nd in zip(bodies, nodes)))
+        title_pt = [run_style(b, 0) for b in bodies]
+        check("timeline 状态：未完成的标题灰色，其余近黑",
+              [t[2] for t in title_pt] == ["6B6B6B" if st == "todo" else "1A1A1A"
+                                            for st in STATUS6_ST], title_pt)
+        check("timeline 状态：关键里程碑 / 进行中的标题比普通的大",
+              all(title_pt[i][0] > title_pt[0][0] for i in (1, 3, 4, 5)), title_pt)
+    icons, labels = shapes_named(s, "Legend Icon"), shapes_named(s, "Legend Label")
+    check("timeline 状态：图例 4 项文字",
+          [l.text_frame.text for l in labels] == ["已完成", "进行中", "未完成", "关键里程碑"],
+          [l.text_frame.text for l in labels])
+    if len(icons) == 4:
+        check("timeline 状态：图例图标按状态着色、关键里程碑是菱形",
+              [(geometry(i), fill_color(i)) for i in icons] ==
+              [("ellipse", DONE_GREEN), ("ellipse", DOING_AMBER), ("ellipse", "FFFFFF"),
+               ("diamond", "1A1A1A")] and line_color(icons[2]) == BRAND_RED,
+              [(geometry(i), fill_color(i), line_color(i)) for i in icons])
+        checks = [sh for sh in s.shapes if sh.name.startswith("Legend Check")]
+        check("timeline 状态：图例对勾带编号 Legend Check 1、在已完成图标中心",
+              [c.name for c in checks] == ["Legend Check 1"]
+              and abs(center_x(checks[0]) - center_x(icons[0])) < 0.05 * EMU,
+              [c.name for c in checks])
+    else:
+        check("timeline 状态：图例 4 个图标", False, len(icons))
+    if icons and labels:
+        top_of_body = min(sh.top for sh in named(s, "Current Tag") + shapes_named(s, "Milestone Date"))
+        check("timeline 状态：图例在右上角、在“当前”标签和日期之上",
+              max(sh.top + sh.height for sh in icons + labels) <= top_of_body
+              and labels[-1].left + labels[-1].width > emu_rect(CONTENT_SLOT_IN)[0]
+              + emu_rect(CONTENT_SLOT_IN)[2] * 0.8)
+    body = [sh for sh in s.shapes if not sh.is_placeholder
+            and sh.name not in ("Caption Bar", "Month Tag")]
+    check("timeline 状态：内容形状都在槽位内",
+          body and all(inside(sh, CONTENT_SLOT_IN) for sh in body),
+          [sh.name for sh in body if not inside(sh, CONTENT_SLOT_IN)])
+    check("timeline 状态：不越界、不压 banner 和页脚", not out_of_bounds(r.prs, [s]),
+          out_of_bounds(r.prs, [s]))
+    check("timeline 状态：空的槽位占位框已删掉", placeholder(s, 19) is None)
+
+
+def test_status_errors():
+    """多个进行中、状态值写错、只有部分写了状态：非零退出，信息含页标题。"""
+    two = STATUS6[:3] + [STATUS6[3].replace("DONE", "进行中")] + STATUS6[4:]
+    r = generate(deck(two, title="Mock Two Doing"))
+    check("timeline 两个进行中：报错含页标题", deck_error(r, "Mock Two Doing", "进行中"),
+          r.stderr)
+    bad = STATUS6[:2] + ["Aug | Codes on | One week late | finished"] + STATUS6[3:]
+    r = generate(deck(bad, title="Mock Bad Status"))
+    check("timeline 状态值写错：报错含页标题和原值",
+          deck_error(r, "Mock Bad Status", "finished"), r.stderr)
+    part = STATUS6[:2] + ["Aug | Codes on | One week late"] + STATUS6[3:]
+    r = generate(deck(part, title="Mock Partial"))
+    check("timeline 部分写了状态：报错含页标题和没写的条号",
+          deck_error(r, "Mock Partial", "3"), r.stderr)
+
+
+def test_status_red():
+    """状态色只在状态元素上：用红的只有未完成节点、图例“未完成”图标和底部红条，且都不实心填红。"""
+    r, s = status_slide()
+    if s is None:
+        return
+    reds = sorted(red_elements(s))
+    check("timeline 状态：红色只出现在未完成节点和图例“未完成”图标上",
+          reds == ["Legend Icon 3", "Milestone Node 6"], reds)
+    greens = sorted(sh.name for sh in s.shapes
+                    if DONE_GREEN in {fill_color(sh), line_color(sh)})
+    check("timeline 状态：绿色只在已完成节点、进度线、图例“已完成”图标上",
+          greens == sorted(["Legend Icon 1", "Progress Line"]
+                           + [f"Milestone Node {i}" for i in (1, 2, 3, 4)]), greens)
+    ambers = sorted(sh.name for sh in s.shapes
+                    if DOING_AMBER in {fill_color(sh), line_color(sh)})
+    check("timeline 状态：琥珀只在进行中节点、外圈、图例“进行中”图标上",
+          ambers == ["Current Ring", "Legend Icon 2", "Milestone Node 5"], ambers)
+
+
+def test_key_without_status():
+    """不写状态但标了 !：照黑白灰画，关键里程碑是放大的深灰菱形；其余节点与旧写法相同。"""
+    items = ["Jan | Kick-off | Mock scope agreed", "!Mar | Pilot | Two sample teams",
+             "Jun | Rollout | Mock release"]
+    r = generate(deck(items))
+    s = body_slide(r)
+    if s is None:
+        check("timeline 旧写法带 !：生成了正文页", False, r.stderr)
+        return
+    nodes = shapes_named(s, "Timeline Node")
+    check("timeline 旧写法带 !：第 2 个节点是放大的菱形、其余是圆",
+          [geometry(n) for n in nodes] == ["ellipse", "diamond", "ellipse"]
+          and nodes[1].width > nodes[0].width, [geometry(n) for n in nodes])
+    check("timeline 旧写法带 !：日期去掉了 !",
+          shapes_named(s, "Timeline Date")[1].text_frame.text == "Mar")
+    check("timeline 旧写法带 !：没有图例和状态色", not shapes_named(s, "Legend Icon")
+          and red_elements(s) == [])
+
+
+def overlap(a, b):
+    return (a.left < b.left + b.width and b.left < a.left + a.width
+            and a.top < b.top + b.height and b.top < a.top + a.height)
+
+
+def test_legend_with_tag():
+    """写了 Tag 时右上角有月份标识：图例让到它下方，不重叠，仍在“当前”标签之上。"""
+    md = deck(STATUS6).replace("Layout: timeline", "Layout: timeline\nTag: Oct")
+    r = generate(md)
+    s = body_slide(r)
+    if s is None:
+        check("timeline 状态 + Tag：生成了正文页", False, r.stderr)
+        return
+    tag = tag_shape(s)
+    legend = shapes_named(s, "Legend Icon") + shapes_named(s, "Legend Label")
+    check("timeline 状态 + Tag：图例不压月份标识",
+          tag is not None and legend and not any(overlap(tag, x) for x in legend),
+          [x.name for x in legend if tag is not None and overlap(tag, x)])
+    cur = named(s, "Current Tag")
+    check("timeline 状态 + Tag：图例仍在“当前”标签之上",
+          cur and max(x.top + x.height for x in legend) <= cur[0].top)
+
+
 if __name__ == "__main__":
     test_chrome()
     test_nodes()
@@ -218,4 +498,13 @@ if __name__ == "__main__":
     test_errors()
     test_overflow_warning()
     test_red_discipline()
+    test_legacy_bytes()
+    test_status_nodes()
+    test_status_emphasis()
+    test_status_lines()
+    test_status_text_and_legend()
+    test_status_errors()
+    test_status_red()
+    test_key_without_status()
+    test_legend_with_tag()
     finish()

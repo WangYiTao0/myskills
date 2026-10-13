@@ -1,6 +1,6 @@
 ---
 name: milwaukee-ppt
-description: Milwaukee Tool 工作汇报 PPT 的格式、视觉规范与 pptx 生成器。当用户撰写或生成任何 Milwaukee 内部汇报类 PPT（项目汇报、月报、阶段汇报、客户简报、复盘、展会/外出参观汇报、培训分享等），或提到"Milwaukee 汇报格式 / MS 汇报模板 / 工作汇报 / 项目总结 / 月报"时使用。本 skill 分两层：①【始终生效】PPT 视觉与排版规范（品牌锚点、设计系统、标题结构、内容硬约束）；②【仅项目汇报生效】固定 Agenda 顺序 + PDCA 标注 + "已落地 vs 未来"分离 —— 仅当任务是"项目汇报 / 项目总结 / 月报"，或用户明确要求 Agenda/PDCA 时才套用，其他汇报场景不强制。附带 md → pptx 生成器：把带 Layout 标记的 md 文稿按 Milwaukee 模板生成可编辑 pptx（封面、6 种正文版式、收尾页）；用户要直接出 pptx 文件时也用它。
+description: Milwaukee Tool 工作汇报 PPT 的格式、视觉规范与 pptx 生成器。当用户撰写或生成任何 Milwaukee 内部汇报类 PPT（项目汇报、月报、阶段汇报、客户简报、复盘、展会/外出参观汇报、培训分享等），或提到"Milwaukee 汇报格式 / MS 汇报模板 / 工作汇报 / 项目总结 / 月报"时使用。本 skill 分两层：①【始终生效】PPT 视觉与排版规范（品牌锚点、设计系统、标题结构、内容硬约束）；②【仅项目汇报生效】固定 Agenda 顺序 + PDCA 标注 + "已落地 vs 未来"分离 —— 仅当任务是"项目汇报 / 项目总结 / 月报"，或用户明确要求 Agenda/PDCA 时才套用，其他汇报场景不强制。附带 md → pptx 生成器：把带 Layout 标记的 md 文稿按 Milwaukee 模板生成可编辑 pptx（封面、8 种正文版式、收尾页）；用户要直接出 pptx 文件时也用它。
 ---
 
 # Milwaukee Tool 工作汇报格式规范
@@ -59,7 +59,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 1. **整理文稿**：把用户的自由文稿整理成带 Layout 标记的 md——每个 `#` 一页，`##` 是 action title，一行 `Layout: <版式名>` 选版式（不写 = evidence），普通文字行是底部红条的一句话结论，`Next:` 是下一步。版式字段、选版依据、反例都在 `references/layouts.md`，整理前先读；内容仍守本文件 §4、§6、§7（项目汇报再加 §1–§3）。完整示例：`examples/demo/deck.md`。
 2. **生成**：跑上面的命令。退出码非 0 = 文稿有错，按错误信息里的「页「标题」」改 md 再跑；`警告:` 行不中止，但对应那页在第 3 步必看。
 3. **转 PNG 逐页检查**：`soffice --headless --convert-to pdf --outdir <目录> <输出.pptx>`，再 `pdftoppm -png -r 80 <输出.pdf> page`。逐页看单行、溢出、对齐、图片边界、页脚间距，有问题回第 1 步精简文字或换版式。
-4. **交付**：把 pptx 交给用户，说明哪些页有警告、哪些地方建议在 PowerPoint 里人工微调。
+4. **交付**：把 pptx 交给用户，说明哪些页有警告；用户还要改某页细节时，按下面「生成后细调」做。
 
 文稿格式：
 
@@ -72,11 +72,50 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 | `evidence`（默认） | 截图 / 实物证据 + 底部红条 | 0 | 0–3 张图 |
 | `before-after` | 改前改后对比 | 3 | lead + `### Before` / `### After`（各一张图或一段短文 + `Caption:`）+ 底部结论 |
 | `process` | 3–5 步流程 | 4 | `1. 步骤名 \| 一句说明` |
-| `stats` | 2–4 个结果数字 | 5 | `- 标签 \| 数字 \| 一句说明`，最多一条 `- !…` 标红 |
-| `timeline` | 3–6 个时间节点 | 6 | `- 日期 \| 标题 \| 说明` |
+| `stats` | 2–4 个结果数字，分栏，每个数字带解读 | 5 | `- 标签 \| 数字 \| 一句说明`，最多一条 `- !…` 标红；下面缩进的 `- ` 是解读（每张 ≤3 条）；可选一行 `口径：` |
+| `stats-side` | 左边 2–3 个数字、右边编号结论 | 5 | 卡片写法同 stats（不带解读）+ 可选 `### 小标题` + 1–4 条 `> 结论要点` + 可选 `口径：` |
+| `timeline` | 3–6 个时间节点，可按状态着色 | 6 | `- [!]日期 \| 标题 \| 说明 [\| 状态]`，`!` = 关键里程碑；状态全写或全不写，不写为黑白灰 |
+| `timeline-phase` | 3–6 个阶段的箭头阶段条 | 6 | `- [!]日期 \| 标题 \| 说明 \| 状态`，每条必须写状态 |
 | `image-text` | 左图右文 | 7 | 一张图 + ≤5 条 `- 要点` |
 
 生成器不做的事：Agenda 顺序、PDCA 图标、上表以外的版式（Agenda 八宫格、团队、表格等）。这些在生成后的 pptx 里按 §1–§2、§6 和 `references/layout-patterns.md` 手工补。
+
+### 生成后细调
+
+生成器搭骨架：品牌、版式结构、间距、颜色规则都由它固定。用户在对话里要改某页细节（节点再大一点、多加一条标注）时，直接改生成好的 pptx：
+
+1. **检查**：`python3 scripts/inspect_ppt.py <输出.pptx>`。每页一个标题行 `== 第 N 页 | layout: <模板 layout> | 版式: <生成器版式>`，下面每个形状一行：名字、类型（占位框带 `idx=N`）、位置和大小（英寸）、文字开头。对照 `references/layouts.md`「形状命名约定」找到要改的元素。
+2. **按名修改**：用 python-pptx 打开成稿，按页码取页、按 `shape.name` 取形状，改完另存为新文件。最小示例（`<skill>` 换成本 skill 目录，在成稿所在目录运行）：
+
+   ```python
+   import sys; sys.path.insert(0, "<skill>/scripts")
+   from pptx import Presentation
+   from pptx.enum.shapes import MSO_SHAPE
+   from pptx.util import Inches
+   from layouts.common import strip_theme_style
+   prs = Presentation("deck.pptx")
+   slide = prs.slides[2 - 1]                                   # inspect 的「第 2 页」
+   shape = next(sh for sh in slide.shapes if sh.name == "Stat Number 2")
+   shape.text_frame.paragraphs[0].runs[0].text = "98"          # 改 run.text，字体字号保留
+   shape.top += Inches(0.1)                                    # 位置、大小用 Inches()
+   note = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(9), Inches(1.4), Inches(2), Inches(0.3))
+   note.name = "Note 1"; strip_theme_style(note)               # 新形状起名、去主题样式，颜色显式给
+   prs.save("deck-fine-tuned.pptx")                            # 另存新文件，不覆盖原稿
+   ```
+
+   - 改文字只改 `run.text`。直接赋值 `text_frame.text` 会把段落重建成一个没有字体、字号、颜色的 run，品牌样式全丢。
+   - 占位框（标题 idx 0、action title idx 10）用 `slide.placeholders[idx]` 取，idx 看 inspect 输出。
+   - 新加的形状颜色显式给（`fill.solid()` + `fill.fore_color.rgb`），仍守 §6。
+
+3. **转 PNG 确认**：同上面第 3 步，看改过的页：没越界、没压 banner 和页脚、红色纪律没破。
+4. **确认**：告诉用户改了哪些形状，并提醒下面这条覆盖规则。
+
+改哪里：
+
+- **回 md 改、重新生成**：内容——文字、数字、条目增删、状态、`!` 重点，以及版式选择、页的增删和顺序。
+- **直接改成稿**：md 表达不了的个别调整——某个形状的位置、大小、强调（字号、加粗），加一个标注。
+
+**重新生成会覆盖细调**：生成器从 md 整份重建 pptx，成稿上的手工改动全部丢失。细调之后用户又要改内容时，先说明这一点，由用户选：重新生成后再细调一遍，或者内容也直接在成稿上改。
 
 ---
 
@@ -350,9 +389,23 @@ banner 以下的正文区用色遵循 §6.2 色板。
 - ❌ 没有理由的红色装饰条 / 红色边框 / 红色高亮框 —— 红色承担信息而非装饰
 - ❌ 给 BEFORE 加红色 —— 红色锚点专属 AFTER
 
+#### 例外：时间线状态色
+
+时间线类版式（生成器的 `timeline`、`timeline-phase`，或手工做的时间线 / 阶段条）可以用状态色标出进度：
+
+| 状态 | 颜色 | 形状区分 |
+| --- | --- | --- |
+| 已完成 | `#2E7D32` 深绿，上面的字 / 对勾白色 | 实心带对勾（阶段条：绿底白字） |
+| 进行中 | `#F2A900` 琥珀，上面的字 `#1A1A1A` | 放大 + 外圈 +“当前”标签（阶段条：加高） |
+| 未完成 | `#DB011C` 品牌红，只用空心或描边 | 白底红描边空心（阶段条：浅粉底 + 红描边） |
+
+- 只用于时间线类版式，其他页面不用绿色和琥珀色。
+- 状态必须同时靠形状区分（上表第三列），色弱和黑白打印也能分辨；配图例。
+- 状态色（含未完成的红描边）不计入上面的面积配额；其他页的红色纪律不变。
+
 ### 6.4 三个高频组合（实战沉淀的视觉模式）
 
-> 下面是手工排版的实战数值。生成器各版式的字号与间距是定稿值（如标签 12pt、说明 14pt、块间距 0.3″），以 `references/layouts.md` 为准。
+> 下面是手工排版的实战数值。生成器各版式的字号与间距是定稿值（如数据标签 16pt、说明 14pt、块间距 0.3″），以 `references/layouts.md` 为准。
 
 整套 PPT 反复使用这三种组合,形成"重复"原则下的视觉特征:
 
@@ -427,11 +480,12 @@ banner 以下的正文区用色遵循 §6.2 色板。
 milwaukee-ppt/
 ├── SKILL.md                      # 本文件
 ├── references/
-│   ├── layouts.md                # 生成器 6 个版式的字段写法、适用场景、反例、报错与警告
+│   ├── layouts.md                # 生成器 8 个版式的字段写法、适用场景、反例、报错与警告、形状命名约定
 │   ├── layout-patterns.md        # 已验证案例参考(项目汇报 15 种 + 月报 5 种),非版式白名单
 │   └── before-after.md           # Before/After 布局的 slot 契约与事实对比验收
 ├── scripts/
 │   ├── generate_ppt.py           # 生成器入口:<文稿.md> [-o 输出.pptx]
+│   ├── inspect_ppt.py            # 检查命令:列出成稿每页的形状名、位置、文字(生成后细调用)
 │   ├── mdparse.py / layouts/     # 解析层 / 每个版式一个渲染模块
 │   └── README.md                 # 改生成器代码时的约定
 ├── examples/demo/                # 虚构示例文稿 deck.md(覆盖全部版式)+ 示意图与其生成脚本

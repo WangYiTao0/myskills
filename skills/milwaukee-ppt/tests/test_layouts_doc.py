@@ -13,6 +13,7 @@ DOC = SKILL / "references" / "layouts.md"
 _BLOCK = re.compile(r"^```markdown\n(.*?)^```", re.S | re.M)
 _IMG = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
 _LAYOUT = re.compile(r"(?im)^layout\s*[:：]\s*(\S+)\s*$")
+NOT_YET_DOCUMENTED = set()   # 已注册、文档还没写的版式；新增版式写进 layouts.md 前临时登记
 
 
 def doc_blocks():
@@ -37,6 +38,7 @@ def test_doc_examples_generate():
     refs = {ref for ref in _IMG.findall(md) if not ref.startswith(("http://", "https://"))}
     r = generate(md, images={ref: (1600, 900) for ref in refs})
     check("layouts.md：示例照抄生成，退出码 0", r.rc == 0, r.stderr)
+    check("layouts.md：示例没有警告", "警告" not in r.stderr, r.stderr)
     pages = len(re.findall(r"(?m)^# ", md))
     closing = 1 if re.search(r"(?m)^closing\s*:\s*\S", md) else 0
     check("layouts.md：页数 = 封面 + 示例页 + 收尾页",
@@ -45,7 +47,8 @@ def test_doc_examples_generate():
     for page in re.split(r"(?m)^# ", md)[1:]:
         m = _LAYOUT.search(page)
         used.add(m.group(1).lower() if m else "evidence")
-    check("layouts.md：示例覆盖全部 6 个版式", used == set(LAYOUT_INDEX), used)
+    want = set(LAYOUT_INDEX) - NOT_YET_DOCUMENTED
+    check(f"layouts.md：示例覆盖全部 {len(want)} 个已写文档的版式", used == want, used)
 
 
 if __name__ == "__main__":

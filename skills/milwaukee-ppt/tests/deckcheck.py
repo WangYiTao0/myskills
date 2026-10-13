@@ -3,12 +3,22 @@
 各版式测试文件（test_<版式>.py）都 `from deckcheck import *` 后使用：
 
 - generate(md, images=...)      写文稿 + 现生成纯色图 → 调生成器 → Result
+                                （probe=True 额外注册测试专用版式 _probe，见 probe_layout.py）
 - open_pptx(path)               打开生成结果
 - placeholder(slide, idx)       按 idx 取占位框（没有返回 None）
 - out_of_bounds(prs, slides)    超出页面 / 压 banner / 压页脚的形状
 - red_elements(slide)           用了红色（填充、描边、文字）的形状名
 - body_slide / pictures / shapes_named / run_style / run_styles / emu_rect
 - caption_bar / tag_texts / paragraphs / caption_style_problems / warnings
+- runs(shape, para)             一段里每个 run 的 (文字, 字号, 粗体, 颜色)，查数字 / 单位拆分
+- fill_color / line_color / geometry(shape)   纯色填充 / 描边 hex、预设几何名（ellipse、diamond…）
+- inside(shape, rect_in)        形状落在英寸矩形（如 CONTENT_SLOT_IN）内
+- inside_shape(inner, outer)    形状整个落在另一个形状里
+- center_x / center_y / bottom(shape)   中心横 / 纵坐标、底边（EMU）
+- named(slide, name)            名字恰为 name 的全部形状；one(slide, name) 恰好一个时返回它，否则 None
+- slide_xmls(path)              各页 slide XML 字节，和改动前的输出逐字节比较
+- deck_error(r, title, *needles) 报错退出且信息含页标题（和 needles）
+- 常量：STATUS_COLORS / DONE_GREEN / DOING_AMBER / DOING_INK、UNIT_PT / UNIT_COLOR
 - check(name, ok, detail) 记录结果；finish() 打印汇总并按结果退出
 """
 import os
@@ -39,8 +49,13 @@ BRAND_RED = "DB011C"
 # 视为“红色”的颜色：品牌红 + 常见纯红/深红，防止有人另起一个红
 RED_COLORS = {BRAND_RED, "FF0000", "C00000", "E3000F", "D0021B", "CC0000"}
 
+# 时间线状态色（spec #20）：未完成用品牌红，只描边、不实心填充
+DONE_GREEN, DOING_AMBER, DOING_INK = "2E7D32", "F2A900", "1A1A1A"
+STATUS_COLORS = {"done": DONE_GREEN, "doing": DOING_AMBER, "todo": BRAND_RED}
+UNIT_PT, UNIT_COLOR = 28, "6B6B6B"   # 数字后的单位：28pt 灰色、不加粗
+
 LAYOUT_INDEX = {"evidence": 0, "before-after": 3, "process": 4, "stats": 5,
-                "timeline": 6, "image-text": 7}
+                "stats-side": 5, "timeline": 6, "timeline-phase": 6, "image-text": 7}
 
 # 模板槽位（英寸，L / T / W / H；#13 定稿）
 CONTENT_SLOT_IN = (0.56, 1.30, 12.21, 4.30)   # process 17 / stats 18 / timeline 19
@@ -86,13 +101,27 @@ class Result:
         return list(self.prs.slides) if self.prs is not None else []
 
 
+# probe=True 时用它代替直接跑生成器：argv = [scripts 目录, tests 目录, 生成器参数...]
+_PROBE_RUNNER = """
+import sys
+scripts, tests = sys.argv[1], sys.argv[2]
+sys.path[:0] = [scripts, tests]
+import layouts, probe_layout, generate_ppt
+layouts.REGISTRY[probe_layout.NAME] = probe_layout
+sys.exit(generate_ppt.main(sys.argv[3:]))
+"""
+HERE = Path(__file__).resolve().parent
+
+
 def generate(md_text, workdir=None, images=None, out_name="out.pptx", use_o=True,
-             env=None):
+             env=None, probe=False):
     """写文稿 deck.md → 调生成器 → Result。
 
     images: {相对路径: (宽, 高)} 或 {相对路径: ((宽, 高), (r, g, b))}，现生成纯色图。
     workdir 不传时用一个新临时目录（进程结束前不清理，便于调试）。
     env: 追加给生成器进程的环境变量（如 MILWAUKEE_PPT_CACHE）。
+    probe: True 时额外注册测试专用版式 `_probe`（tests/probe_layout.py），只给
+           test_common_parts.py 测共用部件用。
     """
     workdir = Path(workdir or tempfile.mkdtemp(prefix="mppt-test-"))
     for rel, spec in (images or {}).items():
@@ -101,7 +130,8 @@ def generate(md_text, workdir=None, images=None, out_name="out.pptx", use_o=True
         make_image(workdir / rel, size, color)
     md = workdir / "deck.md"
     md.write_text(textwrap.dedent(md_text).lstrip(), encoding="utf-8")
-    cmd = [sys.executable, str(GENERATOR), str(md)]
+    cmd = ([sys.executable, "-c", _PROBE_RUNNER, str(GENERATOR.parent), str(HERE)]
+           if probe else [sys.executable, str(GENERATOR)]) + [str(md)]
     out = workdir / out_name
     if use_o:
         cmd += ["-o", str(out)]
@@ -160,6 +190,71 @@ def run_style(shape, para=0):
 def run_styles(shape):
     """文本框里所有 run 的 (字号 pt, 是否粗体, 颜色 hex) 集合，便于断言“全部一致”。"""
     return {_font_style(r) for p in shape.text_frame.paragraphs for r in p.runs}
+
+
+def runs(shape, para=0):
+    """第 para 段每个 run 的 (文字, 字号 pt, 是否粗体, 颜色 hex)，按顺序（查数字 / 单位拆分）。"""
+    return [(r.text, *_font_style(r)) for r in shape.text_frame.paragraphs[para].runs]
+
+
+def fill_color(shape):
+    """形状自身 spPr 的纯色填充 hex；无填充 / 非纯色返回 None。"""
+    el = shape._element.find(f".//{P}spPr/{A}solidFill/{A}srgbClr")
+    return el.get("val").upper() if el is not None else None
+
+
+def line_color(shape):
+    """形状描边的纯色 hex；没写描边颜色或 noFill 返回 None。"""
+    ln = shape._element.find(f".//{P}spPr/{A}ln")
+    if ln is None:
+        return None
+    el = ln.find(f"{A}solidFill/{A}srgbClr")
+    return el.get("val").upper() if el is not None else None
+
+
+def geometry(shape):
+    """预设几何名，如 "ellipse"、"diamond"、"rect"、"homePlate"、"chevron"；没有返回 None。"""
+    el = shape._element.find(f".//{A}prstGeom")
+    return el.get("prst") if el is not None else None
+
+
+def inside(shape, rect_in, tol_in=0.01):
+    """形状整个落在英寸矩形 (L, T, W, H) 内（容差 tol_in 英寸），如槽位 CONTENT_SLOT_IN。"""
+    l, t, w, h = (v * EMU for v in rect_in)
+    tol = tol_in * EMU
+    return (shape.left >= l - tol and shape.top >= t - tol
+            and shape.left + shape.width <= l + w + tol
+            and shape.top + shape.height <= t + h + tol)
+
+
+def inside_shape(inner, outer):
+    """inner 整个落在 outer 的外框里（如卡片里的数字框）。"""
+    return (inner.left >= outer.left and inner.top >= outer.top
+            and inner.left + inner.width <= outer.left + outer.width
+            and inner.top + inner.height <= outer.top + outer.height)
+
+
+def center_x(sh):
+    return sh.left + sh.width // 2
+
+
+def center_y(sh):
+    return sh.top + sh.height // 2
+
+
+def bottom(sh):
+    return sh.top + sh.height
+
+
+def named(slide, name):
+    """名字恰为 name 的全部形状（不带编号的名字，如 "Current Tag"）。"""
+    return [sh for sh in slide.shapes if sh.name == name]
+
+
+def one(slide, name):
+    """名字恰为 name 的形状恰好一个时返回它，否则 None。"""
+    found = named(slide, name)
+    return found[0] if len(found) == 1 else None
 
 
 def texts(slide):
@@ -263,3 +358,15 @@ def slide_parts(pptx_path):
     with zipfile.ZipFile(pptx_path) as z:
         return [n for n in z.namelist()
                 if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)]
+
+
+def slide_xmls(pptx_path):
+    """{"ppt/slides/slideN.xml": 字节}，用来和改动前的输出逐字节比较。"""
+    import zipfile
+    with zipfile.ZipFile(pptx_path) as z:
+        return {n: z.read(n) for n in slide_parts(pptx_path)}
+
+
+def deck_error(r, title, *needles):
+    """生成器报错退出，错误信息含页标题和 needles 里的每一段文字。"""
+    return r.rc != 0 and title in r.stderr and all(s in r.stderr for s in needles)
