@@ -1,4 +1,4 @@
-"""stats 版式：数据对比 / Key Results，基于模板 layout 5「Stats」，分栏式（spec #20 原型第 2 页）。
+"""stats 版式：数据对比 / Key Results，基于模板 layout 5「Stats」，分栏式（Spec #20，见 references/layouts.md「stats」）。
 
 文稿写法：2–4 条无序列表「标签 | 数字 | 一句说明」；最多一条在列表符号后加 `!`，
 标为重点（它那栏的顶线和数字用品牌红）。卡片行下面缩进的 `- ` 子列表是这张卡的解读，
@@ -17,18 +17,17 @@
 形状名（细调用）：Stat Rule N、Stat Label N、Stat Number N、Stat Note N、Stat Divider N、
 Stat Points N（N 从 1 起，左到右），Stat Source。
 """
-import re
-
-from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
+from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (BRAND_RED, LATIN_FONT, UNIT_PT, add_number, add_page_chrome, add_run,
-                     fill_titles, split_number, strip_theme_style, sub_item, take_slot, text_lines, warn)
+from .common import (BRAND_RED, LATIN_FONT, UNIT_PT, add_line, add_number, add_page_chrome,
+                     SOURCE_LINE, add_run, add_shape, add_textbox, check_stat_cards,
+                     fill_titles, parse_stat_card, split_number, sub_item, take_slot,
+                     text_lines, warn)
 
 NAME = "stats"
 LAYOUT_INDEX = 5
@@ -36,7 +35,7 @@ SLOT_IDX = 18
 MIN_ITEMS, MAX_ITEMS = 2, 4
 MAX_POINTS = 3            # 每栏解读最多几条
 
-# 几何（英寸），以原型第 2 页为准
+# 几何（英寸，Spec #20 定稿，见 references/layouts.md「stats」）
 GAP = 0.45                # 栏间距
 RULE_H = 0.06             # 顶部粗线
 RULE_GAP = 0.19           # 顶线 → 标签
@@ -57,8 +56,6 @@ SOURCE_H = 0.28           # 口径一行高，底边贴内容区底
 SOURCE_GAP = 0.1          # 解读区 → 口径
 INK, GRAY, RULE = "1A1A1A", "6B6B6B", "E5E5E5"
 
-_ITEM = re.compile(r"^[-*+]\s+(!?)\s*(.*)$")
-_SOURCE = re.compile(r"^(口径|source)\s*[:：]", re.I)
 
 
 def parse(page):
@@ -74,28 +71,15 @@ def parse(page):
             if sub:
                 items[-1]["points"].append(sub)
             continue
-        if _SOURCE.match(line):
+        if SOURCE_LINE.match(line):
             sources.append(line)
             continue
-        m = _ITEM.match(line)
-        if not m:
-            if line.startswith("!") and "|" in line:     # 重点条漏写列表符号，别悄悄进红条
-                raise DeckError(f"页「{page.title}」的重点数据条要以列表符号开头，"
-                                f"写成「- !标签 | 数字 | 一句说明」: {line}")
+        card = parse_stat_card(page, line)
+        if card is None:
             page.conclusion.append(line)
             continue
-        parts = [x.strip() for x in m.group(2).split("|")]
-        if len(parts) != 3 or not all(parts):
-            raise DeckError(f"页「{page.title}」的数据条目要写成「标签 | 数字 | 一句说明」: "
-                            f"{line}")
-        items.append({"label": parts[0], "value": parts[1], "note": parts[2],
-                      "key": bool(m.group(1)), "points": []})
-    if not MIN_ITEMS <= len(items) <= MAX_ITEMS:
-        raise DeckError(f"页「{page.title}」的数据条目要 {MIN_ITEMS}–{MAX_ITEMS} 条, "
-                        f"现在 {len(items)} 条")
-    keys = sum(it["key"] for it in items)
-    if keys > 1:
-        raise DeckError(f"页「{page.title}」最多一条数据标 ! 重点, 现在 {keys} 条")
+        items.append({**card, "points": []})
+    check_stat_cards(page, items, MIN_ITEMS, MAX_ITEMS)
     for n, it in enumerate(items, start=1):
         if len(it["points"]) > MAX_POINTS:
             raise DeckError(f"页「{page.title}」第 {n} 条数据「{it['label']}」的解读最多 "
@@ -131,11 +115,11 @@ def _glyph_lines(text, pt, width_in):
 
 def _number_size(items, col_w_in, page_title):
     """所有数字共用一个字号：60pt 放不下最长的那个时统一缩小（整数 pt），并警告。
-    宽度按 common.split_number 拆开量：数值部分随字号变，单位固定 UNIT_PT。"""
+    宽度按 common.split_number 拆开量：大数字随字号变，前缀和单位固定 UNIT_PT。"""
     def fit_pt(value):
-        number, unit = split_number(value)
-        unit_w = _glyph_width_in(" " + unit, UNIT_PT) if unit else 0
-        return int((col_w_in - unit_w) / _glyph_width_in(number, 1))
+        prefix, number, unit = split_number(value)
+        affix_w = _glyph_width_in(prefix + unit, UNIT_PT)
+        return int((col_w_in - affix_w) / _glyph_width_in(number, 1))
 
     tightest = min(items, key=lambda it: fit_pt(it["value"]))
     fit, longest = fit_pt(tightest["value"]), tightest["value"]
@@ -152,12 +136,7 @@ def _number_size(items, col_w_in, page_title):
 
 
 def _text_box(slide, name, x, y, w, h, wrap=True, anchor=MSO_ANCHOR.TOP):
-    tb = slide.shapes.add_textbox(Emu(x), Emu(y), Emu(w), Emu(h))
-    tb.name = name
-    tf = tb.text_frame
-    tf.word_wrap = wrap
-    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
-    tf.vertical_anchor = anchor
+    tf = add_textbox(slide, name, x, y, w, h, anchor, wrap)
     tf.paragraphs[0].alignment = PP_ALIGN.LEFT
     return tf
 
@@ -166,27 +145,6 @@ def _text(slide, name, x, y, w, h, text, pt, bold, color):
     tf = _text_box(slide, name, x, y, w, h)
     add_run(tf.paragraphs[0], text, pt, bold, color)
     return tf
-
-
-def _rect(slide, name, x, y, w, h, color):
-    """扁平纯色矩形（无描边、去主题样式，渲染器不会补阴影）。"""
-    sp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Emu(x), Emu(y), Emu(w), Emu(h))
-    sp.name = name
-    strip_theme_style(sp)
-    sp.shadow.inherit = False
-    sp.fill.solid()
-    sp.fill.fore_color.rgb = RGBColor.from_string(color)
-    sp.line.fill.background()
-    return sp
-
-
-def _hline(slide, name, x, y, w, color, pt=1):
-    c = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Emu(x), Emu(y), Emu(x + w), Emu(y))
-    c.name = name
-    strip_theme_style(c)
-    c.line.color.rgb = RGBColor.from_string(color)
-    c.line.width = Pt(pt)
-    return c
 
 
 def _bullets(tf, texts, pt, color):
@@ -256,8 +214,8 @@ def render(prs, page, ctx):
     for i, it in enumerate(items, start=1):
         x = left + (col_w + gap) * (i - 1)
         w = (left + width - x) if i == n else col_w     # 最后一栏吃掉取整余数
-        _rect(slide, f"Stat Rule {i}", x, y0, w, Inches(RULE_H),
-              BRAND_RED if it["key"] else INK)
+        add_shape(slide, MSO_SHAPE.RECTANGLE, f"Stat Rule {i}", x, y0, w, Inches(RULE_H),
+                  BRAND_RED if it["key"] else INK)
         _text(slide, f"Stat Label {i}", x, y0 + Inches(label_y), w, Inches(label_h),
               it["label"], LABEL_PT, True, INK)
         tf = _text_box(slide, f"Stat Number {i}", x, y0 + Inches(number_y), w,
@@ -267,7 +225,8 @@ def render(prs, page, ctx):
         _text(slide, f"Stat Note {i}", x, y0 + Inches(note_y), w, Inches(note_h),
               it["note"], NOTE_PT, False, GRAY)
         if has_points:
-            _hline(slide, f"Stat Divider {i}", x, y0 + Inches(divider_y), w, RULE)
+            dy = y0 + Inches(divider_y)
+            add_line(slide, f"Stat Divider {i}", x, dy, x + w, dy, RULE, 1)
         if it["points"]:
             tf = _text_box(slide, f"Stat Points {i}", x, y0 + Inches(points_y), w,
                            Inches(max(points_h, _height_in(1, POINT_PT))))

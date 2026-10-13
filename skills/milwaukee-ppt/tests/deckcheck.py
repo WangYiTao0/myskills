@@ -13,6 +13,9 @@
 - runs(shape, para)             一段里每个 run 的 (文字, 字号, 粗体, 颜色)，查数字 / 单位拆分
 - fill_color / line_color / geometry(shape)   纯色填充 / 描边 hex、预设几何名（ellipse、diamond…）
 - inside(shape, rect_in)        形状落在英寸矩形（如 CONTENT_SLOT_IN）内
+- inside_shape(inner, outer)    形状整个落在另一个形状里
+- center_x / center_y / bottom(shape)   中心横 / 纵坐标、底边（EMU）
+- named(slide, name)            名字恰为 name 的全部形状；one(slide, name) 恰好一个时返回它，否则 None
 - slide_xmls(path)              各页 slide XML 字节，和改动前的输出逐字节比较
 - deck_error(r, title, *needles) 报错退出且信息含页标题（和 needles）
 - 常量：STATUS_COLORS / DONE_GREEN / DOING_AMBER / DOING_INK、UNIT_PT / UNIT_COLOR
@@ -222,6 +225,36 @@ def inside(shape, rect_in, tol_in=0.01):
     return (shape.left >= l - tol and shape.top >= t - tol
             and shape.left + shape.width <= l + w + tol
             and shape.top + shape.height <= t + h + tol)
+
+
+def inside_shape(inner, outer):
+    """inner 整个落在 outer 的外框里（如卡片里的数字框）。"""
+    return (inner.left >= outer.left and inner.top >= outer.top
+            and inner.left + inner.width <= outer.left + outer.width
+            and inner.top + inner.height <= outer.top + outer.height)
+
+
+def center_x(sh):
+    return sh.left + sh.width // 2
+
+
+def center_y(sh):
+    return sh.top + sh.height // 2
+
+
+def bottom(sh):
+    return sh.top + sh.height
+
+
+def named(slide, name):
+    """名字恰为 name 的全部形状（不带编号的名字，如 "Current Tag"）。"""
+    return [sh for sh in slide.shapes if sh.name == name]
+
+
+def one(slide, name):
+    """名字恰为 name 的形状恰好一个时返回它，否则 None。"""
+    found = named(slide, name)
+    return found[0] if len(found) == 1 else None
 
 
 def texts(slide):

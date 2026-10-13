@@ -44,6 +44,67 @@ check("文字只取前 30 字",
       "这是一段很长很长的结论文字，用来检查文字前三十个字的截断是否" in r.stdout
       and "超出部分不应出现" not in r.stdout, r.stdout)
 
+# 页标题行除模板 layout 名外还给生成器版式名；共用模板 layout 的版式（stats / stats-side、
+# timeline / timeline-phase）也要分得出来。占位框给出 idx。
+LAYOUTS_MD = """
+---
+title: Mock Deck
+date: 13 Oct 2026
+closing: Thank You
+---
+
+# Mock Evidence
+![](img/a.png)
+
+# Mock Stats
+Layout: stats
+- A | 1 | n
+- B | 2 | n
+
+# Mock Side
+Layout: stats-side
+- A | 1 | n
+- B | 2 | n
+> Mock finding.
+
+# Mock Timeline
+Layout: timeline
+- Jan | A | n
+- Feb | B | n
+- Mar | C | n
+
+# Mock Status Timeline
+Layout: timeline
+- Jan | A | n | 完成
+- Feb | B | n | 进行中
+- Mar | C | n | 未完成
+
+# Mock Phase
+Layout: timeline-phase
+- Jan | A | n | 完成
+- Feb | B | n | 进行中
+- Mar | C | n | 未完成
+
+# Mock Steps
+Layout: process
+1. A | n
+2. B | n
+3. C | n
+"""
+res = generate(LAYOUTS_MD, images={"img/a.png": (800, 450)})
+r = run(res.path)
+heads = [l for l in r.stdout.splitlines() if l.startswith("== ")]
+want = ["-", "evidence", "stats", "stats-side", "timeline", "timeline", "timeline-phase",
+        "process", "-"]
+got = [re.search(r"\| 版式: (\S+)$", h).group(1) if re.search(r"\| 版式: (\S+)$", h) else None
+       for h in heads]
+check("页标题行：模板 layout 名之后给生成器版式名（封面 / 收尾为 -）", got == want, heads)
+check("页标题行：模板 layout 名仍在", "layout: Stats |" in r.stdout, heads)
+check("占位框给出 idx", any("PLACEHOLDER idx=0 |" in l for l in r.stdout.splitlines()),
+      r.stdout[:800])
+check("非占位框不带 idx", all("idx=" not in l for l in r.stdout.splitlines()
+                              if l.startswith("Stat Number")), r.stdout[:800])
+
 r = run(Path(tempfile.gettempdir()) / "no-such-file-xyz.pptx")
 check("不存在的文件非零退出并报错", r.returncode != 0 and "不存在" in r.stderr, r.stderr)
 

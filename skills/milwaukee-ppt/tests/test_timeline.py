@@ -7,11 +7,11 @@
 """
 import hashlib
 
-from deckcheck import (BRAND_RED, CONTENT_SLOT_IN, DOING_AMBER, DONE_GREEN, LAYOUT_INDEX,
-                       body_slide, caption_bar, caption_style_problems, check, deck_error,
-                       emu_rect, fill_color, finish, generate, geometry, inside, line_color,
-                       out_of_bounds, paragraphs, placeholder, red_elements, run_style, runs,
-                       shapes_named, slide_xmls, tag_shape, warnings)
+from deckcheck import (BRAND_RED, CONTENT_SLOT_IN, DOING_AMBER, DONE_GREEN, EMU, LAYOUT_INDEX,
+                       body_slide, caption_bar, caption_style_problems, center_x, center_y,
+                       check, deck_error, emu_rect, fill_color, finish, generate, geometry,
+                       inside, line_color, named, out_of_bounds, paragraphs, placeholder,
+                       red_elements, run_style, shapes_named, slide_xmls, tag_shape, warnings)
 
 NAME = "timeline"
 TITLE = "Mock Timeline Page"
@@ -66,14 +66,6 @@ def test_chrome():
 
 # 模板 layout 6 的槽位 idx 19「Timeline Area」：0.56 / 1.30 / 12.21 / 4.30 英寸
 SLOT = emu_rect(CONTENT_SLOT_IN)
-
-
-def center_x(sh):
-    return sh.left + sh.width // 2
-
-
-def center_y(sh):
-    return sh.top + sh.height // 2
 
 
 def inside_slot(sh):
@@ -188,6 +180,9 @@ def test_errors():
         check(f"timeline {name}：非零退出", r.rc != 0, r.rc)
         check(f"timeline {name}：错误信息含页标题和条数",
               "Mock Bad Count" in r.stderr and str(len(items)) in r.stderr, r.stderr)
+    r = generate(deck(["!!" + SIX[0]] + SIX[1:3], title="Mock Double Key"))
+    check("timeline !! 两个叹号：报错含页标题和 !!", deck_error(r, "Mock Double Key", "!!"),
+          r.stderr)
     r = generate(deck(SIX[:2] + ["Mar | Pilot only"], title="Mock Bad Item"))
     check("timeline 条目缺说明：非零退出", r.rc != 0, r.rc)
     check("timeline 条目缺说明：错误信息含页标题和该行",
@@ -273,7 +268,6 @@ def test_status_nodes():
     check("timeline 状态：不再画旧的黑白灰节点", not shapes_named(s, "Timeline Node"))
 
 
-
 def test_status_emphasis():
     """关键里程碑是菱形且比普通节点大；进行中比普通节点大、带外圈和“当前”标签，日期加粗放大。"""
     r, s = status_slide()
@@ -317,11 +311,6 @@ def test_status_emphasis():
     if s is not None:
         check("timeline 没有进行中：不画外圈和“当前”标签",
               not [sh.name for sh in s.shapes if sh.name.startswith("Current")])
-
-
-
-def named(slide, name):
-    return [sh for sh in slide.shapes if sh.name == name]
 
 
 def dash(shape):
@@ -370,7 +359,6 @@ def test_status_lines():
             check(f"timeline {label}：进度线 / 剩余线 = {want}", got == want, got)
 
 
-
 def test_status_text_and_legend():
     """标题 + 说明在节点下方居中；右上角图例 4 项；所有形状在槽位内、不越界。"""
     r, s = status_slide()
@@ -403,6 +391,11 @@ def test_status_text_and_legend():
               [("ellipse", DONE_GREEN), ("ellipse", DOING_AMBER), ("ellipse", "FFFFFF"),
                ("diamond", "1A1A1A")] and line_color(icons[2]) == BRAND_RED,
               [(geometry(i), fill_color(i), line_color(i)) for i in icons])
+        checks = [sh for sh in s.shapes if sh.name.startswith("Legend Check")]
+        check("timeline 状态：图例对勾带编号 Legend Check 1、在已完成图标中心",
+              [c.name for c in checks] == ["Legend Check 1"]
+              and abs(center_x(checks[0]) - center_x(icons[0])) < 0.05 * EMU,
+              [c.name for c in checks])
     else:
         check("timeline 状态：图例 4 个图标", False, len(icons))
     if icons and labels:
@@ -419,7 +412,6 @@ def test_status_text_and_legend():
     check("timeline 状态：不越界、不压 banner 和页脚", not out_of_bounds(r.prs, [s]),
           out_of_bounds(r.prs, [s]))
     check("timeline 状态：空的槽位占位框已删掉", placeholder(s, 19) is None)
-
 
 
 def test_status_errors():
@@ -474,7 +466,6 @@ def test_key_without_status():
           shapes_named(s, "Timeline Date")[1].text_frame.text == "Mar")
     check("timeline 旧写法带 !：没有图例和状态色", not shapes_named(s, "Legend Icon")
           and red_elements(s) == [])
-
 
 
 def overlap(a, b):
