@@ -395,8 +395,9 @@ def check_alignment(slide, place):
     return issues
 
 
-# 文字溢出：行高按字号 × 1.2 估算（和各版式警告用的 LINE_SPACING 同一口径），字宽用
-# 生成器的 text_width_in。估算高度超出文本框可用高度（去掉内边距）OVERFLOW_TOL 以上才报：
+# 文字溢出：行高按字号 × 1.2 估算，和 process / stats / stats-side / timeline / timeline-phase /
+# before-after 估算溢出警告的行高同一口径；section / agenda / team / table 排框高用更宽松的
+# common.LINE_SPACING（1.25），它们的框按 1.2 估不会报溢出。字宽用生成器的 text_width_in。估算高度超出文本框可用高度（去掉内边距）OVERFLOW_TOL 以上才报：
 # 正常稿里最紧的大数字框估算高度恰好等于框高，0.05" 吸收估算与取整误差。
 LINE_HEIGHT = 1.2
 OVERFLOW_TOL = int(0.05 * EMU_PER_IN)

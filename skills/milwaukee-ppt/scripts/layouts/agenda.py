@@ -14,8 +14,9 @@ from pptx.util import Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (IMG_H, IMG_LEFT, IMG_TOP, IMG_W, add_line, add_page_chrome, add_run,
-                     add_textbox, fill_titles, text_width_in)
+from .common import (IMG_H, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, MUTED, RULE, add_line,
+                     add_page_chrome, add_run, add_textbox, chapter_row, check_chapter_row,
+                     fill_titles, text_width_in)
 
 NAME = "agenda"
 LAYOUT_INDEX = 0
@@ -23,16 +24,13 @@ MARK_SHAPE = "Agenda Number 1"
 
 MIN_ITEMS, MAX_ITEMS = 3, 8
 ONE_COLUMN_MAX = 4                                  # 超过 4 条分两列
-MAX_NUMBER, MAX_NAME, MAX_ENGLISH = 3, 12, 40       # 与 section 相同
 
 NUMBER_PT, NAME_PT, ENGLISH_PT = 32, 20, 12
-INK, MUTED, RULE = "1A1A1A", "6B6B6B", "BFBFBF"
 INDENT = 1.0          # 单列时从正文区左沿缩进（英寸），与 section 对齐
 COLUMN_GAP = 0.4      # 两列之间（英寸）
 GAP = 0.2             # 编号 → 竖线 → 名字（英寸）
 NAME_GAP = Inches(0.04)
 ROW_PITCH = 0.95      # 行距（英寸）：4 行 3.8"，放得进 4.30" 正文区
-LINE_SPACING = 1.25   # 行高 ≈ 字号 × 1.25
 
 
 def parse(page):
@@ -40,8 +38,8 @@ def parse(page):
     for line in page.lines:
         if not line:
             continue
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) != 3:
+        parts = chapter_row(line)
+        if parts is None:
             raise DeckError(f"页「{page.title}」目录页每行写「编号 | 中文名 | 英文名」，"
                             f"不放结论红条；这一行不对: {line!r}")
         items.append(parts)
@@ -50,15 +48,8 @@ def parse(page):
     if not MIN_ITEMS <= len(items) <= MAX_ITEMS:
         raise DeckError(f"页「{page.title}」目录页须 {MIN_ITEMS}–{MAX_ITEMS} 行"
                         f"「编号 | 中文名 | 英文名」，现在 {len(items)} 行")
-    for number, name, english in items:
-        for label, value, limit in (("编号", number, MAX_NUMBER), ("中文名", name, MAX_NAME),
-                                    ("英文名", english, MAX_ENGLISH)):
-            if not value:
-                raise DeckError(f"页「{page.title}」目录页「{number} | {name} | {english}」"
-                                f"的{label}为空")
-            if len(value) > limit:
-                raise DeckError(f"页「{page.title}」目录页的{label}「{value}」有 {len(value)} 字，"
-                                f"最多 {limit} 字")
+    for row in items:
+        check_chapter_row(page, "目录页", row, show_row=True)
     numbers = [it[0] for it in items]
     dup = sorted({n for n in numbers if numbers.count(n) > 1})
     if dup:

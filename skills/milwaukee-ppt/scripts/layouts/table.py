@@ -22,8 +22,8 @@ from pptx.util import Inches
 
 from mdparse import DeckError
 
-from .common import (BRAND_RED, IMG_H, IMG_LEFT, IMG_TOP, IMG_W, LIST_ITEM, add_page_chrome,
-                     add_run, add_shape, fill_titles, key_mark, text_lines)
+from .common import (BRAND_RED, IMG_H, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, LIST_ITEM, RULE,
+                     add_page_chrome, add_run, add_shape, fill_titles, key_mark, text_lines)
 
 NAME = "table"
 LAYOUT_INDEX = 0
@@ -34,8 +34,7 @@ MIN_ROWS, MAX_ROWS = 2, 8       # 表头以外的行
 MAX_CELL_LINES = 2
 
 FONT_PT = 14
-LINE_SPACING = 1.25             # 行高 ≈ 字号 × 1.25（和其他版式的警告同一口径）
-INK, HEAD_FILL, RULE = "1A1A1A", "E5E5E5", "BFBFBF"
+HEAD_FILL = "E5E5E5"
 HEAD_RULE_PT, RULE_PT = 1.5, 0.75
 NO_STYLE = "{2D5ABB26-0587-4C30-8999-92F81FD0307C}"   # 内置「无样式，无网格」
 
@@ -47,7 +46,7 @@ TABLE_W = IMG_W - KEY_BAR_W - KEY_GAP
 CELL_PAD_X, CELL_PAD_Y = 0.1, 0.06
 TAG_BOTTOM = 1.42               # common.add_month_tag 的框下沿
 TAG_GAP = 0.08
-LINE_H = FONT_PT * LINE_SPACING / 72
+LINE_H = FONT_PT * LINE_SPACING / 72   # 行高口径（1.25）见 common.LINE_SPACING
 
 _ROW = re.compile(r"^\|(.*?)\|?$")
 _SEP_CELL = re.compile(r"^:?-+:?$")

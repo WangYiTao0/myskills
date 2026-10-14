@@ -18,8 +18,9 @@ from pptx.util import Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (IMG_H, IMG_LEFT, IMG_TOP, IMG_W, LIST_ITEM, add_line, add_page_chrome,
-                     add_run, add_shape, add_textbox, fill_titles, text_lines, text_width_in)
+from .common import (IMG_H, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, LIST_ITEM, MUTED, RULE,
+                     add_line, add_page_chrome, add_run, add_shape, add_textbox, fill_titles,
+                     text_lines, text_width_in)
 
 NAME = "team"
 LAYOUT_INDEX = 0
@@ -30,9 +31,7 @@ ROW_MAX = 4                     # 一行最多 4 张卡片
 
 NAME_PT, ROLE_PT, DUTY_PT = 20, 14, 12
 MAX_DUTY_LINES = 3
-INK, MUTED, RULE = "1A1A1A", "6B6B6B", "BFBFBF"
 CARD_FILL, CARD_LINE = "F5F5F5", "E5E5E5"
-LINE_SPACING = 1.25             # 行高 ≈ 字号 × 1.25
 
 # 几何（英寸）
 GAP = 0.3                       # 卡片之间（横、竖）

@@ -12,21 +12,18 @@ from pptx.util import Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (IMG_H, IMG_LEFT, IMG_TOP, IMG_W, add_line, add_page_chrome, add_run,
-                     add_textbox, fill_titles, text_width_in)
+from .common import (IMG_H, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, MUTED, RULE, add_line,
+                     add_page_chrome, add_run, add_textbox, chapter_row, check_chapter_row,
+                     fill_titles, text_width_in)
 
 NAME = "section"
 LAYOUT_INDEX = 0
 MARK_SHAPE = "Section Number"
 
-MAX_NUMBER, MAX_NAME, MAX_ENGLISH = 3, 12, 40     # 编号 / 中文名 / 英文名最多字数
-
 NUMBER_PT, NAME_PT, ENGLISH_PT = 96, 40, 20
-INK, MUTED, RULE = "1A1A1A", "6B6B6B", "BFBFBF"
 GROUP_LEFT = Inches(IMG_LEFT + 1.0)    # 整组从正文区左沿再缩进 1"
 GAP = Inches(0.4)                      # 编号 → 竖线 → 名字
 NAME_GAP = Inches(0.12)                # 中文名 → 英文名
-LINE_SPACING = 1.25                    # 行高 ≈ 字号 × 1.25
 
 
 def parse(page):
@@ -34,8 +31,8 @@ def parse(page):
     for line in page.lines:
         if not line:
             continue
-        parts = [p.strip() for p in line.split("|")]
-        if len(parts) != 3:
+        parts = chapter_row(line)
+        if parts is None:
             raise DeckError(f"页「{page.title}」隔断页只写一行「编号 | 中文名 | 英文名」，"
                             f"不放结论红条；这一行不对: {line!r}")
         found.append(parts)
@@ -44,14 +41,8 @@ def parse(page):
     if len(found) != 1:
         raise DeckError(f"页「{page.title}」隔断页须正好一行「编号 | 中文名 | 英文名」，"
                         f"现在 {len(found)} 行")
+    check_chapter_row(page, "隔断页", found[0])
     number, name, english = found[0]
-    for label, value, limit in (("编号", number, MAX_NUMBER), ("中文名", name, MAX_NAME),
-                                ("英文名", english, MAX_ENGLISH)):
-        if not value:
-            raise DeckError(f"页「{page.title}」隔断页的{label}为空")
-        if len(value) > limit:
-            raise DeckError(f"页「{page.title}」隔断页的{label}「{value}」有 {len(value)} 字，"
-                            f"最多 {limit} 字")
     page.fields = {"number": number, "name": name, "english": english}
 
 

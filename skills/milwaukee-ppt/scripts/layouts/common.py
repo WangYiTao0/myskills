@@ -1,7 +1,8 @@
 """各版式共用的部件：Context、警告、图片加载、标题填充、底部红条、月份标识，
 以及画原生形状的小工具（取槽位、删形状、等比放图、写带中文字体的 run、去主题样式、
 估算文字宽度和行数、写“大数字 + 缩小单位”）和品牌红、字体名常量；
-缩进子列表、时间线状态解析和状态色。
+缩进子列表、时间线状态解析和状态色、章节行「编号 | 中文名 | 英文名」解析，
+以及 section / agenda / team / table 共用的黑白灰和行高倍数。
 
 版式模块只从这里 import，互相之间不 import。"""
 import hashlib
@@ -25,6 +26,15 @@ from mdparse import DeckError
 BRAND_RED = "DB011C"          # Milwaukee Red（与 banner 同色）
 LATIN_FONT = "Arial"
 EA_FONT = "PingFang SC"       # 中文字体（a:ea）
+
+# 黑白灰（section / agenda / team / table）：正文和标题、次要文字（英文名、角色）、细线
+INK, MUTED, RULE = "1A1A1A", "6B6B6B", "BFBFBF"
+# 这几个版式排文本框 / 表格行高用的行高倍数：字号 × 1.25。审核脚本估算溢出按字号 × 1.2，
+# 比这里紧 4%，所以生成器按 1.25 排出的框审核不会报溢出（见 scripts/README.md 审核脚本一节）。
+LINE_SPACING = 1.25
+
+# 章节行「编号 | 中文名 | 英文名」（section 隔断页、agenda 目录页同一写法）：各段名称和最多字数
+CHAPTER_FIELDS = (("编号", 3), ("中文名", 12), ("英文名", 40))
 
 # 正文区几何（英寸）：banner 占顶部 1.0"，底部留给红条（各版式槽位见模板 layout 4–7）
 IMG_LEFT, IMG_TOP, IMG_W, IMG_H = 0.56, 1.3, 12.2, 4.3
@@ -349,6 +359,24 @@ _NUMBER = re.compile(r"^(" + _PREFIX + r")?"
                      r"(.*)$", re.S)
 # 算单位的尾巴：% 或 CJK 开头（前面可有空白），或空白后面的英文单词；空白原样保留
 _UNIT = re.compile(r"^(\s*[%\u2E80-\uFFFF]|\s+[A-Za-z])")
+
+
+def chapter_row(line):
+    """「编号 | 中文名 | 英文名」→ [编号, 中文名, 英文名]（各段去掉首尾空白）；不是三段返回 None。"""
+    parts = [p.strip() for p in line.split("|")]
+    return parts if len(parts) == 3 else None
+
+
+def check_chapter_row(page, kind, row, show_row=False):
+    """查章节行三段都不空、不超字数，否则抛 DeckError（含页标题和 kind，如「隔断页」）。
+    show_row=True 时空段报错里带上整行原文（目录页一页多行，要指明是哪行）。"""
+    for (label, limit), value in zip(CHAPTER_FIELDS, row):
+        if not value:
+            which = f"「{' | '.join(row)}」" if show_row else ""
+            raise DeckError(f"页「{page.title}」{kind}{which}的{label}为空")
+        if len(value) > limit:
+            raise DeckError(f"页「{page.title}」{kind}的{label}「{value}」有 {len(value)} 字，"
+                            f"最多 {limit} 字")
 
 
 def is_number(value):

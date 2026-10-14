@@ -9,7 +9,8 @@
   - 形状：`slot` / `take_slot` / `remove_shape`（按 idx 取槽位、删形状）、`fit_picture`（矩形内等比放图）、`add_run`（Arial + 中文 PingFang SC 的 run）、`strip_theme_style`（去 p:style）；
   - 画形状：`add_textbox(slide, name, x, y, w, h, anchor=TOP, wrap=True) -> text_frame`（起名、内边距 0）、`add_shape(slide, kind, name, x, y, w, h, fill, line=None, line_pt=None)`（扁平自选图形：去主题样式、关阴影，`fill` / `line` 为 None 即无填充 / 无描边）、`add_line(slide, name, x1, y1, x2, y2, color, pt, dash=None)`（直线）。坐标都是 EMU，可为浮点。版式模块不要再各写一份；需要额外属性（如 timeline 的线关阴影、stats-side 的卡片段落左对齐）就在返回的形状上再设。
   - 估算：`text_width_in` / `text_lines`（CJK 1em、拉丁 0.55em），溢出警告一律用它；
-  - 常量：`BRAND_RED`、`LATIN_FONT`、`EA_FONT`。
+  - 常量：`BRAND_RED`、`LATIN_FONT`、`EA_FONT`；黑白灰 `INK "1A1A1A"`、`MUTED "6B6B6B"`、`RULE "BFBFBF"` 和行高倍数 `LINE_SPACING = 1.25`（section / agenda / team / table 排框高用；审核估算溢出用 1.2，见下文审核脚本一节）。
+  - 章节行（section、agenda）：`chapter_row(line)` 把「编号 | 中文名 | 英文名」拆成三段（去首尾空白），不是三段返回 `None`；`check_chapter_row(page, kind, row, show_row=False)` 查三段非空且不超字数（`CHAPTER_FIELDS`：编号 3、中文名 12、英文名 40），否则抛 `DeckError`。
   - 例外：底部红条的加高算法是月报固定样式，不改用 `text_lines`；stats 的卡片几何（大数字字号、标签 / 说明行数）用本版式的逐字宽表。stats-side 的大数字字号用通用口径（`number_width_in`）。两边口径不同是有意保留的：stats 的逐字宽表直接决定栏内形状尺寸，改成通用口径会改变已有文稿（含示例文稿）的输出；stats-side 只用估算判断要不要缩小，用通用口径即可。
   - 缩进子列表：`sub_item(page, i)`——`page.lines[i]` 是缩进（≥1 列）的 `- ` / `* ` / `+ ` 行时返回去掉列表符号的文字，否则 `None`。不缩进的 `- ` 行仍是本版式的条目行。stats 类版式用它把卡片行下面的解读挂到上一张卡上：
     ```python
@@ -18,7 +19,7 @@
         if sub is not None:      # 解读：挂到 items[-1]；前面没有卡片行时按版式规则报错
             ...
     ```
-  - 数字 + 缩小单位：`split_number(value) -> (前缀, 大数字, 单位)`，三段拼起来就是去掉首尾空白的原文，不补、不删空白。
+  - 数字 + 缩小单位：`split_number(value) -> (前缀, 大数字, 单位)`，三段拼起来就是去掉首尾空白的原文，不补、不删空白。`is_number(value)` 判断是否「（前缀 +）数字」开头，和 `split_number` 同一条规则；审核脚本的「数字卡不是数字」直接用它。
     - 大数字：可带 `$ + -` 的数字（千分位逗号、小数点），连同后面的数量级后缀（`K M B k m b x X`，后面不能紧跟字母）、`+`、`/数字`，如 `12.3M`、`5x`、`1,000+`、`24/7`。
     - 单位：大数字后面以 `%` 或 CJK 字符开头的尾巴（`100%`、`120件`、`120 件`），或空白后接英文单词（`5 d`）；空白原样留在单位里。其他尾巴（如 `10Mbps`）并进大数字。
     - 前缀：数字前的 `约 ~ ～ ≈ ≥ ≤ > < ＞ ＜ ± +/-` 之一，连同其后的空白（`约 5 天` → `("约 ", "5", " 天")`）。
@@ -80,5 +81,5 @@ python3 scripts/review_deck.py deck.md deck.pptx
   - PDCA 和章节不符：标的阶段和所属节不对应（01–04 P、05 D、06 D 或 C、08 A），或一页标了多个阶段（§2：06 节一页只放一个；生成器允许 `D/C` 组合，由审核报）。还没进入八节的页不比对。
   - 章节和版式不配：TARGET / SCOPE 用 process / before-after，USE CASES 用 before-after。
 - 真伪检查（看 pptx，确认是生成器按当前文稿做的）：页数不符（封面 + 正文 + 收尾页）、不是生成脚本做的（正文页 idx 0 / 10 占位框里的文字和文稿的主标题、副标题不一致，或 banner 0–1.0" 上另画了文本框）。位置写成 `pptx 第 N 页（页「主标题」）`。
-- 几何检查（看 pptx 正文页，只用 python-pptx 和计算，不依赖 LibreOffice）：出界（超出页面）、压 banner（上沿高于 1.0"，idx 0 / 10 标题框除外）、压页脚（下沿低于 7.25"）、文字溢出（字宽用 `layouts/common.py` 的 `text_width_in`，行高 = 字号 × 1.2，与生成器警告同一口径；字号继承模板的占位框不估；原生表格按单元格估，某行估计高过行高才报）、重叠、错位。每条带页码和形状名。重叠豁免和错位比较按形状名，规则见 `references/layouts.md`「审核的几何豁免」；阈值是 `review_deck.py` 里的命名常量（`OVERLAP_TOL`、`MISALIGN_TOL`、`ALIGN_SNAP`、`OVERFLOW_TOL`），取值理由写在常量旁。几何检查的测试在 `tests/test_review_geometry.py`。
+- 几何检查（看 pptx 正文页，只用 python-pptx 和计算，不依赖 LibreOffice）：出界（超出页面）、压 banner（上沿高于 1.0"，idx 0 / 10 标题框除外）、压页脚（下沿低于 7.25"）、文字溢出（字宽用 `layouts/common.py` 的 `text_width_in`，行高 = 字号 × 1.2，与 process / stats / stats-side / timeline / timeline-phase / before-after 的溢出警告同一口径；section / agenda / team / table 按 `common.LINE_SPACING`（1.25）排框高，比审核宽 4%，生成器的框不会被报溢出；字号继承模板的占位框不估；原生表格按单元格估，某行估计高过行高才报）、重叠、错位。每条带页码和形状名。重叠豁免和错位比较按形状名，规则见 `references/layouts.md`「审核的几何豁免」；阈值是 `review_deck.py` 里的命名常量（`OVERLAP_TOL`、`MISALIGN_TOL`、`ALIGN_SNAP`、`OVERFLOW_TOL`），取值理由写在常量旁。几何检查的测试在 `tests/test_review_geometry.py`。
 - 测试在 `tests/test_review.py`（通用内容检查、真伪检查）和 `tests/test_review_project.py`（项目模式、配图、目录和隔断页）：正样本是生成器的正常输出（含示例文稿），负样本用 python-pptx 把正常输出改坏或改文稿。`test_review_project.py` 的 `PROJECT_FULL` 是全版式正样本（项目模式一份、去掉 `report: project` 和 PDCA 的非项目模式一份，都要打印 `REVIEW OK`），`test_review_geometry.py` 的 `VARIANTS` 是几何正样本；两者都强制覆盖 `registered_layouts()`，新增版式没补正样本时测试失败并提示补哪个版式。新增规则时规则名放进 `[]`，测试按 `[规则]` 行首匹配。
