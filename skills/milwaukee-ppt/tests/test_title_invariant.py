@@ -94,13 +94,16 @@ SAMPLES = {
 }
 
 
-def deck(names):
-    """每个版式一页：主标题「版式 N / LAYOUT」，副标题「第 N 页副标题写成一句结论」。"""
+def deck(names, project=False):
+    """每个版式一页：主标题「版式 N / LAYOUT」，副标题「第 N 页副标题写成一句结论」。
+    project=True 时是项目汇报模式，每页加 PDCA: D/C 和 Tag。"""
     pages = []
+    extra = "PDCA: D/C\nTag: Aug\n" if project else ""
     for n, name in enumerate(names, start=1):
         body = "\n".join(line.strip() for line in SAMPLES[name].strip("\n").splitlines())
-        pages.append(f"# 版式 {n} / {name.upper()}\n## 第 {n} 页副标题写成一句结论\n{body}\n")
-    return "---\ntitle: 跨版式不变量\nclosing: Thank You\n---\n\n" + "\n".join(pages)
+        pages.append(f"# 版式 {n} / {name.upper()}\n## 第 {n} 页副标题写成一句结论\n{extra}{body}\n")
+    report = "report: project\n" if project else ""
+    return f"---\ntitle: 跨版式不变量\nclosing: Thank You\n{report}---\n\n" + "\n".join(pages)
 
 
 def test_every_layout_titles_in_placeholders():
@@ -108,14 +111,21 @@ def test_every_layout_titles_in_placeholders():
     missing = [name for name in names if name not in SAMPLES]
     check("注册表里的每个版式都有示例页（新版式在 SAMPLES 补一页）", not missing, missing)
     names = [name for name in names if name in SAMPLES]
-    r = generate(deck(names), images={"img/a.png": (1600, 900)})
-    check("全部版式一份文稿：生成成功", r.rc == 0, r.stderr)
+    for project in (False, True):
+        check_titles(names, project)
+
+
+def check_titles(names, project):
+    mode = "（项目模式，带 PDCA 和 Tag）" if project else ""
+    r = generate(deck(names, project), images={"img/a.png": (1600, 900)})
+    check(f"全部版式一份文稿{mode}：生成成功", r.rc == 0, r.stderr)
     if r.rc != 0:
         return
     for n, (name, slide) in enumerate(zip(names, r.slides[1:]), start=1):
+        name = name + mode
         title, sub = placeholder(slide, 0), placeholder(slide, 10)
         check(f"{name}：主标题在 idx 0 占位框里",
-              title is not None and title.text_frame.text == f"版式 {n} / {name.upper()}",
+              title is not None and title.text_frame.text == f"版式 {n} / {name.removesuffix(mode).upper()}",
               title.text_frame.text if title is not None else None)
         check(f"{name}：副标题在 idx 10 占位框里",
               sub is not None and sub.text_frame.text == f"第 {n} 页副标题写成一句结论",

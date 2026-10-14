@@ -196,6 +196,20 @@ B 仓高峰等待 35 分钟，是 A 仓的两倍
 IMAGES = {"img/a.png": (1600, 900), "img/b.png": (1200, 900), "img/tall.png": (900, 1600)}
 
 
+# 项目汇报模式正样本：同一批页面，frontmatter 加 report: project，每页轮流写单个 / 组合 PDCA；
+# 写了 Tag 的页（证据、流程、隔断、目录、表格满表…）就是 PDCA 图标和月份标识同时出现。
+PROJECT_PDCA = ("P", "D/C", "C", "A", "D")
+
+
+def project_variants_md():
+    md = VARIANTS.replace("closing: Thank You\n", "closing: Thank You\nreport: project\n", 1)
+    pages = md.split("\n# ")
+    for i in range(1, len(pages)):
+        title, rest = pages[i].split("\n", 1)
+        pages[i] = f"{title}\nPDCA: {PROJECT_PDCA[(i - 1) % len(PROJECT_PDCA)]}\n{rest}"
+    return "\n# ".join(pages)
+
+
 def geometry_lines(out):
     return [line for line in out.splitlines()
             if any(line.startswith(f"[{rule}]") for rule in GEOMETRY_RULES)]
@@ -204,6 +218,14 @@ def geometry_lines(out):
 def variants():
     """→ (文稿路径, pptx 路径)。"""
     r = generate(VARIANTS, images=IMAGES)
+    if r.rc != 0:
+        raise RuntimeError(r.stderr)
+    return r.workdir / "deck.md", r.path
+
+
+def project_variants():
+    """→ (文稿路径, pptx 路径)：各版式写法的项目汇报模式版本（带 PDCA 图标）。"""
+    r = generate(project_variants_md(), images=IMAGES)
     if r.rc != 0:
         raise RuntimeError(r.stderr)
     return r.workdir / "deck.md", r.path
@@ -243,7 +265,8 @@ def reported(md, pptx, rule, page, name):
 
 
 def test_normal_decks_have_no_geometry_issues():
-    for label, (md, pptx) in (("示例文稿", demo()), ("各版式写法", variants())):
+    for label, (md, pptx) in (("示例文稿", demo()), ("各版式写法", variants()),
+                              ("各版式写法（项目模式，带 PDCA 和 Tag）", project_variants())):
         r = review(md, pptx)
         check(f"{label}：没有几何问题", not geometry_lines(r.stdout), geometry_lines(r.stdout))
 
@@ -284,6 +307,16 @@ def test_overlap():
           any("Process Card 1" in line for line in lines), out)
 
 
+def test_pdca_icon_not_exempt():
+    """PDCA 图标不在重叠豁免里：挪进内容区压到流程卡片要报出来。"""
+    md, pptx = project_variants()
+
+    def push_down(prs):
+        shape(prs, 4, "PDCA Icon 1").top = shape(prs, 4, "Process Card 5").top + Inches(0.2)
+
+    expect("PDCA 图标挪进流程卡片", md, pptx, push_down, "重叠", 4, "PDCA Icon 1")
+
+
 def test_misaligned():
     md, pptx = demo()
 
@@ -318,6 +351,7 @@ if __name__ == "__main__":
     test_normal_decks_have_no_geometry_issues()
     test_out_of_page()
     test_overlap()
+    test_pdca_icon_not_exempt()
     test_misaligned()
     test_text_overflow()
     finish()

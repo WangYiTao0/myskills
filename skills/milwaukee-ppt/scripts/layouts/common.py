@@ -179,15 +179,18 @@ def add_caption_bar(slide, page):
     return sp
 
 
-def add_month_tag(slide, tag, year):
+def add_month_tag(slide, tag, year, right=None, top=None):
     """正文区右上角极简月份标识（无框、灰字）；只在页面写了 Tag 时显示。
 
-    Tag 不含 4 位年份时补上文稿年份，如 "Mar" → "Mar 2026"。"""
+    Tag 不含 4 位年份时补上文稿年份，如 "Mar" → "Mar 2026"。
+    right / top（EMU）默认是正文区右缘和 1.12"；有 PDCA 图标时由调用方让到图标左侧。"""
     if not tag:
         return None
     text = tag if re.search(r"\d{4}", tag) else f"{tag} {year}"
     w, h = Inches(1.7), Inches(0.3)
-    tb = slide.shapes.add_textbox(Inches(IMG_LEFT + IMG_W) - w, Inches(1.12), w, h)
+    right = Inches(IMG_LEFT + IMG_W) if right is None else right
+    top = Inches(1.12) if top is None else top
+    tb = slide.shapes.add_textbox(right - w, top, w, h)
     tb.name = "Month Tag"
     tf = tb.text_frame
     tf.word_wrap = False
@@ -205,11 +208,42 @@ def add_month_tag(slide, tag, year):
 
 
 def add_page_chrome(slide, page, ctx):
-    """所有版式通用的页面装饰：右上月份标识 + 底部红条（结论 / Next）。
+    """所有版式通用的页面装饰：右上 PDCA 图标和月份标识 + 底部红条（结论 / Next）。
 
     版式渲染函数画完自己的内容后最后调用它，红条叠在最上层。"""
-    add_month_tag(slide, page.tag, ctx.year)
+    if page.pdca:
+        left = add_pdca_icons(slide, page.pdca)
+        add_month_tag(slide, page.tag, ctx.year, right=left - Inches(PDCA_TAG_GAP),
+                      top=Inches(PDCA_TAG_TOP))
+    else:
+        add_month_tag(slide, page.tag, ctx.year)
     add_caption_bar(slide, page)
+
+
+# PDCA 图标（项目汇报模式，`PDCA:`）：assets/pdca/<字母>_icon.png（由同名 SVG 预转，
+# 转换命令见 scripts/README.md），运行时只插 PNG。
+# 放在 banner 下沿和正文槽位上沿之间的窄条里（1.02–1.30"），右缘贴正文区右缘；
+# 各版式的内容都从 IMG_TOP（1.30"）起排，图标不压内容，版式不用为它让位。
+# 组合（D/C）按文稿顺序从左到右排。写了 Tag 时月份标识让到图标左侧、纵向中线和图标对齐。
+PDCA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "assets", "pdca")
+PDCA_SIZE = 0.28        # 图标边长（英寸）
+PDCA_TOP = 1.02         # 图标上沿：banner 下沿 1.0" 下留 0.02"，下沿正好到 IMG_TOP
+PDCA_GAP = 0.06         # 组合图标之间的间距
+PDCA_TAG_GAP = 0.12     # 月份标识文字右缘到最左图标的间距
+PDCA_TAG_TOP = 1.07     # 有图标时月份标识框上沿：11pt 一行的中线落在图标中线 1.16"
+
+
+def add_pdca_icons(slide, letters):
+    """右上角按顺序插 PDCA 图标（PDCA Icon 1..n），返回最左图标的左缘（EMU）。"""
+    size, gap = Inches(PDCA_SIZE), Inches(PDCA_GAP)
+    right = Inches(IMG_LEFT + IMG_W)
+    left = right - len(letters) * size - (len(letters) - 1) * gap
+    for n, letter in enumerate(letters, start=1):
+        pic = slide.shapes.add_picture(os.path.join(PDCA_DIR, f"{letter}_icon.png"),
+                                       left + (n - 1) * (size + gap), Inches(PDCA_TOP),
+                                       size, size)
+        pic.name = f"PDCA Icon {n}"
+    return left
 
 
 # ---- 画原生形状的小工具 ---------------------------------------------------------

@@ -1,11 +1,11 @@
 # 生成器代码约定（给版式票的实现者）
 
-- 三层：`mdparse.py` 只切页并取通用字段（`#` `##` `Layout:` `Tag:` `Next:`），其余正文行去掉首尾空白后放进 `page.lines`，行首缩进宽度放进一一对应的 `page.indents`（空格算 1，tab 算 4，空行 0）；`layouts/<版式>.py` 解析本版式字段并渲染；`generate_ppt.py` 装配封面 / 各页 / 收尾。
+- 三层：`mdparse.py` 只切页并取通用字段（`#` `##` `Layout:` `Tag:` `PDCA:` `Next:`；`PDCA:` 解析成 `page.pdca`，如 `["D", "C"]`，frontmatter 没写 `report: project` 时报错），其余正文行去掉首尾空白后放进 `page.lines`，行首缩进宽度放进一一对应的 `page.indents`（空格算 1，tab 算 4，空行 0）；`layouts/<版式>.py` 解析本版式字段并渲染；`generate_ppt.py` 装配封面 / 各页 / 收尾。
 - 每个版式一个模块：`layouts/evidence.py`、`before_after.py`、`process.py`、`stats.py`、`stats_side.py`、`timeline.py`、`timeline_phase.py`、`image_text.py`、`section.py`、`agenda.py`、`team.py`、`table.py`，接口相同：`NAME`、`LAYOUT_INDEX`、`parse(page)`、`render(prs, page, ctx) -> slide`。
 - `parse(page)` 读 `page.lines`（空行为 `""`），写 `page.fields`，把红条结论行追加到 `page.conclusion`；文稿有错抛 `DeckError`，信息里带 `页「{page.title}」`。
 - `render` 用 `prs.slide_layouts[LAYOUT_INDEX]` 建页，`fill_titles` 填 idx 0/10，按 idx 取槽位画内容（槽位只用来定位的就 `take_slot` 取矩形并删掉占位框），最后调 `add_page_chrome(slide, page, ctx)` 画 Tag 和底部红条。
 - 共用部件只放 `layouts/common.py`，版式模块之间不互相 import：
-  - 页面：`warn`、`load_image`、`fill_titles`、`add_page_chrome`（Tag + 底部红条）；
+  - 页面：`warn`、`load_image`、`fill_titles`、`add_page_chrome`（PDCA 图标 + Tag + 底部红条）；版式模块不用管 PDCA：图标在 banner 下沿和正文区上沿之间的窄条（1.02–1.30"），各版式内容都从 1.30" 起排，不需要让位；有图标时 `add_month_tag` 由 `add_page_chrome` 让到图标左侧。
   - 形状：`slot` / `take_slot` / `remove_shape`（按 idx 取槽位、删形状）、`fit_picture`（矩形内等比放图）、`add_run`（Arial + 中文 PingFang SC 的 run）、`strip_theme_style`（去 p:style）；
   - 画形状：`add_textbox(slide, name, x, y, w, h, anchor=TOP, wrap=True) -> text_frame`（起名、内边距 0）、`add_shape(slide, kind, name, x, y, w, h, fill, line=None, line_pt=None)`（扁平自选图形：去主题样式、关阴影，`fill` / `line` 为 None 即无填充 / 无描边）、`add_line(slide, name, x1, y1, x2, y2, color, pt, dash=None)`（直线）。坐标都是 EMU，可为浮点。版式模块不要再各写一份；需要额外属性（如 timeline 的线关阴影、stats-side 的卡片段落左对齐）就在返回的形状上再设。
   - 估算：`text_width_in` / `text_lines`（CJK 1em、拉丁 0.55em），溢出警告一律用它；
@@ -30,6 +30,14 @@
   - 数据卡片（stats 类）：`parse_stat_card(page, line)` 把「- [!]标签 | 数字 | 一句说明」解析成 `{"label", "value", "note", "key"}`，不是列表行返回 `None`；三段不全、重点行漏写列表符号（`!标签 | …`）时报错。`check_stat_cards(page, items, lo, hi)` 查条数和最多一个 `!`。
   - 状态图例：`add_legend(slide, right, top, entries, text_pad=LEGEND_TEXT_PAD)`，`entries = [(图形占位宽英寸, draw(name, cx, cy), 文字)]`，一行右对齐；第 n 项图形叫 `Legend Icon n`、文字叫 `Legend Label n`，图形上另加的形状也带编号（`Legend Check 1`）。文字 `LEGEND_STYLE` 12pt 灰，第 4 项文字用 `KEY_LABEL`（关键里程碑）。
 - 注册表在 `layouts/__init__.py`，已登记 12 个版式。
+- PDCA 图标资产：`assets/pdca/{P,D,C,A}_icon.png` 由同名 SVG 预转，提交进仓库，生成器运行时只插 PNG、不做转换。改了 SVG 后在 skill 目录下重转（macOS 自带 `sips`；SVG 只有 viewBox，先加上 320×320 的 width / height 再转（不加只出 80px），得到 320px 带透明底的 PNG）：
+  ```
+  for L in P D C A; do
+    sed 's/<svg viewBox="0 0 80 80"/<svg width="320" height="320" viewBox="0 0 80 80"/' assets/pdca/${L}_icon.svg > /tmp/${L}_icon.svg
+    sips -s format png /tmp/${L}_icon.svg --out assets/pdca/${L}_icon.png
+  done
+  ```
+  （bash / zsh 写法；在 fish 里先 `bash` 再贴。）转完和 SVG 并排看一眼（如用浏览器打开两者），确认圆弧、颜色、字母一致。
 - 形状命名：每个画出来的形状都 `name = "<角色> N"`（N 从 1 起，与条目顺序一致），这是生成后细调时对 AI 的契约；各版式的名字列在 `references/layouts.md`「形状命名约定」，改名时同步改那一节。
 - 测试：每个版式一个 `tests/test_<版式>.py`，只走“md 进、pptx 出”；辅助函数（`generate`、`body_slide`、`pictures`、`shapes_named`、`run_style` 等）和模板槽位常量都在 `tests/deckcheck.py`，测试文件里不要再各写一份。`python3 tests/run_all.py` 跑全部。
   - 新增辅助：`runs(shape, para=0)` 返回一段里每个 run 的 `(文字, 字号, 粗体, 颜色)`，查单位拆分；`fill_color` / `line_color` 取形状纯色填充 / 描边 hex（没有为 `None`）；`geometry(shape)` 取预设几何名（`ellipse`、`diamond`、`homePlate`、`chevron`…）；`inside(shape, rect_in)` 判断形状落在英寸矩形内（如 `CONTENT_SLOT_IN`）；`slide_xmls(path)` 取各页 slide XML 字节，用于和改动前逐字节比较；`deck_error(r, title, *needles)` 判断报错退出且信息含页标题。`review(md, pptx=None)` 跑审核脚本、返回 `CompletedProcess`；`registered_layouts()` 从未知版式的报错信息里读出注册表全部版式名（只走外部切入点）。`inside_shape(inner, outer)` 判断形状落在另一个形状里；`center_x` / `center_y` / `bottom` 取中心坐标和底边；`named(slide, name)` 取名字恰为 name 的全部形状，`one(slide, name)` 恰好一个时返回它。常量 `STATUS_COLORS`、`DONE_GREEN`、`DOING_AMBER`、`DOING_INK`、`UNIT_PT`、`UNIT_COLOR`。

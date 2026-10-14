@@ -13,21 +13,25 @@ subtitle: 示例文稿 · 虚构数据
 author: 示例改进小组
 date: 13 Oct 2026
 closing: Thank You
+report: project
 ---
 
 # 项目背景 / BACKGROUND
 ## 纸质登记让借还记录难以追溯
 Layout: evidence
 Tag: Oct
+PDCA: P
 ![](img/paper-log.png)
 抽查 3 个月的登记本，约三成借出记录没有归还登记
 Next: 10 月底前完成全部工具贴码
 ```
 
 - frontmatter：写了 `title` = 通用模式；`subtitle`、`author`、`date`、`closing` 都可选。`date` 里的 4 位年份用于给 Tag 补年份；不写 `closing` 就没有收尾页。
+- `report: project` 可选 = 项目汇报模式（只在用户明确说"这是一个项目的完整汇报"时写，规则见 SKILL.md「适用范围」B 类）；不是项目汇报就整行不写。`report` 只认 `project`，写别的值报错。
 - `# ` 是主标题（banner 右上，填 idx 0），`## ` 是 action title（填 idx 10）。
 - `Layout:` 选版式，不写 = evidence，不区分大小写。
 - `Tag:` 可选，正文区右上角灰字；没写年份时补上文稿年份。
+- `PDCA:` 可选，只在项目汇报模式下用：`P` / `D` / `C` / `A`，组合用 `/`（`PDCA: D/C`），不区分大小写；所有版式都支持。生成器在 banner 下沿和正文区上沿之间（1.02–1.30"）插 0.28" 见方的 PDCA 图标（`assets/pdca/` 的 PNG），右缘贴正文区右缘，组合按写的顺序从左到右排；不压任何版式的内容。同页写了 `Tag:` 时月份标识让到图标左侧、和图标纵向居中对齐。不写 `PDCA:` 的页没有图标。生成器只管画，不检查章节顺序和每节写没写 PDCA（交给审核）。
 - 版式字段（上例是 evidence 的图）见下文各小节。
 - 普通文字行是一句话结论，进底部红条。
 - `Next:` 可选，写已确定的下一步；写成「下一步：」时红条也显示「下一步」。
@@ -42,6 +46,8 @@ Next: 10 月底前完成全部工具贴码
 **报错**：以非零退出，不留半坏的文件。出在某一页的错误（版式名、条目、图片），信息里带 `页「标题」`；整份文稿的错误（输入文件找不到、frontmatter、没有任何页、输出路径）不带页标题。
 
 - frontmatter 缺必填项（通用模式缺 title；月报模式缺 month / author，或 month 不是 YYYY-MM）
+- frontmatter 的 `report` 写了 `project` 以外的值
+- 没写 `report: project` 却写了 `PDCA:`；`PDCA:` 的字母不是 P / D / C / A，或有重复（带页标题）
 - 文稿里没有任何 `# ` 页
 - `Layout:` 写了未知名字
 - 条目数超出该版式范围，或条目格式不对（各版式小节里列出）
@@ -417,7 +423,7 @@ Layout: section
 
 | 范围 | 形状名 |
 | --- | --- |
-| 各版式共用 | `Caption Bar`（底部红条）、`Month Tag`（`Tag:` 月份标识） |
+| 各版式共用 | `Caption Bar`（底部红条）、`Month Tag`（`Tag:` 月份标识）、`PDCA Icon N`（`PDCA:` 图标，图片形状，N 按文稿里字母的顺序从左到右） |
 | stats | `Stat Rule N`（顶部粗线）、`Stat Label N`、`Stat Number N`（前缀、数字、单位是同一段里的几个 run）、`Stat Note N`、`Stat Divider N`、`Stat Points N`（这张卡的全部解读，一条一段）、`Stat Source`（口径）；旧写法没有 Divider / Points |
 | stats-side | `Side Card N`（卡片底）、`Side Accent N`（只有重点卡）、`Side Number N`、`Side Text N`（标签一段 + 说明一段）、`Side Conclusion Title`、`Side Conclusion Rule`、`Side Points`（全部结论要点，一条一段）、`Stat Source` |
 | timeline（写了状态） | `Milestone Node N`、`Milestone Check N`（只在已完成节点上）、`Milestone Date N`、`Milestone Text N`（标题一段 + 说明一段）、`Progress Line`（绿色已完成段）、`Remaining Line`（灰色虚线）、`Current Ring`、`Current Tag`；图例 `Legend Icon 1–4`、`Legend Label 1–4`（1 已完成、2 进行中、3 未完成、4 关键里程碑）、`Legend Check 1`（已完成图标上的对勾） |
@@ -436,7 +442,7 @@ Layout: section
 
 - 重叠不报：
   - 模板占位框（主标题、action title、各版式槽位，包括被图片盖住的 Before/After 13 / 14）；
-  - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"）；
+  - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"；有 PDCA 图标时框让到图标左侧，不和图标相压）；
   - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
   - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）。
 - 原生表格（table 的 `Data Table`）整张算一个形状，出界、重叠照常按外框查；单元格不另加豁免。文字溢出按单元格估算（同文本框口径：字宽 `text_width_in`、行高字号 × 1.2），某行估计高过行高才报。
