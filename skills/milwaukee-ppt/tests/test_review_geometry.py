@@ -17,7 +17,8 @@ DEMO = SKILL / "examples" / "demo" / "deck.md"
 GEOMETRY_RULES = ("出界", "压 banner", "压页脚", "文字溢出", "重叠", "错位")
 PX = 9525   # 96 dpi 下一个像素（EMU）
 
-# 正样本：各版式的常见写法（写了 / 没写 Tag、状态 / 旧写法、图 / 短文、条目数上下限）
+# 正样本：各版式的常见写法（写了 / 没写 Tag、状态 / 旧写法、图 / 短文、条目数上下限、
+# 隔断页字数上限）
 VARIANTS = """\
 ---
 title: 仓库叉车充电排班优化 项目汇报
@@ -48,6 +49,12 @@ Tag: Aug
 4. 按时充电 | 到点去指定充电位
 5. 复核 | 班长每周复核一次
 五步流程在 B 仓试运行 3 周
+
+# 试运行 / PILOT
+## B 仓试运行 3 周，排队明显缩短
+Layout: section
+Tag: Aug
+3.1 | 试运行与数据复盘阶段汇总 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
 
 # 新旧流程 / FLOW
 ## 交班登记一步完成

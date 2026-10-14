@@ -67,6 +67,10 @@ SAMPLES = {
         - 每天早班前自动刷新
         看板已在试点车间晨会使用
         """,
+    "section": """
+        Layout: section
+        02 | 试点推进 | PILOT
+        """,
 }
 
 

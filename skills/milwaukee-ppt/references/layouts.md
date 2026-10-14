@@ -1,6 +1,6 @@
 # 生成器版式参考
 
-把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（8 个版式各一页）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
+把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（evidence 到 image-text 8 个版式各一页；section 的写法见本文件对应小节）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
 
 ## 文稿格式
 
@@ -291,6 +291,27 @@ Layout: image-text
 - 报错：没有图；图片不存在。
 - 警告：图多于一张（只用第一张）；要点超过 5 条。
 
+## section · 隔断页
+
+模板 layout 0（和 evidence 共用；inspect 靠 `Section Number` 认出 section）。章节之间的过渡页：章节编号 + 中文名 + 英文名是页面主体。
+
+```markdown
+# 试点推进 / PILOT
+## 试点 4 周，借还记录全部可追溯
+Layout: section
+02 | 试点推进 | PILOT
+```
+
+- 字段：正好一行「编号 | 中文名 | 英文名」，三段都必填。
+- 容量：编号最多 3 字（`02`、`A`、`3.1`），中文名最多 12 字，英文名最多 40 字符。
+- 主标题、副标题照常填 idx 0 / 10；副标题仍写一句结论（本章要点），不要只重复章节名。
+- 不放结论红条：写普通文字行或 `Next:` 都报错。`Tag:` 照常可用。
+- 画法：正文区里一组横排、整组垂直居中：左边 96pt bold #1A1A1A 编号，一条 #BFBFBF 竖线，右边 40pt bold #1A1A1A 中文名，下面 20pt #6B6B6B 英文名。只用黑白灰，不用红。
+- 适用：页数较多、分了几个章节的汇报，在章节之间提示“下面进入第几部分”。
+- 反例：总页数本来就少（≤ 6 页）或只有一两个章节，加隔断页只是凑页；两张隔断页连着放（中间那章没有内容）；把本章的结论、数字写进隔断页（放到该章的正文页）。
+- 报错：没有编号行或多于一行；某行不是三段；某段为空；编号、中文名、英文名超过字数上限；写了普通文字结论行或 `Next:`。报错信息带页标题。
+- 审核：`review_deck.py` 对 section 不报「缺结论行」（按设计没有红条）；「目录式副标题」照样检查。
+
 ## 选版速查
 
 | 内容 | 版式 |
@@ -303,6 +324,7 @@ Layout: image-text
 | 3–6 个时间节点（带状态时看得出进度） | timeline |
 | 3–6 个前后衔接的阶段，强调推进到哪一段 | timeline-phase |
 | 一张图 + 几条解释 | image-text |
+| 章节之间的过渡（编号 + 章节名） | section |
 | 都不匹配（Agenda、团队、表格等） | 生成器没有对应版式；先用最接近的生成，再在 PowerPoint 里按 SKILL.md §6 和 `layout-patterns.md` 手工调整 |
 
 ## 形状命名约定
@@ -320,6 +342,7 @@ Layout: image-text
 | stats-side | `Side Card N`（卡片底）、`Side Accent N`（只有重点卡）、`Side Number N`、`Side Text N`（标签一段 + 说明一段）、`Side Conclusion Title`、`Side Conclusion Rule`、`Side Points`（全部结论要点，一条一段）、`Stat Source` |
 | timeline（写了状态） | `Milestone Node N`、`Milestone Check N`（只在已完成节点上）、`Milestone Date N`、`Milestone Text N`（标题一段 + 说明一段）、`Progress Line`（绿色已完成段）、`Remaining Line`（灰色虚线）、`Current Ring`、`Current Tag`；图例 `Legend Icon 1–4`、`Legend Label 1–4`（1 已完成、2 进行中、3 未完成、4 关键里程碑）、`Legend Check 1`（已完成图标上的对勾） |
 | timeline（不写状态） | `Timeline Line`、`Timeline Node N`、`Timeline Date N`、`Timeline Text N` |
+| section | `Section Number`（章节编号，也是 inspect 区分 section / evidence 的标记形状）、`Section Rule`（竖线）、`Section Name`（中文名）、`Section English`（英文名） |
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
 
 其他版式的形状名（如 `Process Card N`、`Lead`）以 `inspect_ppt.py` 的输出为准。

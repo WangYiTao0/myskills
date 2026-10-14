@@ -58,7 +58,8 @@ STATUS_COLORS = {"done": DONE_GREEN, "doing": DOING_AMBER, "todo": BRAND_RED}
 UNIT_PT, UNIT_COLOR = 28, "6B6B6B"   # 数字后的单位：28pt 灰色、不加粗
 
 LAYOUT_INDEX = {"evidence": 0, "before-after": 3, "process": 4, "stats": 5,
-                "stats-side": 5, "timeline": 6, "timeline-phase": 6, "image-text": 7}
+                "stats-side": 5, "timeline": 6, "timeline-phase": 6, "image-text": 7,
+                "section": 0}
 
 # 模板槽位（英寸，L / T / W / H；#13 定稿）
 CONTENT_SLOT_IN = (0.56, 1.30, 12.21, 4.30)   # process 17 / stats 18 / timeline 19
