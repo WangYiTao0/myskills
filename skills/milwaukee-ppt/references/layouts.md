@@ -373,3 +373,14 @@ Layout: section
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
 
 其他版式的形状名（如 `Process Card N`、`Lead`）以 `inspect_ppt.py` 的输出为准。
+
+### 审核的几何豁免
+
+`scripts/review_deck.py` 的几何检查按上面的形状名判断哪些叠放是有意的。改形状名时同步这里和 `review_deck.py` 的 `OVERLAP_EXEMPT` / `OVERLAP_PAIRS`。
+
+- 重叠不报：
+  - 模板占位框（主标题、action title、各版式槽位，包括被图片盖住的 Before/After 13 / 14）；
+  - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"）；
+  - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Side Card 1` 和 `Side Number 1`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
+  - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）。
+- 错位只比同类形状：名字去掉末尾编号后相同（如 `Process Card 1–4`、`Side Card 1–3`；占位框不比）。同一行比上沿 / 中线 / 下沿，同一列比左沿 / 中线 / 右沿，有一条对齐（差不到半像素）就算对齐；都没对齐且最近的差值小于 5 像素时报告。大小不同、中线对齐的节点（关键里程碑、进行中）不算错位。
