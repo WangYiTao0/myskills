@@ -44,6 +44,7 @@ def entries():
     """(包内路径, 内容 bytes)，按包内路径排序。"""
     files = {"SKILL.md": skill_md().encode("utf-8"),
              "scripts/check_env.py": (AGENT / "skill" / "check_env.py").read_bytes(),
+             "scripts/review_deck.py": (AGENT / "skill" / "review_deck.py").read_bytes(),
              "assets/MS_Template.pptx": (SKILL / "assets" / "MS_Template.pptx").read_bytes(),
              "references/example-deck.md": (AGENT / "knowledge" / "example-deck.txt").read_bytes()}
     for py in sorted((SKILL / "scripts").rglob("*.py")):
