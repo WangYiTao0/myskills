@@ -70,7 +70,15 @@ python3 scripts/review_deck.py deck.md deck.pptx
 - 输出：每条问题一行 `[规则] 位置：问题 → 怎么改`；全部通过时只打印一行 `REVIEW OK`，有问题时最后一行是 `REVIEW: N 条问题`。
 - 只报告、不改文件。审完退出码总是 0（有问题也是 0）；文稿读不了（找不到、写错）或 pptx 打不开时退出码 1，错误写到 stderr。
 - 和生成器共用 `mdparse` 与版式注册表：文稿按生成器同一套规则解析，生成器会报错的文稿审核也报错。
-- 内容检查（只看文稿）：页数过多（> 10 页）、相邻两页版式相同、目录式副标题（不到 8 字或和主标题中文部分相同）、缺结论行（`NO_CONCLUSION` 里的版式不报，目前是按设计不放红条的 section、agenda）、章节和版式不配（TARGET / SCOPE 用 process / before-after，USE CASES 用 before-after）、内容重复（两页流程步骤名一半以上相同）、数字卡不是数字、数据缺失（`[数据缺失]` 占位）、用词（浮夸 / 空洞词表）、关键标记过多（时间线 3 个以上节点、超过一半标了 `!`）。
+- 内容检查（只看文稿，所有文稿都查）：页数过多（> 10 页，不含目录页、隔断页）、相邻两页版式相同（连着两张隔断页不报）、目录式副标题（不到 6 字，或只是主标题中文部分加两三个字，如「项目目标介绍」；6 字以上的短结论不报）、缺结论行（`NAV_LAYOUTS` 里的导航页不报，目前是按设计不放红条的 section、agenda）、内容重复（两页流程步骤名一半以上相同）、数字卡不是数字、数据缺失（`[数据缺失]` 占位）、用词（浮夸 / 空洞词表）、关键标记过多（时间线 3 个以上节点、超过一半标了 `!`）、目录和隔断页不一致（文稿有目录页时，隔断页的中文章节名不在目录里）。
+- 配图检查（只看文稿，所有文稿都查）：缺配图（evidence 页没放图；evidence 是唯一"必须配图、但解析不强制"的版式）、图片不存在（evidence 的图、image-text 的图、before-after 两侧写了的图，本地路径相对文稿找不到；URL 不查）。image-text 没图在解析时就报错（和生成器同一条规则，审核退出码 1）；before-after 每侧按设计可放图或短文，不要求配图。
+- 项目汇报模式检查（只在 frontmatter 写了 `report: project` 时查，对应 SKILL.md §1、§2）：页按主标题英文部分（`中文 / 英文`）认 §1 八节 `BACKGROUND → TARGET → SCOPE → USE CASES → MILESTONE → OUTCOMES → TEAM → LESSONS`，英文名不在八节里的页是子节点，归到前面最近的一节。
+  - 章节顺序：八节的页倒序出现；目录页列出的八节顺序不对。
+  - 缺章节：八节少了哪节（整份文稿）。
+  - 缺 PDCA：页没写 `PDCA:`（团队页、目录页、隔断页不要求）。
+  - 团队页带 PDCA：`team` 版式或 TEAM 节的页写了 `PDCA:`。
+  - PDCA 和章节不符：标的阶段和所属节不对应（01–04 P、05 D、06 D 或 C、08 A），或一页标了多个阶段（§2：06 节一页只放一个；生成器允许 `D/C` 组合，由审核报）。还没进入八节的页不比对。
+  - 章节和版式不配：TARGET / SCOPE 用 process / before-after，USE CASES 用 before-after。
 - 真伪检查（看 pptx，确认是生成器按当前文稿做的）：页数不符（封面 + 正文 + 收尾页）、不是生成脚本做的（正文页 idx 0 / 10 占位框里的文字和文稿的主标题、副标题不一致，或 banner 0–1.0" 上另画了文本框）。位置写成 `pptx 第 N 页（页「主标题」）`。
 - 几何检查（看 pptx 正文页，只用 python-pptx 和计算，不依赖 LibreOffice）：出界（超出页面）、压 banner（上沿高于 1.0"，idx 0 / 10 标题框除外）、压页脚（下沿低于 7.25"）、文字溢出（字宽用 `layouts/common.py` 的 `text_width_in`，行高 = 字号 × 1.2，与生成器警告同一口径；字号继承模板的占位框不估；原生表格按单元格估，某行估计高过行高才报）、重叠、错位。每条带页码和形状名。重叠豁免和错位比较按形状名，规则见 `references/layouts.md`「审核的几何豁免」；阈值是 `review_deck.py` 里的命名常量（`OVERLAP_TOL`、`MISALIGN_TOL`、`ALIGN_SNAP`、`OVERFLOW_TOL`），取值理由写在常量旁。几何检查的测试在 `tests/test_review_geometry.py`。
-- 测试在 `tests/test_review.py`：正样本是生成器的正常输出（含示例文稿），负样本用 python-pptx 把正常输出改坏。新增规则时规则名放进 `[]`，测试按 `[规则]` 行首匹配。
+- 测试在 `tests/test_review.py`（通用内容检查、真伪检查）和 `tests/test_review_project.py`（项目模式、配图、目录和隔断页）：正样本是生成器的正常输出（含示例文稿），负样本用 python-pptx 把正常输出改坏或改文稿。`test_review_project.py` 的 `PROJECT_FULL` 是全版式正样本（项目模式一份、去掉 `report: project` 和 PDCA 的非项目模式一份，都要打印 `REVIEW OK`），`test_review_geometry.py` 的 `VARIANTS` 是几何正样本；两者都强制覆盖 `registered_layouts()`，新增版式没补正样本时测试失败并提示补哪个版式。新增规则时规则名放进 `[]`，测试按 `[规则]` 行首匹配。

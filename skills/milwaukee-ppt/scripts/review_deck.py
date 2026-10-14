@@ -22,7 +22,7 @@ import mdparse  # noqa: E402
 from layouts.common import text_width_in  # noqa: E402  生成器估算文字宽度的同一个函数
 from mdparse import DeckError  # noqa: E402
 
-# 章节 → 不适合放的版式（目标、范围要写目标和边界，不放流程和改前改后；应用场景不放改前改后）
+# 项目汇报模式下，章节 → 不适合放的版式（目标、范围要写目标和边界，不放流程和改前改后；应用场景不放改前改后）
 MISFIT = {"TARGET": {"process", "before-after"}, "SCOPE": {"process", "before-after"},
           "USE CASES": {"before-after"}}
 VOICE = ["赋能", "打通", "闭环", "抓手", "拉通", "组合拳", "打造", "未来可期", "令人兴奋", "激动人心",
@@ -30,7 +30,7 @@ VOICE = ["赋能", "打通", "闭环", "抓手", "拉通", "组合拳", "打造"
          "散乱", "低效", "容易出错", "混乱"]
 _NUMBER = re.compile(r"^\s*(?:约|~|≈|≥|≤|>|<|\+/-)?\s*[$+\-]?\d")
 MAX_PAGES = 10
-NO_CONCLUSION = {"section", "agenda"}   # 按设计不放结论红条的版式（隔断页、目录页），不报缺结论行
+NAV_LAYOUTS = {"section", "agenda"}     # 导航页（隔断页、目录页）：不放结论红条、不计页数、不要求 PDCA
 EMU_PER_IN = 914400
 BANNER_BOTTOM = EMU_PER_IN           # 模板顶部红 banner 占 0–1.0"（EMU）
 FOOTER_TOP = int(7.25 * EMU_PER_IN)  # 母版页脚文本框上沿
@@ -53,32 +53,76 @@ def page_text(page):
     return "\n".join([page.title, page.action_title, *page.lines, page.next])
 
 
+def image_refs(page):
+    """本页引用的图片（evidence 的图、image-text 的图、before-after 两侧的图）。"""
+    f = page.fields
+    if page.layout == "evidence":
+        return list(f["images"])
+    if page.layout == "image-text":
+        return [f["image"]]
+    if page.layout == "before-after":
+        return [f[side]["image"] for side in ("before", "after") if f[side]["image"]]
+    return []
+
+
+def check_images(doc, page):
+    """配图检查：证据页必须有图（image-text 没图解析时已报错）；本地图片文件要在。"""
+    issues = []
+    if page.layout == "evidence" and not page.fields["images"]:
+        issues.append(("缺配图", where(page), "证据页（evidence，不写 Layout: 时的默认版式）没有放图",
+                       "加一行 ![](图片路径) 放截图或现场照片；只有文字就改用 process / stats 等版式"))
+    for ref in image_refs(page):
+        if ref.startswith(("http://", "https://")):
+            continue
+        path = ref if os.path.isabs(ref) else os.path.join(doc.source_dir, ref)
+        if not os.path.exists(path):
+            issues.append(("图片不存在", where(page), f"引用的图片 {ref} 找不到",
+                           "检查路径（相对文稿所在目录），把图片放到位后重新生成"))
+    return issues
+
+
+# 目录式副标题：太短（不到 6 字，如「项目目标」「试点总结」），或只是主标题中文部分
+# 加两三个字（如「项目目标介绍」）。6 字以上的短结论（「两项指标均达标」）不报。
+MIN_SUBTITLE = 6
+
+
+def is_directory_subtitle(title, topic):
+    return (len(title) < MIN_SUBTITLE
+            or (bool(topic) and topic in title and len(title) - len(topic) <= 2))
+
+
+def check_agenda_sections(doc):
+    """有目录页时，每张隔断页的章节名都要在目录里出现。"""
+    names = {item["name"] for p in doc.pages if p.layout == "agenda" for item in p.fields["items"]}
+    if not names:
+        return []
+    return [("目录和隔断页不一致", where(p), f"隔断页章节名「{p.fields['name']}」不在目录页里",
+             "隔断页和目录页的章节名写成一样，或在目录页补上这一节")
+            for p in doc.pages if p.layout == "section" and p.fields["name"] not in names]
+
+
 def review_md(doc):
     """内容检查：只看文稿（版式字段由版式模块解析好）。返回 [(规则, 位置, 问题, 怎么改)]。"""
     issues = []
     pages = doc.pages
-    if len(pages) > MAX_PAGES:
-        issues.append(("页数过多", "整份文稿", f"{len(pages)} 页",
+    content = [p for p in pages if p.layout not in NAV_LAYOUTS]
+    if len(content) > MAX_PAGES:
+        issues.append(("页数过多", "整份文稿", f"{len(content)} 页（不含目录页、隔断页）",
                        f"合并重复的页，控制在 {MAX_PAGES} 页以内"))
     for prev, page in zip(pages, pages[1:]):
-        if prev.layout == page.layout:
+        if prev.layout == page.layout and page.layout != "section":   # 连着两张隔断页各管一节，不算版式重复
             issues.append(("相邻两页版式相同", where(page),
                            f"和上一页「{prev.title}」都是 {page.layout}，连着看像同一页",
                            "合并两页，或给其中一页换更贴合内容的版式"))
     seen_steps = []
     for page in pages:
         title = page.action_title.strip()
-        if len(title) < 8 or title == chinese(page.title):
+        if is_directory_subtitle(title, chinese(page.title)):
             issues.append(("目录式副标题", where(page), f"副标题「{title}」没有给出结论",
                            "改成一句结论，如「试点 8 周，检验单全部电子化」"))
-        if not page.conclusion and page.layout not in NO_CONCLUSION:
+        if not page.conclusion and page.layout not in NAV_LAYOUTS:
             issues.append(("缺结论行", where(page), "没有普通文字结论行，页底没有红条",
                            "在版式字段后加一行本页结论，最好带数字"))
-        bad_layouts = MISFIT.get(english(page.title), set())
-        if page.layout in bad_layouts:
-            issues.append(("章节和版式不配", where(page),
-                           f"{english(page.title)} 章节用了 {page.layout}",
-                           "目标、范围写目标值和边界（stats / stats-side），流程和改前改后放到对应章节"))
         if page.layout == "process":
             names = {name for name, _ in page.fields["steps"]}
             for other_title, other in seen_steps:
@@ -102,6 +146,7 @@ def review_md(doc):
                 issues.append(("关键标记过多", where(page),
                                f"{sum(keys)}/{len(keys)} 个节点标了 !",
                                "只给 1–2 个真正关键的节点加 !"))
+        issues += check_images(doc, page)
         text = page_text(page)
         if "[数据缺失]" in text:
             issues.append(("数据缺失", where(page), "有 [数据缺失] 占位",
@@ -110,7 +155,86 @@ def review_md(doc):
         if words:
             issues.append(("用词", where(page), "用了 " + "、".join(words),
                            "换成具体做了什么、结果是多少"))
+    issues += check_agenda_sections(doc)
+    if mdparse.is_project(doc.meta):
+        issues += review_project(doc)
     return issues
+
+
+# 项目汇报模式（report: project）的 8 节：SKILL.md §1 的固定英文名、顺序和 PDCA。
+# 英文名不在表里的页是子节点，归到它前面最近的一节。
+CHAPTERS = ("BACKGROUND", "TARGET", "SCOPE", "USE CASES", "MILESTONE", "OUTCOMES", "TEAM", "LESSONS")
+CHAPTER_PDCA = {"BACKGROUND": "P", "TARGET": "P", "SCOPE": "P", "USE CASES": "P",
+                "MILESTONE": "D", "OUTCOMES": "DC", "TEAM": "", "LESSONS": "A"}
+# 06 节 [DO/CHECK]：讲做了什么的页标 D、讲结果验证的页标 C，一页只放一个（§2）
+
+
+def chapter_of(page):
+    """页属于 §1 的哪一节（0–7）；英文名不是 8 节之一返回 None。"""
+    name = english(page.title)
+    return CHAPTERS.index(name) if name in CHAPTERS else None
+
+
+def review_project(doc):
+    """项目汇报模式检查（§1 章节顺序、§2 PDCA）。返回 [(规则, 位置, 问题, 怎么改)]。"""
+    issues = []
+    order = " → ".join(CHAPTERS)
+    latest = None                       # 已出现的最靠后的一节
+    current = None                      # 当前页所属的节（子节点沿用前一节）
+    for page in doc.pages:
+        n = chapter_of(page)
+        if n is not None:
+            if latest is not None and n < latest:
+                issues.append(("章节顺序", where(page),
+                               f"{CHAPTERS[n]} 排在 {CHAPTERS[latest]} 后面",
+                               f"按 SKILL.md §1 的顺序排：{order}"))
+            latest = n if latest is None else max(latest, n)
+            current = CHAPTERS[n]
+        issues += _check_pdca(page, current)
+        if page.layout in MISFIT.get(english(page.title), set()):
+            issues.append(("章节和版式不配", where(page),
+                           f"{english(page.title)} 章节用了 {page.layout}",
+                           "目标、范围写目标值和边界（stats / stats-side），流程和改前改后放到对应章节"))
+    for page in doc.pages:
+        if page.layout != "agenda":
+            continue
+        listed = [e for e in (item["english"].upper() for item in page.fields["items"])
+                  if e in CHAPTERS]
+        if listed != sorted(listed, key=CHAPTERS.index):
+            issues.append(("章节顺序", where(page),
+                           f"目录页的顺序是 {' → '.join(listed)}",
+                           f"按 SKILL.md §1 的顺序排：{order}"))
+    missing = [c for c in CHAPTERS if not any(english(p.title) == c for p in doc.pages)]
+    if missing:
+        issues.append(("缺章节", "整份文稿", "少了 " + "、".join(missing),
+                       f"项目汇报 8 节不可去节，按 {order} 补齐（主标题写「中文 / 英文固定名」）"))
+    return issues
+
+
+def _check_pdca(page, chapter):
+    """一页的 PDCA 标注：团队页不带；导航页可不写；其余页要写且和所属节对应。"""
+    letters = "/".join(page.pdca)
+    if page.layout == "team" or chapter == "TEAM":
+        if page.pdca:
+            return [("团队页带 PDCA", where(page), f"项目团队页标了 PDCA: {letters}",
+                     "删掉这一行 PDCA:；第 07 节项目团队不带 PDCA 标签")]
+        return []
+    if not page.pdca:
+        if page.layout in NAV_LAYOUTS:
+            return []
+        return [("缺 PDCA", where(page), "项目汇报模式的这一页没有标 PDCA",
+                 "加一行 PDCA: <字母>，按所属节填（§1 表的 PDCA 列）")]
+    allowed = CHAPTER_PDCA.get(chapter)
+    if allowed is None:                 # 还没进入 8 节中的任何一节，对不上表
+        return []
+    want = " 或 ".join(allowed)
+    if len(page.pdca) > 1:
+        return [("PDCA 和章节不符", where(page), f"一页标了 {letters} 多个阶段",
+                 f"一页只放一个图标；{chapter} 节标 {want}，做了什么和结果验证分两页")]
+    if page.pdca[0] not in allowed:
+        return [("PDCA 和章节不符", where(page), f"{chapter} 节标了 {letters}",
+                 f"按 SKILL.md §1 改成 PDCA: {want}")]
+    return []
 
 
 def review_pptx(doc, path):

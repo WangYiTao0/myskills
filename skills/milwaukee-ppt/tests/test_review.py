@@ -79,6 +79,7 @@ def test_good_deck_passes():
 BAD = """\
 ---
 title: 来料检验记录电子化 项目汇报
+report: project
 ---
 
 # 项目目标 / TARGET

@@ -20,6 +20,7 @@
 - deck_error(r, title, *needles) 报错退出且信息含页标题（和 needles）
 - review(md, pptx=None)         调审核脚本 review_deck.py → (退出码, stdout, stderr)
 - registered_layouts()          生成器注册表里的全部版式名（从未知版式的报错信息里读）
+- layouts_in(md)                文稿各页用到的版式名（不写 Layout: 的页算 evidence），查正样本覆盖
 - 常量：STATUS_COLORS / DONE_GREEN / DOING_AMBER / DOING_INK、UNIT_PT / UNIT_COLOR
 - check(name, ok, detail) 记录结果；finish() 打印汇总并按结果退出
 """
@@ -396,3 +397,10 @@ def registered_layouts():
     if r.rc == 0 or not m:
         raise RuntimeError(f"读不到注册表: {r.stderr}")
     return [name.strip() for name in m.group(1).split(" / ")]
+
+
+def layouts_in(md):
+    """文稿各页用到的版式名集合（不写 Layout: 的页是 evidence）。"""
+    pages = re.split(r"^# ", md, flags=re.M)[1:]
+    return {(re.search(r"^Layout: (\S+)$", p, flags=re.M) or [None, "evidence"])[1].lower()
+            for p in pages}

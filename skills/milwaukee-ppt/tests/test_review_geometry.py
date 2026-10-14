@@ -11,7 +11,8 @@ from pathlib import Path
 
 from pptx.util import Emu, Inches
 
-from deckcheck import GENERATOR, SKILL, check, finish, generate, open_pptx, review
+from deckcheck import (GENERATOR, SKILL, check, finish, generate, layouts_in, open_pptx,
+                       registered_layouts, review)
 
 DEMO = SKILL / "examples" / "demo" / "deck.md"
 GEOMETRY_RULES = ("出界", "压 banner", "压页脚", "文字溢出", "重叠", "错位")
@@ -264,6 +265,13 @@ def reported(md, pptx, rule, page, name):
             and f"「{name}」" in line and " → " in line], r.stdout
 
 
+def test_variants_cover_every_layout():
+    """新版式登记进注册表后，必须在 VARIANTS 补一页正样本，否则这里失败。"""
+    missing = sorted(set(registered_layouts()) - layouts_in(VARIANTS))
+    check("几何正样本 VARIANTS 覆盖注册表全部版式", not missing,
+          f"缺 {' / '.join(missing)}：在 tests/test_review_geometry.py 的 VARIANTS 补一页")
+
+
 def test_normal_decks_have_no_geometry_issues():
     for label, (md, pptx) in (("示例文稿", demo()), ("各版式写法", variants()),
                               ("各版式写法（项目模式，带 PDCA 和 Tag）", project_variants())):
@@ -348,6 +356,7 @@ def test_text_overflow():
 
 
 if __name__ == "__main__":
+    test_variants_cover_every_layout()
     test_normal_decks_have_no_geometry_issues()
     test_out_of_page()
     test_overlap()

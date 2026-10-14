@@ -63,7 +63,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 
 - frontmatter 写 `title` = 通用模式：封面主标题 title，副标题由 `subtitle` 和「`date`   `author`」两行组成；写了 `closing` 才加收尾页。
 - frontmatter 不写 title、写 `month: YYYY-MM` + `author` = 月报模式：封面「<Mon>. YYYY Working Summary」、结尾 Thank You，与月报模式约定一致。
-- frontmatter 加 `report: project` = 项目汇报模式（B 类规则，见「适用范围」）：各页可写 `PDCA: P|D|C|A`（组合用 `/`，如 `PDCA: D/C`，不区分大小写），生成器在该页正文区右上角插对应 PDCA 图标；不写 `PDCA:` 的页没有图标。没写 `report: project` 却写了 `PDCA:`、字母写错或重复、`report` 写成 project 以外的值都报错。生成器不检查章节顺序和各节 PDCA 是否齐全（交给审核）。
+- frontmatter 加 `report: project` = 项目汇报模式（B 类规则，见「适用范围」）：各页可写 `PDCA: P|D|C|A`（组合用 `/`，如 `PDCA: D/C`，不区分大小写），生成器在该页正文区右上角插对应 PDCA 图标；不写 `PDCA:` 的页没有图标。没写 `report: project` 却写了 `PDCA:`、字母写错或重复、`report` 写成 project 以外的值都报错。生成器不检查章节顺序和各节 PDCA 是否齐全，交给审核 `review_deck.py`：章节乱序、缺节、缺 PDCA、团队页带 PDCA、PDCA 和所属节不符（含 06 节一页标了 `D/C`）都会报出来。
 - 页面通用字段：`Tag:`（正文区右上角月份标识）、`PDCA:`（项目汇报模式）、`Next:` / `下一步：`；所有版式都支持。
 
 | `Layout:` | 用途 | 模板 layout | 字段 |
