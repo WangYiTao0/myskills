@@ -83,6 +83,12 @@ Layout: stats
 # 版式名中间有空格：生成器整行当版式名、报错
 SPACED = BAD_LAYOUT.replace("Layout: flowchart", "Layout: stats side")
 
+# 复制的是渲染后的文字：行首转义、行间空行、图片只剩路径
+RENDERED = (GOOD.split("```markdown\n")[1].split("```")[0]
+            .replace("![](img/看板截图.png)", "img/看板截图.png")
+            .replace("\n# ", "\n\\# ").replace("\n## ", "\n\\## ").replace("\n- ", "\n\\- ")
+            .replace("---\n", "\\---\n").replace("\n", "\n\n"))
+
 NO_BLOCK = "抱歉，我需要更多信息才能写文稿：项目开始时间是？"
 
 
@@ -108,6 +114,11 @@ def test_single_answers():
     spaced = evaluate.evaluate_answer(write(tmp, {"04.md": SPACED})[0])
     check("版式名带空格：判为非法，与生成器一致",
           spaced.bad_layouts == ["stats side"] and not spaced.generated, spaced)
+    rendered = evaluate.evaluate_answer(write(tmp, {"05.md": RENDERED})[0])
+    check("渲染后粘贴的回答：还原后可生成，并标为没用代码块",
+          rendered.found and rendered.generated and not rendered.fenced
+          and rendered.layouts == ["process", "image-text"], rendered)
+    check("代码块回答：标为用了代码块", good.fenced, good)
     check("没有文稿的回答：报告找不到文稿", not none.found and not none.generated, none)
 
 

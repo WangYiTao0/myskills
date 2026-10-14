@@ -1,10 +1,12 @@
-"""评测 Copilot 的回答：同一道题的多份回答，逐份看能否生成、版式是否合法，再比较几次之间的漂移。
+r"""评测 Copilot 的回答：同一道题的多份回答，逐份看能否生成、版式是否合法，再比较几次之间的漂移。
 
 运行：python3 copilot-agent/evaluate.py <回答目录 或 回答文件...>
 
 - 目录：读其中所有 .md，跳过 question.md 和 README.md；按文件名排序。
 - 每份回答取第一个含 `# ` 页的代码块（```markdown / ```md / 不带语言都行）；没有代码块但全文以
   frontmatter 开头时用全文。
+- 复制的是渲染后的文字时（行首 `\#`、`\---`、`\-` 这类转义，图片只剩路径），先还原再评测，
+  报告里单列「代码块」= 否，提示回答没有按约定放进代码块。
 - 文稿里的图片一律换成现生成的纯色占位图，评测只看文稿结构，不看图。
 - 输出 Markdown 报告，可直接贴成 issue 评论；报告里不含本机路径。
 """
@@ -33,6 +35,7 @@ _IMG = re.compile(r"(!\[[^\]]*\]\()([^)]+)(\))")
 class Answer:
     name: str
     found: bool = False          # 找到文稿
+    fenced: bool = False         # 文稿在代码块里（否 = 从渲染后的文字还原）
     generated: bool = False      # 生成器退出码 0
     error: str = ""              # 生成器报错（已去掉临时目录路径）
     layouts: list = field(default_factory=list)       # 每页版式，不写 = evidence
@@ -65,13 +68,22 @@ class Drift:
         return len({tuple(s) for s in self.title_seqs}) <= 1
 
 
+def unrender(text):
+    """渲染后复制的文字还原成 md：去掉行首转义、空行，单独一行的图片路径补回图片写法。"""
+    text = re.sub(r"(?m)^\\([-#>*!\[])", r"\1", text)
+    text = re.sub(r"(?mi)^(\S+\.(?:png|jpe?g|gif))\s*$", r"![](\1)", text)
+    return "\n".join(line for line in text.splitlines() if line.strip()) + "\n"
+
+
 def extract_deck(text):
+    """返回 (文稿, 是否在代码块里)；找不到返回 (None, False)。"""
     for _, body in _FENCE.findall(text):
         if re.search(r"(?m)^# ", body):
-            return body
-    if text.lstrip().startswith("---") and re.search(r"(?m)^# ", text):
-        return text.lstrip()
-    return None
+            return body, True
+    for candidate in (text, unrender(text)):
+        if candidate.lstrip().startswith("---") and re.search(r"(?m)^# ", candidate):
+            return candidate.lstrip(), False
+    return None, False
 
 
 def pages(deck):
@@ -103,7 +115,7 @@ def generate(deck):
 def evaluate_answer(path):
     path = Path(path)
     a = Answer(path.name)
-    deck = extract_deck(path.read_text(encoding="utf-8"))
+    deck, a.fenced = extract_deck(path.read_text(encoding="utf-8"))
     if deck is None:
         a.error = "回答里没有找到文稿代码块"
         return a
@@ -148,13 +160,14 @@ def _yn(ok):
 def report(answers, title):
     n = len(answers)
     lines = [f"## 评测：{title}", "",
-             "| 回答 | 找到文稿 | 可生成 | 版式合法 | 警告 | 页数 | 每页版式 |",
-             "| --- | --- | --- | --- | --- | --- | --- |"]
+             "| 回答 | 找到文稿 | 代码块 | 可生成 | 版式合法 | 警告 | 页数 | 每页版式 |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- |"]
     for a in answers:
-        lines.append(f"| {a.name} | {_yn(a.found)} | {_yn(a.generated)} | {_yn(a.layouts_ok)} | {a.warnings} "
+        lines.append(f"| {a.name} | {_yn(a.found)} | {_yn(a.fenced)} | {_yn(a.generated)} | {_yn(a.layouts_ok)} | {a.warnings} "
                      f"| {len(a.layouts)} | {' / '.join(a.layouts)} |")
     lines += ["", f"生成成功 {sum(a.generated for a in answers)}/{n}，"
-                  f"版式合法 {sum(a.layouts_ok for a in answers)}/{n}"]
+                  f"版式合法 {sum(a.layouts_ok for a in answers)}/{n}，"
+                  f"代码块 {sum(a.fenced for a in answers)}/{n}"]
     errors = [a for a in answers if a.error]
     if errors:
         lines += ["", "### 报错"]
