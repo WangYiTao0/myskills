@@ -1,6 +1,6 @@
 # 生成器版式参考
 
-把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（evidence 到 image-text 8 个版式各一页；agenda、section 的写法见本文件对应小节）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
+把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（evidence 到 image-text 8 个版式各一页；agenda、section、team 的写法见本文件对应小节）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
 
 ## 文稿格式
 
@@ -316,6 +316,31 @@ Layout: agenda
 - 报错：少于 3 条或多于 8 条；某行不是三段；某段为空；编号、中文名、英文名超过字数上限；编号重复；写了普通文字结论行或 `Next:`。报错信息带页标题。
 - 审核：`review_deck.py` 对 agenda 不报「缺结论行」（按设计没有红条，同 section）；「目录式副标题」照样检查。
 
+## team · 团队页
+
+模板 layout 0（和 evidence、section、agenda 共用；inspect 靠 `Member Card 1` 认出 team）。列出成员、角色和分工，每人一张卡片；本期不带头像。
+
+```markdown
+# 项目团队 / TEAM
+## 四人小组，现场推进和数据复盘分开负责
+Layout: team
+- 林晓 | 项目负责人 | 统筹进度，对接车间主任
+- 周航 | 现场推进 | 试点车间贴码、培训和巡检
+- 陈雨 | 数据复盘 | 每周汇总借还记录并出周报
+- Alex Kim | 系统支持 | 扫码小程序维护和问题处理
+分工按现场和数据两条线，周会对齐一次
+```
+
+- 字段：2–8 行无序列表「- 姓名 | 角色 | 职责」，一人一行，三段都必填。其余普通文字行进底部红条（一句分工结论），`Next:`、`Tag:` 照常可用。
+- 容量：2–8 人。每段按 4 张一行时的卡片宽度量：姓名一行放得下（约 8 个汉字 / 15 个英文字母），角色一行放得下（约 12 个汉字），职责最多 3 行（约 40 个汉字）。只有 1 人不必做团队页；超过 8 人按小组拆页，或只列牵头人。
+- 主标题、副标题照常填 idx 0 / 10；副标题写一句结论（团队怎么分工），不要写成「团队成员」。
+- 结论红条：保留。团队页通常有一句分工结论（谁牵头、按什么分线、怎么协同），写在成员行后面；没写时审核照常报「缺结论行」。
+- 画法：每人一张 #F5F5F5 底、#E5E5E5 细描边的卡片，卡片宽固定为一行 4 张时的宽度；2–4 人排一行，5–8 人排两行（第一行 = 总数一半向上取整，第二行从同一左沿排起）；整组在正文区里水平、垂直居中。卡片里自上而下：20pt bold #1A1A1A 姓名，14pt #6B6B6B 角色，一条 #BFBFBF 细线，12pt #1A1A1A 职责。只用黑白灰，不标重点、不用红。
+- 适用：项目汇报第 07 节「项目团队」（SKILL.md §1，不带 PDCA）、新项目立项时介绍小组分工、跨部门协作汇报列出各方对接人。
+- 反例：只有一两个人且没有分工可讲（在封面或收尾写汇报人即可）；把职责写成一段话或几条子列表（每人一句分工）；用团队页列资源需求、人力缺口（用 stats 或 evidence 讲数字和证据）；想放头像（本期不支持，生成后手工补）。
+- 报错：少于 2 人或多于 8 人；某行不是三段；某段为空；姓名、角色一行放不下；职责超过 3 行；成员行漏写列表符号（`陈雨 | 数据复盘 | …`，免得悄悄进红条）；标了 `!`；写了缩进子列表。报错信息带页标题。
+- 审核：`review_deck.py` 对 team 和其他有红条的版式一样检查「缺结论行」「目录式副标题」；几何检查不需要另加豁免（卡片和卡片里的文字同属 `Member … N` 一个组件）。
+
 ## section · 隔断页
 
 模板 layout 0（和 evidence 共用；inspect 靠 `Section Number` 认出 section）。章节之间的过渡页：章节编号 + 中文名 + 英文名是页面主体。
@@ -351,7 +376,8 @@ Layout: section
 | 一张图 + 几条解释 | image-text |
 | 开场列出本次汇报的 3–8 个章节 | agenda |
 | 章节之间的过渡（编号 + 章节名） | section |
-| 都不匹配（团队、表格等） | 生成器没有对应版式；先用最接近的生成，再在 PowerPoint 里按 SKILL.md §6 和 `layout-patterns.md` 手工调整 |
+| 2–8 个成员的角色和分工 | team |
+| 都不匹配（表格等） | 生成器没有对应版式；先用最接近的生成，再在 PowerPoint 里按 SKILL.md §6 和 `layout-patterns.md` 手工调整 |
 
 ## 形状命名约定
 
@@ -369,6 +395,7 @@ Layout: section
 | timeline（写了状态） | `Milestone Node N`、`Milestone Check N`（只在已完成节点上）、`Milestone Date N`、`Milestone Text N`（标题一段 + 说明一段）、`Progress Line`（绿色已完成段）、`Remaining Line`（灰色虚线）、`Current Ring`、`Current Tag`；图例 `Legend Icon 1–4`、`Legend Label 1–4`（1 已完成、2 进行中、3 未完成、4 关键里程碑）、`Legend Check 1`（已完成图标上的对勾） |
 | timeline（不写状态） | `Timeline Line`、`Timeline Node N`、`Timeline Date N`、`Timeline Text N` |
 | agenda | `Agenda Number N`（章节编号；`Agenda Number 1` 也是 inspect 区分 agenda / section / evidence 的标记形状）、`Agenda Rule N`（竖线）、`Agenda Name N`（中文名）、`Agenda English N`（英文名） |
+| team | `Member Card N`（卡片底；`Member Card 1` 也是 inspect 区分 team / agenda / section / evidence 的标记形状）、`Member Name N`（姓名）、`Member Role N`（角色）、`Member Rule N`（角色和职责之间的细线）、`Member Duty N`（职责） |
 | section | `Section Number`（章节编号，也是 inspect 区分 section / evidence 的标记形状）、`Section Rule`（竖线）、`Section Name`（中文名）、`Section English`（英文名） |
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
 
@@ -381,6 +408,6 @@ Layout: section
 - 重叠不报：
   - 模板占位框（主标题、action title、各版式槽位，包括被图片盖住的 Before/After 13 / 14）；
   - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"）；
-  - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Side Card 1` 和 `Side Number 1`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
+  - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
   - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）。
 - 错位只比同类形状：名字去掉末尾编号后相同（如 `Process Card 1–4`、`Side Card 1–3`；占位框不比）。同一行比上沿 / 中线 / 下沿，同一列比左沿 / 中线 / 右沿，有一条对齐（差不到半像素）就算对齐；都没对齐且最近的差值小于 5 像素时报告。大小不同、中线对齐的节点（关键里程碑、进行中）不算错位。
