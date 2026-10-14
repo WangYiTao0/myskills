@@ -351,6 +351,11 @@ _NUMBER = re.compile(r"^(" + _PREFIX + r")?"
 _UNIT = re.compile(r"^(\s*[%\u2E80-\uFFFF]|\s+[A-Za-z])")
 
 
+def is_number(value):
+    """数字栏是不是「（前缀 +）数字」开头：和 split_number 同一条规则，审核也用它判定。"""
+    return _NUMBER.match(value.strip()) is not None
+
+
 def split_number(value):
     """拆成 (前缀, 大数字, 单位)，三段拼起来等于去掉首尾空白的原文（不补、不删空白）：
 

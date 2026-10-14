@@ -19,7 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import mdparse  # noqa: E402
-from layouts.common import text_width_in  # noqa: E402  生成器估算文字宽度的同一个函数
+from layouts.common import is_number, text_width_in  # noqa: E402  和生成器同一套数字判定、字宽估算
 from mdparse import DeckError  # noqa: E402
 
 # 项目汇报模式下，章节 → 不适合放的版式（目标、范围要写目标和边界，不放流程和改前改后；应用场景不放改前改后）
@@ -28,7 +28,6 @@ MISFIT = {"TARGET": {"process", "before-after"}, "SCOPE": {"process", "before-af
 VOICE = ["赋能", "打通", "闭环", "抓手", "拉通", "组合拳", "打造", "未来可期", "令人兴奋", "激动人心",
          "惊艳", "重磅", "大幅", "显著", "大量", "彻底解决", "完美", "全面", "零问题", "革命性",
          "散乱", "低效", "容易出错", "混乱"]
-_NUMBER = re.compile(r"^\s*(?:约|~|≈|≥|≤|>|<|\+/-)?\s*[$+\-]?\d")
 MAX_PAGES = 10
 NAV_LAYOUTS = {"section", "agenda"}     # 导航页（隔断页、目录页）：不放结论红条、不计页数、不要求 PDCA
 EMU_PER_IN = 914400
@@ -135,7 +134,7 @@ def review_md(doc):
             for item in page.fields["items"]:
                 if "[数据缺失]" in item["value"]:
                     continue
-                if not _NUMBER.match(item["value"]):
+                if not is_number(item["value"]):
                     issues.append(("数字卡不是数字", where(page),
                                    f"卡片「{item['label']}」的数字栏是「{item['value']}」",
                                    "数字栏只放数字；文字内容改写进说明、结论要点或别的版式"))

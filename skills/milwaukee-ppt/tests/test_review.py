@@ -159,6 +159,20 @@ def test_too_many_pages():
           rr.stdout)
 
 
+def test_number_prefixes_same_as_generator():
+    """生成器认作「前缀 + 大数字」的写法（～ ＞ ＜ ± 等），审核不能报「数字卡不是数字」。"""
+    values = ("～5 天", "＞95%", "＜3 台", "±0.5 mm", "约 1.5 分钟", "~2 周", "≥99%")
+    pages = "".join(
+        f"# 关键数据 {k} / KEY RESULTS {k}\n## 各项指标都达标\nLayout: stats\n"
+        + "\n".join(f"- 指标{n} | {v} | 说明{n}" for n, v in enumerate(group, 1))
+        + "\n各项指标都达标\n"
+        for k, group in enumerate((values[:4], values[4:]), 1))
+    md = "---\ntitle: 数字前缀\n---\n" + pages
+    md_path, pptx = generated(md)
+    out = review(md_path, pptx).stdout
+    check("～ ＞ ＜ ± 等前缀的数字：不报「数字卡不是数字」", not lines_with(out, "数字卡不是数字"), out)
+
+
 def broken_copy(pptx, name, change):
     """把生成器的输出另存一份，用 change(prs) 改坏。"""
     prs = open_pptx(pptx)
@@ -241,6 +255,7 @@ if __name__ == "__main__":
     test_good_deck_passes()
     test_bad_deck_flags()
     test_too_many_pages()
+    test_number_prefixes_same_as_generator()
     test_pptx_authenticity()
     test_demo_deck_passes()
     test_unreadable_deck()
