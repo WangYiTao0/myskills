@@ -1,4 +1,4 @@
-"""项目汇报模式：frontmatter `report: project` + 各页 `PDCA:` → 正文区右上角的 PDCA 图标。
+"""项目汇报模式：frontmatter `report: project` + 各页 `PDCA:` → banner 下沿与正文区上沿之间（1.02–1.30"）右侧窄带里的 PDCA 图标。
 
 运行：python3 skills/milwaukee-ppt/tests/test_pdca.py
 只走“md 进、pptx 出”：写文稿 → 调生成器 → 看 pptx 里的图片形状。文稿内容全部虚构。

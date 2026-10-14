@@ -29,7 +29,7 @@ description: Milwaukee Tool 工作汇报 PPT 的格式、视觉规范与 pptx �
 项目汇报模式套用下列三条：
 
 1. **固定 Agenda 顺序**（§1）：8 节按规定顺序，可加子节点，不可改顺序、不可去节
-2. **PDCA 标注**（§2）：每节标注 `P` / `D` / `C` / `A` 图标——文稿里每页写一行 `PDCA: <字母>`，生成器在正文区右上角插 `assets/pdca/` 的图标
+2. **PDCA 标注**（§2）：每节标注 `P` / `D` / `C` / `A` 图标——文稿里每页写一行 `PDCA: <字母>`，生成器在 banner 下沿与正文区上沿之间（1.02–1.30"）的右侧窄带插 `assets/pdca/` 的图标
 3. **"已落地 vs 未来" 严格分离**（§3）：整篇不写未来规划 / Next Step / Roadmap / 画饼（月报底部"下一步计划"为唯一例外）
 
 > **判断示例**
@@ -55,6 +55,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 用户要出 pptx 时按这四步走：
 
 1. **整理文稿**：把用户的自由文稿整理成带 Layout 标记的 md——每个 `#` 一页，`##` 是 action title，一行 `Layout: <版式名>` 选版式（不写 = evidence），普通文字行是底部红条的一句话结论，`Next:` 是下一步。版式字段、选版依据、反例都在 `references/layouts.md`，整理前先读；内容仍守本文件 §4、§6、§7（项目汇报再加 §1–§3）。完整示例：`examples/demo/deck.md`。
+   - 用户没有提供图片时，不选 `evidence` / `image-text`（这两种必须配图），`before-after` 两侧都写短文；和 ppt-grill「素材清单为"无"」的规则一致。
    - 用户先用 ppt-grill 定过**简报**（`简报.md`）时，简报就是这一步的唯一输入：按 ppt-grill「交给 milwaukee-ppt」一节的对照表逐行转成 md，放在简报同目录，页数、页序、标题、数字和简报逐项一致。用户还没定简报、但想先把结论和页序磨清楚时，先走 ppt-grill。
 2. **生成**：跑上面的命令。退出码非 0 = 文稿有错，按错误信息里的「页「标题」」改 md 再跑；`警告:` 行不中止，带进第 3 步一起处理。
 3. **审核**：走 ppt-review skill——跑审核脚本、照它的核对清单逐页判断、改 md 重新生成，最多两轮。审核脚本单独跑的写法：
@@ -70,7 +71,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 
 - frontmatter 写 `title` = 通用模式：封面主标题 title，副标题由 `subtitle` 和「`date`   `author`」两行组成；写了 `closing` 才加收尾页。
 - frontmatter 不写 title、写 `month: YYYY-MM` + `author` = 月报模式：封面「<Mon>. YYYY Working Summary」、结尾 Thank You，与月报模式约定一致。
-- frontmatter 加 `report: project` = 项目汇报模式（B 类规则，见「适用范围」）：各页可写 `PDCA: P|D|C|A`（组合用 `/`，如 `PDCA: D/C`，不区分大小写），生成器在该页正文区右上角插对应 PDCA 图标；不写 `PDCA:` 的页没有图标。没写 `report: project` 却写了 `PDCA:`、字母写错或重复、`report` 写成 project 以外的值都报错。生成器不检查章节顺序和各节 PDCA 是否齐全，交给审核 `review_deck.py`：章节乱序、缺节、缺 PDCA、团队页带 PDCA、PDCA 和所属节不符（含 06 节一页标了 `D/C`）都会报出来。
+- frontmatter 加 `report: project` = 项目汇报模式（B 类规则，见「适用范围」）：各页可写 `PDCA: P|D|C|A`（组合用 `/`，如 `PDCA: D/C`，不区分大小写），生成器在该页 banner 下沿与正文区上沿之间（1.02–1.30"）的右侧窄带插对应 PDCA 图标；不写 `PDCA:` 的页没有图标。没写 `report: project` 却写了 `PDCA:`、字母写错或重复、`report` 写成 project 以外的值都报错。生成器不检查章节顺序和各节 PDCA 是否齐全，交给审核 `review_deck.py`：章节乱序、缺节、缺 PDCA、团队页带 PDCA、PDCA 和所属节不符（含 06 节一页标了 `D/C`）都会报出来。
 - 页面通用字段：`Tag:`（正文区右上角月份标识）、`PDCA:`（项目汇报模式）、`Next:` / `下一步：`；所有版式都支持。
 
 | `Layout:` | 用途 | 模板 layout | 字段 |
@@ -161,7 +162,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 
 > ⚠️ **本节属于 B 类规则，仅项目汇报模式（`report: project`）生效。** 其他场景不加 PDCA 图标。
 
-**位置固定**：PDCA 标签放在**正文区右上角**，不要写进红 banner 的副标题里。
+**位置固定**：PDCA 标签放在**banner 下沿与正文区上沿之间（1.02–1.30"）的右侧窄带**（右缘贴正文区右缘），不要写进红 banner 的副标题里。
 生成器写法：该页写一行 `PDCA: D`（组合 `PDCA: D/C` 按写的顺序从左到右排）。图标 0.28" 见方，放在 banner 下沿和正文区上沿之间（1.02–1.30"），右缘贴正文区右缘，不压任何版式的内容；同页写了 `Tag:` 时月份标识让到图标左侧、与图标纵向居中对齐。
 标签值固定为 `P` / `D` / `C` / `A`，与上表对应。两个特例：
 
@@ -298,7 +299,7 @@ slide.placeholders[10].text = '报表分散已成为扩展瓶颈'   # 副标题�
 - **顶部红色 banner**
 - **左上**（banner 内）：Milwaukee logo
 - **右上**（banner 内）：本页主标题 + 副标题
-- **正文区右上角**：PDCA 小图标（见 §2）
+- **banner 下沿与正文区上沿之间（1.02–1.30"）的右侧窄带**：PDCA 小图标（见 §2）
 - **正文区中部**：正文内容
 - 底部模板自带页脚
 
@@ -467,8 +468,8 @@ banner 以下的正文区用色遵循 §6.2 色板。
 | 正文用色与红 banner 撞色         | 用了中明度蓝/绿/紫等冲突色     | 过 §6.2 撞色判断 3 问,改用色板内的色            |
 | 出现渐变 / 阴影 / 发光           | 想做"高级感"                   | 全部去掉,Milwaukee 是工业 flat 风(§6.2)         |
 | 一节信息塞不下                   | 多议题混搭                     | 拆成子节点(如 06.1 / 06.2),仍归属同一父节       |
-| 没标 PDCA                        | 漏标                           | 在正文区右上角加 PDCA 小图标(P/D/C/A,见 §2)     |
-| PDCA 写进了 banner 副标题里      | 位置错了                       | 挪到正文区右上角的小图标位                      |
+| 没标 PDCA                        | 漏标                           | 在 banner 下沿与正文区上沿之间（1.02–1.30"）的右侧窄带加 PDCA 小图标(P/D/C/A,见 §2) |
+| PDCA 写进了 banner 副标题里      | 位置错了                       | 挪到 banner 下沿与正文区上沿之间（1.02–1.30"）的右侧窄带的小图标位 |
 
 ---
 
