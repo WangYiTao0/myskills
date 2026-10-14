@@ -64,4 +64,5 @@ python3 scripts/review_deck.py deck.md deck.pptx
 - 和生成器共用 `mdparse` 与版式注册表：文稿按生成器同一套规则解析，生成器会报错的文稿审核也报错。
 - 内容检查（只看文稿）：页数过多（> 10 页）、相邻两页版式相同、目录式副标题（不到 8 字或和主标题中文部分相同）、缺结论行、章节和版式不配（TARGET / SCOPE 用 process / before-after，USE CASES 用 before-after）、内容重复（两页流程步骤名一半以上相同）、数字卡不是数字、数据缺失（`[数据缺失]` 占位）、用词（浮夸 / 空洞词表）、关键标记过多（时间线 3 个以上节点、超过一半标了 `!`）。
 - 真伪检查（看 pptx，确认是生成器按当前文稿做的）：页数不符（封面 + 正文 + 收尾页）、不是生成脚本做的（正文页 idx 0 / 10 占位框里的文字和文稿的主标题、副标题不一致，或 banner 0–1.0" 上另画了文本框）。位置写成 `pptx 第 N 页（页「主标题」）`。
+- 几何检查（看 pptx 正文页，只用 python-pptx 和计算，不依赖 LibreOffice）：出界（超出页面）、压 banner（上沿高于 1.0"，idx 0 / 10 标题框除外）、压页脚（下沿低于 7.25"）、文字溢出（字宽用 `layouts/common.py` 的 `text_width_in`，行高 = 字号 × 1.2，与生成器警告同一口径；字号继承模板的占位框不估）、重叠、错位。每条带页码和形状名。重叠豁免和错位比较按形状名，规则见 `references/layouts.md`「审核的几何豁免」；阈值是 `review_deck.py` 里的命名常量（`OVERLAP_TOL`、`MISALIGN_TOL`、`ALIGN_SNAP`、`OVERFLOW_TOL`），取值理由写在常量旁。几何检查的测试在 `tests/test_review_geometry.py`。
 - 测试在 `tests/test_review.py`：正样本是生成器的正常输出（含示例文稿），负样本用 python-pptx 把正常输出改坏。新增规则时规则名放进 `[]`，测试按 `[规则]` 行首匹配。
