@@ -18,7 +18,7 @@ GEOMETRY_RULES = ("出界", "压 banner", "压页脚", "文字溢出", "重叠",
 PX = 9525   # 96 dpi 下一个像素（EMU）
 
 # 正样本：各版式的常见写法（写了 / 没写 Tag、状态 / 旧写法、图 / 短文、条目数上下限、
-# 隔断页字数上限）
+# 隔断页字数上限、目录页 8 条写满）
 VARIANTS = """\
 ---
 title: 仓库叉车充电排班优化 项目汇报
@@ -55,6 +55,19 @@ Tag: Aug
 Layout: section
 Tag: Aug
 3.1 | 试运行与数据复盘阶段汇总 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+
+# 目录 / AGENDA
+## 分八部分汇报，试运行数据集中在第三部分
+Layout: agenda
+Tag: Aug
+1.1 | 项目目标与充电排班的背景 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+2.1 | 实施范围与试点仓库的选择 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+3.1 | 试运行与数据复盘阶段汇总 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+4.1 | 各充电位使用率与排队时长 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+5.1 | 叉车司机与班组长反馈汇总 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+6.1 | 推广计划与A仓切换时间表 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+7.1 | 风险清单与逐项应对措施表 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
+8.1 | 团队分工与下阶段资源需求 | PILOT RUN AND DATA REVIEW IN WAREHOUSE B
 
 # 新旧流程 / FLOW
 ## 交班登记一步完成
