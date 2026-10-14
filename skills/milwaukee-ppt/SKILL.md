@@ -55,9 +55,16 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 用户要出 pptx 时按这四步走：
 
 1. **整理文稿**：把用户的自由文稿整理成带 Layout 标记的 md——每个 `#` 一页，`##` 是 action title，一行 `Layout: <版式名>` 选版式（不写 = evidence），普通文字行是底部红条的一句话结论，`Next:` 是下一步。版式字段、选版依据、反例都在 `references/layouts.md`，整理前先读；内容仍守本文件 §4、§6、§7（项目汇报再加 §1–§3）。完整示例：`examples/demo/deck.md`。
-2. **生成**：跑上面的命令。退出码非 0 = 文稿有错，按错误信息里的「页「标题」」改 md 再跑；`警告:` 行不中止，但对应那页在第 3 步必看。
-3. **转 PNG 逐页检查**：`soffice --headless --convert-to pdf --outdir <目录> <输出.pptx>`，再 `pdftoppm -png -r 80 <输出.pdf> page`。逐页看单行、溢出、对齐、图片边界、页脚间距，有问题回第 1 步精简文字或换版式。
-4. **交付**：把 pptx 交给用户，说明哪些页有警告；用户还要改某页细节时，按下面「生成后细调」做。
+   - 用户先用 ppt-grill 定过**简报**（`简报.md`）时，简报就是这一步的唯一输入：按 ppt-grill「交给 milwaukee-ppt」一节的对照表逐行转成 md，放在简报同目录，页数、页序、标题、数字和简报逐项一致。用户还没定简报、但想先把结论和页序磨清楚时，先走 ppt-grill。
+2. **生成**：跑上面的命令。退出码非 0 = 文稿有错，按错误信息里的「页「标题」」改 md 再跑；`警告:` 行不中止，带进第 3 步一起处理。
+3. **审核**：走 ppt-review skill——跑审核脚本、照它的核对清单逐页判断、改 md 重新生成，最多两轮。审核脚本单独跑的写法：
+
+   ```bash
+   python3 scripts/review_deck.py <文稿.md> <输出.pptx>
+   ```
+
+   每条问题一行 `[规则] 位置：问题 → 怎么改`，全过打印 `REVIEW OK`；规则全表见 `scripts/README.md`「审核命令」。转 PNG 看图降为可选复核（能读图时用）：`soffice --headless --convert-to pdf --outdir <目录> <输出.pptx>`，再 `pdftoppm -png -r 80 <输出.pdf> page`。
+4. **交付**：按 ppt-review「交付给人」把 pptx 连同最后一轮审核结果、未解决项交给用户；用户还要改某页细节时，按下面「生成后细调」做。
 
 文稿格式：
 
@@ -110,7 +117,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
    - 占位框（标题 idx 0、action title idx 10）用 `slide.placeholders[idx]` 取，idx 看 inspect 输出。
    - 新加的形状颜色显式给（`fill.solid()` + `fill.fore_color.rgb`），仍守 §6。
 
-3. **转 PNG 确认**：同上面第 3 步，看改过的页：没越界、没压 banner 和页脚、红色纪律没破。
+3. **转 PNG 确认**：命令同上面第 3 步的看图，看改过的页：没越界、没压 banner 和页脚、红色纪律没破。
 4. **确认**：告诉用户改了哪些形状，并提醒下面这条覆盖规则。
 
 改哪里：
@@ -490,6 +497,7 @@ milwaukee-ppt/
 ├── scripts/
 │   ├── generate_ppt.py           # 生成器入口:<文稿.md> [-o 输出.pptx]
 │   ├── inspect_ppt.py            # 检查命令:列出成稿每页的形状名、位置、文字(生成后细调用)
+│   ├── review_deck.py            # 审核命令:<文稿.md> [<输出.pptx>],ppt-review 调用
 │   ├── mdparse.py / layouts/     # 解析层 / 每个版式一个渲染模块
 │   └── README.md                 # 改生成器代码时的约定
 ├── examples/demo/                # 虚构示例文稿 deck.md(覆盖全部版式)+ 示意图与其生成脚本
