@@ -2,7 +2,7 @@ r"""评测 Copilot 的回答：同一道题的多份回答，逐份看能否生�
 
 运行：python3 copilot-agent/evaluate.py <回答目录 或 回答文件...>
 
-- 目录：读其中所有 .md，跳过 question.md 和 README.md；按文件名排序。
+- 目录：读其中所有 .md，跳过 question.md、README.md 和还没填的空文件；按文件名排序。
 - 每份回答取第一个含 `# ` 页的代码块（```markdown / ```md / 不带语言都行）；没有代码块但全文以
   frontmatter 开头时用全文。
 - 复制的是渲染后的文字时（行首 `\#`、`\---`、`\-` 这类转义，图片只剩路径），先还原再评测，
@@ -147,7 +147,8 @@ def answer_files(args):
     files = []
     for arg in map(Path, args):
         if arg.is_dir():
-            files += sorted(p for p in arg.glob("*.md") if p.name.lower() not in SKIP)
+            files += sorted(p for p in arg.glob("*.md") if p.name.lower() not in SKIP
+                            and p.read_text(encoding="utf-8").strip())   # 空文件 = 还没填
         else:
             files.append(arg)
     return files

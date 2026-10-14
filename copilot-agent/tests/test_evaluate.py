@@ -142,12 +142,14 @@ def test_drift():
 
 def test_cli_report():
     tmp = Path(tempfile.mkdtemp(prefix="copilot-eval-"))
-    write(tmp, {"01.md": GOOD, "02.md": BAD_LAYOUT, "03.md": DRIFT, "question.md": "题目"})
+    write(tmp, {"01.md": GOOD, "02.md": BAD_LAYOUT, "03.md": DRIFT, "question.md": "题目",
+                "05.md": "\n"})
     r = subprocess.run([sys.executable, str(AGENT / "evaluate.py"), str(tmp)],
                        capture_output=True, text=True)
     check("命令行：退出码 0", r.returncode == 0, r.stderr)
     out = r.stdout
     check("命令行：不把 question.md 当回答", "question.md" not in out, out)
+    check("命令行：跳过还没填的空回答文件", "05.md" not in out, out)
     check("命令行：汇总生成成功率", "生成成功 2/3" in out, out)
     check("命令行：汇总版式合法率", "版式合法 2/3" in out, out)
     check("命令行：输出一致性摘要", "一致性" in out and "页数" in out, out)
