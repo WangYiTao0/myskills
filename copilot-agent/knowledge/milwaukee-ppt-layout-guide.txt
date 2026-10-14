@@ -38,7 +38,7 @@ Tag: Oct
 
 ## 月报写法
 
-月报以月报模板为准：封面固定为「<月份>. <年份> Working Summary」，每页是一个工作项的证据 + 底部红条（已完成的结论一句 + 下一步一句），结尾固定 Thank You。frontmatter 不写 title，写 `month` 和 `author`：
+月报以月报模板为准：封面固定为「<英文月份缩写>. <年份> Working Summary」（如 Sep. 2026 Working Summary），每页是一个工作项的证据 + 底部红条（已完成的结论一句 + 下一步一句），结尾固定 Thank You。frontmatter 不写 title，写 `month` 和 `author`：
 
 ```markdown
 ---

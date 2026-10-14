@@ -43,6 +43,7 @@ def test_examples_generate():
         return
     for md, r in generate_blocks(blocks):
         check("示例照抄生成，退出码 0", r.rc == 0, r.stderr)
+        check("示例没有警告", "警告" not in r.stderr, r.stderr)
         check("示例每个 Layout 都被识别", layout_mentions(md) <= registered_layouts(),
               layout_mentions(md) - registered_layouts())
         check("示例页数都生成出来", len(r.slides) >= 1 + page_count(md),

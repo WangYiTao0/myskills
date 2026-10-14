@@ -80,6 +80,9 @@ Layout: stats
 ```
 """
 
+# 版式名中间有空格：生成器整行当版式名、报错
+SPACED = BAD_LAYOUT.replace("Layout: flowchart", "Layout: stats side")
+
 NO_BLOCK = "抱歉，我需要更多信息才能写文稿：项目开始时间是？"
 
 
@@ -102,6 +105,9 @@ def test_single_answers():
     check("版式非法的回答：报告不可生成", not bad.generated, bad.error)
     check("版式非法的回答：指出非法版式名", bad.bad_layouts == ["flowchart"], bad.bad_layouts)
     check("版式非法的回答：错误信息来自生成器", "flowchart" in bad.error, bad.error)
+    spaced = evaluate.evaluate_answer(write(tmp, {"04.md": SPACED})[0])
+    check("版式名带空格：判为非法，与生成器一致",
+          spaced.bad_layouts == ["stats side"] and not spaced.generated, spaced)
     check("没有文稿的回答：报告找不到文稿", not none.found and not none.generated, none)
 
 

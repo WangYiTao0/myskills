@@ -5,9 +5,8 @@
 import re
 
 from contract import (AGENT, char_count, check, finish, generate_blocks, generate_md,
-                      layout_mentions,
-                      md_blocks, missing_refs, page_count, registered_layouts, sections,
-                      test_no_private_paths)
+                      layout_mentions, md_blocks, missing_refs, page_count, registered_layouts,
+                      sections, test_no_private_paths)
 
 KNOWLEDGE = AGENT / "knowledge" / "milwaukee-ppt-layout-guide.txt"
 EXAMPLE_DECK = AGENT / "knowledge" / "example-deck.txt"   # 虚构示例 deck，整份是一份文稿

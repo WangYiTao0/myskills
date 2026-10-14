@@ -7,6 +7,8 @@
 - registered_layouts()           生成器注册的版式名集合（直接读生成器的注册表，不硬编码）
 - layout_mentions(text)          文中所有 `Layout: 名字` 里的名字集合
 - md_blocks(text)                文中所有 ```markdown 代码块
+- generate_md(md)                一份完整文稿交给现有生成器（图片现生成占位图）→ deckcheck.Result
+- page_count(md)                 文稿页数（`# ` 行数）
 - generate_blocks(blocks)        按文稿分组交给现有生成器 → [(文稿, deckcheck.Result)]
                                  （带 frontmatter 的块开一份新文稿，其后的片段拼进这份）
 - sections(text)                代码块以外的 `## ` 小节：[(标题, 正文)]

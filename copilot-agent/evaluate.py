@@ -24,7 +24,7 @@ from layouts import DEFAULT_LAYOUT, REGISTRY  # noqa: E402
 
 SKIP = {"question.md", "readme.md"}
 _FENCE = re.compile(r"^```[ \t]*(markdown|md)?[ \t]*\n(.*?)^```", re.S | re.M | re.I)
-_LAYOUT = re.compile(r"(?im)^layout\s*[:：]\s*(\S+)\s*$")
+_LAYOUT = re.compile(r"(?im)^layout\s*[:：]\s*(.+)$")   # 与生成器 mdparse 的解析一致
 _TITLE = re.compile(r"(?m)^##\s+(.+?)\s*$")
 _IMG = re.compile(r"(!\[[^\]]*\]\()([^)]+)(\))")
 
@@ -110,7 +110,7 @@ def evaluate_answer(path):
     a.found = True
     for page in pages(deck):
         m = _LAYOUT.search(page)
-        layout = m.group(1).lower() if m else DEFAULT_LAYOUT
+        layout = m.group(1).strip().lower() if m else DEFAULT_LAYOUT
         a.layouts.append(layout)
         if layout not in REGISTRY:
             a.bad_layouts.append(layout)

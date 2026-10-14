@@ -65,10 +65,12 @@ Instructions 的长度：本指令按 8000 字符上限控制（这个上限出�
 
 ## 手工套模板
 
-agent 给出的 md 每个 `# ` 是一页。同事没有生成脚本时，在 PowerPoint 里照下面的步骤套模板：
+agent 给出的 md 每个 `# ` 是一页。同事没有生成脚本时，在 PowerPoint 里照下面的步骤套模板。
+
+**待测**：本节按生成脚本的画法整理，还没有人照着在 PowerPoint 里完整做过一遍；测试卡第 4 条会验证，结果出来后再修订。
 
 1. 用 `MS_Template.pptx` 新建演示文稿（或打开它另存一份）。
-2. 封面：新建一页，版式选 **Title Slide**，主标题填 frontmatter 的 `title`，副标题填 `subtitle` 和日期、作者。月报封面写「<月份>. <年份> Working Summary」。
+2. 封面：新建一页，版式选 **Title Slide**，主标题填 frontmatter 的 `title`，副标题填 `subtitle` 和日期、作者。月报封面写「<英文月份缩写>. <年份> Working Summary」，如 `Oct. 2026 Working Summary`。
 3. 每个 `# ` 新建一页：开始 → 新建幻灯片 → 按下表选母版 layout。
 4. 标题区：`# ` 后面的文字填进顶部红色 banner 里的主标题框，`## ` 后面的文字填进紧贴其下的副标题框。
 5. 正文：按下表把版式字段填进内容区。
