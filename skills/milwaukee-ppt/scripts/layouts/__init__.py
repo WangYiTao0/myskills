@@ -13,13 +13,13 @@
 """
 from mdparse import DeckError
 
-from . import (before_after, evidence, image_text, process, section, stats, stats_side,
+from . import (agenda, before_after, evidence, image_text, process, section, stats, stats_side,
                timeline, timeline_phase)
 from .common import Context  # noqa: F401  （装配层用 layouts.Context）
 
 REGISTRY = {m.NAME: m for m in
             (evidence, before_after, process, stats, stats_side, timeline, timeline_phase,
-             image_text, section)}
+             image_text, section, agenda)}
 DEFAULT_LAYOUT = evidence.NAME
 
 

@@ -27,7 +27,7 @@ VOICE = ["赋能", "打通", "闭环", "抓手", "拉通", "组合拳", "打造"
          "散乱", "低效", "容易出错", "混乱"]
 _NUMBER = re.compile(r"^\s*(?:约|~|≈|≥|≤|>|<|\+/-)?\s*[$+\-]?\d")
 MAX_PAGES = 10
-NO_CONCLUSION = {"section"}   # 按设计不放结论红条的版式（隔断页），不报缺结论行
+NO_CONCLUSION = {"section", "agenda"}   # 按设计不放结论红条的版式（隔断页、目录页），不报缺结论行
 BANNER_BOTTOM = 914400   # 模板顶部红 banner 占 0–1.0"（EMU）
 REDRAW = "不要自己写代码画幻灯片；改 md 文稿后用 generate_ppt.py 重新生成"
 

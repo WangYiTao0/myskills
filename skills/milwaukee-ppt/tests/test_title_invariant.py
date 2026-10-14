@@ -71,6 +71,12 @@ SAMPLES = {
         Layout: section
         02 | 试点推进 | PILOT
         """,
+    "agenda": """
+        Layout: agenda
+        01 | 项目目标 | TARGET
+        02 | 试点推进 | PILOT
+        03 | 下一步 | NEXT STEPS
+        """,
 }
 
 

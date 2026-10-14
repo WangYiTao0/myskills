@@ -1,6 +1,6 @@
 # 生成器版式参考
 
-把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（evidence 到 image-text 8 个版式各一页；section 的写法见本文件对应小节）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
+把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（evidence 到 image-text 8 个版式各一页；agenda、section 的写法见本文件对应小节）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
 
 ## 文稿格式
 
@@ -291,6 +291,31 @@ Layout: image-text
 - 报错：没有图；图片不存在。
 - 警告：图多于一张（只用第一张）；要点超过 5 条。
 
+## agenda · Agenda 目录页
+
+模板 layout 0（和 evidence、section 共用；inspect 靠 `Agenda Number 1` 认出 agenda）。开场列出本次汇报分几部分：每条一行章节编号 + 中文名 + 英文名。
+
+```markdown
+# 目录 / AGENDA
+## 分四部分汇报，试点数据集中在第三部分
+Layout: agenda
+01 | 项目目标 | TARGET
+02 | 实施范围 | SCOPE
+03 | 试点推进 | PILOT
+04 | 下一步 | NEXT STEPS
+```
+
+- 字段：3–8 行「编号 | 中文名 | 英文名」，一行一章，三段都必填；写法和 section 的那一行完全相同。编号不能重复。
+- 容量：3–8 条；每段上限同 section——编号最多 3 字，中文名最多 12 字，英文名最多 40 字符。少于 3 条不必做目录页；项目汇报的 8 节（SKILL.md §1）正好放满。
+- 主标题、副标题照常填 idx 0 / 10；副标题写一句结论（这次汇报的重点在哪一部分），不要写成「目录」。
+- 不放结论红条：写普通文字行或 `Next:` 都报错。`Tag:` 照常可用。
+- 画法：3–4 条排一列（从正文区左沿缩进 1"，和 section 对齐）；5–8 条排两列，先填满左列再填右列（左列条数 = 总数一半向上取整）；整组在正文区里垂直居中。每条：左边 32pt bold #1A1A1A 编号，一条 #BFBFBF 竖线，右边 20pt bold #1A1A1A 中文名，下面 12pt #6B6B6B 英文名。只用黑白灰，不用红；不高亮任何一章。
+- 和 section 配合：Agenda 放在封面后第一页，列出全部章节；每章开头的 section 把 Agenda 里对应那一行原样抄过去（编号、中文名、英文名一字不差），读者翻到隔断页就能对上目录。Agenda 里有几章，就最多几张 section；不想加隔断页时只放 Agenda 也行。
+- 适用：分了 3 个以上章节的汇报（项目汇报按 §1 的 8 节、阶段汇报、培训分享）。
+- 反例：只有一两个章节（用不着目录）；把每章的结论、数字写进目录（目录只列章节名，结论放副标题或正文页）；目录里的章节和后面正文、隔断页对不上（改了章节名要同时改两处）。
+- 报错：少于 3 条或多于 8 条；某行不是三段；某段为空；编号、中文名、英文名超过字数上限；编号重复；写了普通文字结论行或 `Next:`。报错信息带页标题。
+- 审核：`review_deck.py` 对 agenda 不报「缺结论行」（按设计没有红条，同 section）；「目录式副标题」照样检查。
+
 ## section · 隔断页
 
 模板 layout 0（和 evidence 共用；inspect 靠 `Section Number` 认出 section）。章节之间的过渡页：章节编号 + 中文名 + 英文名是页面主体。
@@ -324,8 +349,9 @@ Layout: section
 | 3–6 个时间节点（带状态时看得出进度） | timeline |
 | 3–6 个前后衔接的阶段，强调推进到哪一段 | timeline-phase |
 | 一张图 + 几条解释 | image-text |
+| 开场列出本次汇报的 3–8 个章节 | agenda |
 | 章节之间的过渡（编号 + 章节名） | section |
-| 都不匹配（Agenda、团队、表格等） | 生成器没有对应版式；先用最接近的生成，再在 PowerPoint 里按 SKILL.md §6 和 `layout-patterns.md` 手工调整 |
+| 都不匹配（团队、表格等） | 生成器没有对应版式；先用最接近的生成，再在 PowerPoint 里按 SKILL.md §6 和 `layout-patterns.md` 手工调整 |
 
 ## 形状命名约定
 
@@ -342,6 +368,7 @@ Layout: section
 | stats-side | `Side Card N`（卡片底）、`Side Accent N`（只有重点卡）、`Side Number N`、`Side Text N`（标签一段 + 说明一段）、`Side Conclusion Title`、`Side Conclusion Rule`、`Side Points`（全部结论要点，一条一段）、`Stat Source` |
 | timeline（写了状态） | `Milestone Node N`、`Milestone Check N`（只在已完成节点上）、`Milestone Date N`、`Milestone Text N`（标题一段 + 说明一段）、`Progress Line`（绿色已完成段）、`Remaining Line`（灰色虚线）、`Current Ring`、`Current Tag`；图例 `Legend Icon 1–4`、`Legend Label 1–4`（1 已完成、2 进行中、3 未完成、4 关键里程碑）、`Legend Check 1`（已完成图标上的对勾） |
 | timeline（不写状态） | `Timeline Line`、`Timeline Node N`、`Timeline Date N`、`Timeline Text N` |
+| agenda | `Agenda Number N`（章节编号；`Agenda Number 1` 也是 inspect 区分 agenda / section / evidence 的标记形状）、`Agenda Rule N`（竖线）、`Agenda Name N`（中文名）、`Agenda English N`（英文名） |
 | section | `Section Number`（章节编号，也是 inspect 区分 section / evidence 的标记形状）、`Section Rule`（竖线）、`Section Name`（中文名）、`Section English`（英文名） |
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
 

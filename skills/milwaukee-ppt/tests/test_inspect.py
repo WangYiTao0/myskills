@@ -45,7 +45,7 @@ check("文字只取前 30 字",
       and "超出部分不应出现" not in r.stdout, r.stdout)
 
 # 页标题行除模板 layout 名外还给生成器版式名；共用模板 layout 的版式（stats / stats-side、
-# timeline / timeline-phase、evidence / section）也要分得出来。占位框给出 idx。
+# timeline / timeline-phase、evidence / section / agenda）也要分得出来。占位框给出 idx。
 LAYOUTS_MD = """
 ---
 title: Mock Deck
@@ -94,12 +94,18 @@ Layout: process
 # Mock Section
 Layout: section
 02 | 试点推进 | PILOT
+
+# Mock Agenda
+Layout: agenda
+01 | 项目目标 | TARGET
+02 | 试点推进 | PILOT
+03 | 下一步 | NEXT STEPS
 """
 res = generate(LAYOUTS_MD, images={"img/a.png": (800, 450)})
 r = run(res.path)
 heads = [l for l in r.stdout.splitlines() if l.startswith("== ")]
 want = ["-", "evidence", "stats", "stats-side", "timeline", "timeline", "timeline-phase",
-        "process", "section", "-"]
+        "process", "section", "agenda", "-"]
 got = [re.search(r"\| 版式: (\S+)$", h).group(1) if re.search(r"\| 版式: (\S+)$", h) else None
        for h in heads]
 check("页标题行：模板 layout 名之后给生成器版式名（封面 / 收尾为 -）", got == want, heads)
