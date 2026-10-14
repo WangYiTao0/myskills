@@ -3,7 +3,7 @@
 运行：python3 copilot-agent/tests/test_instructions.py
 """
 from contract import (AGENT, char_count, check, finish, generate_blocks, layout_mentions,
-                      md_blocks, page_count, private_hits, registered_layouts,
+                      md_blocks, missing_refs, page_count, private_hits, registered_layouts,
                       test_no_private_paths)
 
 INSTRUCTIONS = AGENT / "instructions.md"
@@ -41,12 +41,16 @@ def test_examples_generate():
     check("第一个示例是带 frontmatter 的完整文稿", bool(blocks) and blocks[0].startswith("---\n"))
     if not blocks:
         return
-    r = generate_blocks(blocks)
-    check("示例照抄生成，退出码 0", r.rc == 0, r.stderr)
-    md = "\n".join(blocks)
-    check("示例每个 Layout 都被识别", layout_mentions(md) <= registered_layouts(),
-          layout_mentions(md) - registered_layouts())
-    check("示例页数都生成出来", len(r.slides) >= 1 + page_count(md), (len(r.slides), page_count(md)))
+    for md, r in generate_blocks(blocks):
+        check("示例照抄生成，退出码 0", r.rc == 0, r.stderr)
+        check("示例每个 Layout 都被识别", layout_mentions(md) <= registered_layouts(),
+              layout_mentions(md) - registered_layouts())
+        check("示例页数都生成出来", len(r.slides) >= 1 + page_count(md),
+              (len(r.slides), page_count(md)))
+
+
+def test_refs():
+    check("指令提到的文件都真实存在", not missing_refs(text()), missing_refs(text()))
 
 
 if __name__ == "__main__":
@@ -54,5 +58,6 @@ if __name__ == "__main__":
     test_layout_set()
     test_report_voice()
     test_examples_generate()
+    test_refs()
     test_no_private_paths()
     finish()

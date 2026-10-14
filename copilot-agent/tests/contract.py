@@ -7,7 +7,10 @@
 - registered_layouts()           生成器注册的版式名集合（直接读生成器的注册表，不硬编码）
 - layout_mentions(text)          文中所有 `Layout: 名字` 里的名字集合
 - md_blocks(text)                文中所有 ```markdown 代码块
-- generate_blocks(blocks)        拼成一份文稿交给现有生成器 → deckcheck.Result
+- generate_blocks(blocks)        按文稿分组交给现有生成器 → [(文稿, deckcheck.Result)]
+                                 （带 frontmatter 的块开一份新文稿，其后的片段拼进这份）
+- sections(text)                代码块以外的 `## ` 小节：[(标题, 正文)]
+- missing_refs(text)            文中提到的文件名（.md / .pptx 等）在文件夹或 skill 里找不到的
 - private_hits(root)             文件夹内文本文件里的私人路径：[(相对路径, 行号, 命中文字)]
 - check / finish                 沿用 milwaukee-ppt tests 的汇总写法
 """
@@ -57,13 +60,15 @@ def md_blocks(text):
 
 
 def assemble(blocks):
-    """第一个块应是带 frontmatter 的完整文稿；其余没有 `# ` 标题的片段补一个。"""
-    parts = []
+    """带 frontmatter 的块各开一份文稿，其后的片段拼进去；没有 `# ` 标题的片段补一个。"""
+    decks = []
     for i, block in enumerate(blocks):
+        if block.startswith("---\n") or not decks:
+            decks.append([])
         if not re.search(r"(?m)^# ", block):
             block = f"# 示例片段 {i}\n" + block
-        parts.append(block.strip("\n"))
-    return "\n\n".join(parts) + "\n"
+        decks[-1].append(block.strip("\n"))
+    return ["\n\n".join(parts) + "\n" for parts in decks]
 
 
 def generate_md(md):
@@ -73,7 +78,33 @@ def generate_md(md):
 
 
 def generate_blocks(blocks):
-    return generate_md(assemble(blocks))
+    return [(md, generate_md(md)) for md in assemble(blocks)]
+
+
+def sections(text):
+    """代码块以外的 `## ` 小节（代码块里的 `## ` 是示例的副标题，不算）。"""
+    found, fenced = [], False
+    for line in text.splitlines(keepends=True):
+        if line.startswith("```"):
+            fenced = not fenced
+        if not fenced and line.startswith("## "):
+            found.append([line[3:].strip(), ""])
+        elif found:
+            found[-1][1] += line
+    return [tuple(s) for s in found]
+
+
+_REF = re.compile(r"[\w.-]+\.(?:md|txt|pptx|docx|pdf)\b")
+_REF_ROOTS = [AGENT, SKILL / "assets", SKILL / "examples"]
+
+
+def missing_refs(text):
+    """文中提到的文件名，在本文件夹或 skill 的 assets / examples 里找不到的。"""
+    missing = []
+    for name in sorted(set(_REF.findall(text))):
+        if not any(next(root.rglob(name), None) for root in _REF_ROOTS):
+            missing.append(name)
+    return missing
 
 
 def page_count(md):
