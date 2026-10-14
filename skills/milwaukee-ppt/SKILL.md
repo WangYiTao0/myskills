@@ -501,7 +501,7 @@ milwaukee-ppt/
 │   ├── review_deck.py            # 审核命令:<文稿.md> [<输出.pptx>],ppt-review 调用
 │   ├── mdparse.py / layouts/     # 解析层 / 每个版式一个渲染模块
 │   └── README.md                 # 改生成器代码时的约定
-├── examples/demo/                # 虚构示例文稿 deck.md(覆盖全部版式)+ 示意图与其生成脚本
+├── examples/demo/                # 虚构示例文稿 deck.md(覆盖全部 12 种版式，含 Agenda 与隔断页)+ 示意图与其生成脚本
 ├── tests/                        # python3 tests/run_all.py 跑全部
 └── assets/
     ├── MS_Template.pptx          # 官方模板(顶部红 banner + 左上 logo + 底部页脚)

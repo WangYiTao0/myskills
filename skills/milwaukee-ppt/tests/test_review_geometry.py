@@ -279,30 +279,30 @@ def test_out_of_page():
     md, pptx = demo()
 
     def move_right(prs):
-        sh = shape(prs, 3, "Process Card 4")
+        sh = shape(prs, 5, "Process Card 4")
         sh.left = prs.slide_width - sh.width // 2
 
     def move_up(prs):
-        shape(prs, 5, "Stat Label 2").top = Inches(0.5)
+        shape(prs, 8, "Stat Label 2").top = Inches(0.5)
 
     def move_down(prs):
-        sh = shape(prs, 7, "Milestone Text 3")
+        sh = shape(prs, 12, "Milestone Text 3")
         sh.top = Inches(7.4) - sh.height
 
-    expect("形状挪出页面右边", md, pptx, move_right, "出界", 3, "Process Card 4")
-    expect("形状挪进 banner", md, pptx, move_up, "压 banner", 5, "Stat Label 2")
-    expect("形状挪进页脚", md, pptx, move_down, "压页脚", 7, "Milestone Text 3")
+    expect("形状挪出页面右边", md, pptx, move_right, "出界", 5, "Process Card 4")
+    expect("形状挪进 banner", md, pptx, move_up, "压 banner", 8, "Stat Label 2")
+    expect("形状挪进页脚", md, pptx, move_down, "压页脚", 12, "Milestone Text 3")
 
 
 def test_overlap():
     md, pptx = demo()
 
     def push_left(prs):
-        card = shape(prs, 3, "Process Card 2")
+        card = shape(prs, 5, "Process Card 2")
         card.left -= Inches(0.8)
 
-    lines, out = reported(md, broken(pptx, push_left), "重叠", 3, "Process Card 2")
-    check("两个形状互压：报出「重叠」，带第 3 页和形状名",
+    lines, out = reported(md, broken(pptx, push_left), "重叠", 5, "Process Card 2")
+    check("两个形状互压：报出「重叠」，带第 5 页和形状名",
           any("Process Card 1" in line for line in lines), out)
 
 
@@ -320,13 +320,13 @@ def test_misaligned():
     md, pptx = demo()
 
     def nudge_down(prs):
-        shape(prs, 3, "Process Card 3").top += 3 * PX
+        shape(prs, 5, "Process Card 3").top += 3 * PX
 
     def nudge_left(prs):
-        shape(prs, 6, "Side Card 2").left -= 2 * PX
+        shape(prs, 9, "Side Card 2").left -= 2 * PX
 
-    expect("同一行的卡片下移 3 像素", md, pptx, nudge_down, "错位", 3, "Process Card 3")
-    expect("同一列的卡片左移 2 像素", md, pptx, nudge_left, "错位", 6, "Side Card 2")
+    expect("同一行的卡片下移 3 像素", md, pptx, nudge_down, "错位", 5, "Process Card 3")
+    expect("同一列的卡片左移 2 像素", md, pptx, nudge_left, "错位", 9, "Side Card 2")
 
 
 def stuff(sh, times=8):
@@ -338,12 +338,12 @@ def stuff(sh, times=8):
 
 def test_text_overflow():
     md, pptx = demo()
-    expect("数据解读塞满", md, pptx, lambda prs: stuff(shape(prs, 5, "Stat Points 2")),
-           "文字溢出", 5, "Stat Points 2")
-    expect("流程卡片说明塞满", md, pptx, lambda prs: stuff(shape(prs, 3, "Process Card 1")),
-           "文字溢出", 3, "Process Card 1")
-    expect("红条塞满", md, pptx, lambda prs: stuff(shape(prs, 2, "Caption Bar")),
-           "文字溢出", 2, "Caption Bar")
+    expect("数据解读塞满", md, pptx, lambda prs: stuff(shape(prs, 8, "Stat Points 2")),
+           "文字溢出", 8, "Stat Points 2")
+    expect("流程卡片说明塞满", md, pptx, lambda prs: stuff(shape(prs, 5, "Process Card 1")),
+           "文字溢出", 5, "Process Card 1")
+    expect("红条塞满", md, pptx, lambda prs: stuff(shape(prs, 4, "Caption Bar")),
+           "文字溢出", 4, "Caption Bar")
 
 
 if __name__ == "__main__":
