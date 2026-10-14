@@ -18,6 +18,8 @@
 - named(slide, name)            名字恰为 name 的全部形状；one(slide, name) 恰好一个时返回它，否则 None
 - slide_xmls(path)              各页 slide XML 字节，和改动前的输出逐字节比较
 - deck_error(r, title, *needles) 报错退出且信息含页标题（和 needles）
+- review(md, pptx=None)         调审核脚本 review_deck.py → (退出码, stdout, stderr)
+- registered_layouts()          生成器注册表里的全部版式名（从未知版式的报错信息里读）
 - 常量：STATUS_COLORS / DONE_GREEN / DOING_AMBER / DOING_INK、UNIT_PT / UNIT_COLOR
 - check(name, ok, detail) 记录结果；finish() 打印汇总并按结果退出
 """
@@ -35,6 +37,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 SKILL = Path(__file__).resolve().parent.parent
 GENERATOR = SKILL / "scripts" / "generate_ppt.py"
+REVIEWER = SKILL / "scripts" / "review_deck.py"
 TEMPLATE = SKILL / "assets" / "MS_Template.pptx"
 
 EMU = 914400
@@ -370,3 +373,25 @@ def slide_xmls(pptx_path):
 def deck_error(r, title, *needles):
     """生成器报错退出，错误信息含页标题和 needles 里的每一段文字。"""
     return r.rc != 0 and title in r.stderr and all(s in r.stderr for s in needles)
+
+
+def review(md, pptx=None):
+    """跑审核脚本：md、pptx 为路径（pptx 可省略，只审文稿）→ CompletedProcess（rc / stdout / stderr）。"""
+    cmd = [sys.executable, str(REVIEWER), str(md)] + ([str(pptx)] if pptx is not None else [])
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def registered_layouts():
+    """生成器注册表里的全部版式名，按注册顺序。只走外部切入点：写一个未知版式，
+    从报错信息「可选: a / b / …」里读出来；新版式登记进注册表后自动出现在这里。"""
+    r = generate("""
+        ---
+        title: 注册表探测
+        ---
+        # 探测页
+        Layout: __no_such_layout__
+        """)
+    m = re.search(r"可选: (.+)$", r.stderr, re.M)
+    if r.rc == 0 or not m:
+        raise RuntimeError(f"读不到注册表: {r.stderr}")
+    return [name.strip() for name in m.group(1).split(" / ")]

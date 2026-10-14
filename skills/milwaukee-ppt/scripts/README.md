@@ -32,8 +32,9 @@
 - 注册表在 `layouts/__init__.py`，已登记 8 个版式。
 - 形状命名：每个画出来的形状都 `name = "<角色> N"`（N 从 1 起，与条目顺序一致），这是生成后细调时对 AI 的契约；各版式的名字列在 `references/layouts.md`「形状命名约定」，改名时同步改那一节。
 - 测试：每个版式一个 `tests/test_<版式>.py`，只走“md 进、pptx 出”；辅助函数（`generate`、`body_slide`、`pictures`、`shapes_named`、`run_style` 等）和模板槽位常量都在 `tests/deckcheck.py`，测试文件里不要再各写一份。`python3 tests/run_all.py` 跑全部。
-  - 新增辅助：`runs(shape, para=0)` 返回一段里每个 run 的 `(文字, 字号, 粗体, 颜色)`，查单位拆分；`fill_color` / `line_color` 取形状纯色填充 / 描边 hex（没有为 `None`）；`geometry(shape)` 取预设几何名（`ellipse`、`diamond`、`homePlate`、`chevron`…）；`inside(shape, rect_in)` 判断形状落在英寸矩形内（如 `CONTENT_SLOT_IN`）；`slide_xmls(path)` 取各页 slide XML 字节，用于和改动前逐字节比较；`deck_error(r, title, *needles)` 判断报错退出且信息含页标题。`inside_shape(inner, outer)` 判断形状落在另一个形状里；`center_x` / `center_y` / `bottom` 取中心坐标和底边；`named(slide, name)` 取名字恰为 name 的全部形状，`one(slide, name)` 恰好一个时返回它。常量 `STATUS_COLORS`、`DONE_GREEN`、`DOING_AMBER`、`DOING_INK`、`UNIT_PT`、`UNIT_COLOR`。
+  - 新增辅助：`runs(shape, para=0)` 返回一段里每个 run 的 `(文字, 字号, 粗体, 颜色)`，查单位拆分；`fill_color` / `line_color` 取形状纯色填充 / 描边 hex（没有为 `None`）；`geometry(shape)` 取预设几何名（`ellipse`、`diamond`、`homePlate`、`chevron`…）；`inside(shape, rect_in)` 判断形状落在英寸矩形内（如 `CONTENT_SLOT_IN`）；`slide_xmls(path)` 取各页 slide XML 字节，用于和改动前逐字节比较；`deck_error(r, title, *needles)` 判断报错退出且信息含页标题。`review(md, pptx=None)` 跑审核脚本、返回 `CompletedProcess`；`registered_layouts()` 从未知版式的报错信息里读出注册表全部版式名（只走外部切入点）。`inside_shape(inner, outer)` 判断形状落在另一个形状里；`center_x` / `center_y` / `bottom` 取中心坐标和底边；`named(slide, name)` 取名字恰为 name 的全部形状，`one(slide, name)` 恰好一个时返回它。常量 `STATUS_COLORS`、`DONE_GREEN`、`DOING_AMBER`、`DOING_INK`、`UNIT_PT`、`UNIT_COLOR`。
   - 守逐字节：`test_generate.py` 的 `MONTHLY_SHA`（月报各页 slide XML，取自 master e282570）、`test_timeline.py` 的 `LEGACY_SHA`（不写状态也不写 `!` 的旧 timeline）。改共用部件后这两项不过，就是改动了月报或旧写法的输出。
+  - 跨版式不变量：`test_title_invariant.py` 给注册表里每个版式各生成一页，断言主标题、副标题在 idx 0 / 10 占位框里、banner 区（0–1.0"）上没有另画的形状。新版式登记进注册表后会自动纳入，在它的 `SAMPLES` 里补一页最小示例即可（漏补时测试失败）。
   - `test_finetune_doc.py` 抽出 SKILL.md「生成后细调」的 python 示例实际跑一遍；改那段示例时保持它能照抄运行。
   - 共用部件本身由 `tests/test_common_parts.py` 测：`generate(md, probe=True)` 时额外注册测试专用版式 `_probe`（`tests/probe_layout.py`），不进正式注册表，版式票不用动它。
 - 新增或修改一个版式时，通常只动 `layouts/<版式>.py` + `tests/test_<版式>.py`；需要新的共用部件时再动 `common.py` / `deckcheck.py`。
@@ -49,3 +50,18 @@ python3 scripts/inspect_ppt.py deck.pptx
 每页一个标题行 `== 第 N 页 | layout: <模板 layout 名> | 版式: <生成器版式名>`，下面每个形状一行：`名字 | 类型 | L= T= W= H=（英寸，两位小数） | 文字前约 30 字`（换行替换成空格）；占位框的类型写成 `PLACEHOLDER idx=N`。文件不存在或不是 pptx 时，错误信息写到 stderr，退出码非零。
 
 生成器版式名不写进成稿：写进 slide（如 `cSld name`）会改动月报和旧 timeline 的逐字节输出。inspect 从模板 layout 推断：一个模板 layout 只对应一个版式时直接得出；共用模板 layout 的版式靠版式模块的 `MARK_SHAPE`（stats-side 的 `Side Card 1`、timeline-phase 的 `Phase Segment 1`）区分，没有该形状的算另一个（stats / timeline）。封面、收尾为 `-`。新增共用模板 layout 的版式时，给它定一个 `MARK_SHAPE`。
+
+## 审核命令 `review_deck.py`
+
+生成后机械审核，输入 md 文稿和生成的 pptx（pptx 可省略，只审文稿）：
+
+```
+python3 scripts/review_deck.py deck.md deck.pptx
+```
+
+- 输出：每条问题一行 `[规则] 位置：问题 → 怎么改`；全部通过时只打印一行 `REVIEW OK`，有问题时最后一行是 `REVIEW: N 条问题`。
+- 只报告、不改文件。审完退出码总是 0（有问题也是 0）；文稿读不了（找不到、写错）或 pptx 打不开时退出码 1，错误写到 stderr。
+- 和生成器共用 `mdparse` 与版式注册表：文稿按生成器同一套规则解析，生成器会报错的文稿审核也报错。
+- 内容检查（只看文稿）：页数过多（> 10 页）、相邻两页版式相同、目录式副标题（不到 8 字或和主标题中文部分相同）、缺结论行、章节和版式不配（TARGET / SCOPE 用 process / before-after，USE CASES 用 before-after）、内容重复（两页流程步骤名一半以上相同）、数字卡不是数字、数据缺失（`[数据缺失]` 占位）、用词（浮夸 / 空洞词表）、关键标记过多（时间线 3 个以上节点、超过一半标了 `!`）。
+- 真伪检查（看 pptx，确认是生成器按当前文稿做的）：页数不符（封面 + 正文 + 收尾页）、不是生成脚本做的（正文页 idx 0 / 10 占位框里的文字和文稿的主标题、副标题不一致，或 banner 0–1.0" 上另画了文本框）。位置写成 `pptx 第 N 页（页「主标题」）`。
+- 测试在 `tests/test_review.py`：正样本是生成器的正常输出（含示例文稿），负样本用 python-pptx 把正常输出改坏。新增规则时规则名放进 `[]`，测试按 `[规则]` 行首匹配。
