@@ -1,0 +1,53 @@
+<!doctype html>
+<!-- PROTOTYPE，用完即弃：milwaukee-ppt 三个视觉方向对比页。双击打开；?variant=0|A|B|C 切换。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>milwaukee-ppt 视觉方向原型</title>
+<style>
+  body { margin: 0; font: 14px/1.5 -apple-system, "PingFang SC", Arial, sans-serif; background: #ECECEC; color: #1A1A1A; }
+  header { padding: 16px 24px 4px; }
+  header h1 { font-size: 18px; margin: 0 0 4px; }
+  #note { margin: 0; color: #333; }
+  main { display: grid; grid-template-columns: repeat(auto-fill, minmax(520px, 1fr)); gap: 16px; padding: 16px 24px 96px; }
+  figure { margin: 0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  figure img { width: 100%; display: block; }
+  figcaption { padding: 4px 8px; color: #6B6B6B; font-size: 12px; }
+  nav { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #1A1A1A; border-radius: 999px; padding: 6px; display: flex; gap: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+  nav button { border: 0; border-radius: 999px; padding: 8px 18px; background: transparent; color: #fff; font: inherit; cursor: pointer; }
+  nav button.on { background: #DB011C; }
+</style>
+</head>
+<body>
+<header><h1 id="title"></h1><p id="note"></p></header>
+<main id="slides"></main>
+<nav id="bar"></nav>
+<script>
+const NOTES = {
+  "0": ["基线", "正式生成器原样输出：月报红条 1.2\" 每页最抢眼；卡片 14pt 灰字、内容浮在上半；表格贴上沿。"],
+  "A": ["A 保留红条，内容撑满", "红条原样不动；卡片撑满可用高度、说明 18pt 近黑；流程卡加箭头和大编号水印；团队卡加大；表格 18pt 垂直居中。"],
+  "B": ["B 薄结论条", "红条压成 0.42\" 细条（白字一行，结论 ｜ Next），正文多出约 0.7\"；大数字 72/88pt；其余同 A。"],
+  "C": ["C 结论前置（lead）", "结论移到标题下作 lead（22pt 黑粗字 + 红短竖线），底部不画红条；流程大编号圆 + 连接线；团队首字头像；stats 数字 88pt；Next 放页底一行。"],
+};
+const PAGES = [1, 2, 3, 4, 5, 6, 7, 8];
+const v = new URLSearchParams(location.search).get("variant") || "0";
+const cur = NOTES[v] ? v : "0";
+document.getElementById("title").textContent = "方向 " + NOTES[cur][0];
+document.getElementById("note").textContent = NOTES[cur][1];
+const main = document.getElementById("slides");
+for (const n of PAGES) {
+  const f = document.createElement("figure");
+  f.innerHTML = `<img src="out/${cur}/slide-${n}.png" alt="第 ${n} 页"><figcaption>第 ${n} 页</figcaption>`;
+  main.appendChild(f);
+}
+const bar = document.getElementById("bar");
+for (const k of Object.keys(NOTES)) {
+  const b = document.createElement("button");
+  b.textContent = k === "0" ? "0 基线" : k;
+  if (k === cur) b.className = "on";
+  b.onclick = () => { location.search = "?variant=" + k; };
+  bar.appendChild(b);
+}
+</script>
+</body>
+</html>
