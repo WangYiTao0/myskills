@@ -9,8 +9,8 @@ from contract import (AGENT, char_count, check, finish, generate_blocks, generat
                       md_blocks, missing_refs, page_count, registered_layouts, sections,
                       test_no_private_paths)
 
-KNOWLEDGE = AGENT / "knowledge" / "milwaukee-ppt-layout-guide.md"
-EXAMPLE_DECK = AGENT / "knowledge" / "example-deck.md"   # 虚构示例 deck，整份是一份文稿
+KNOWLEDGE = AGENT / "knowledge" / "milwaukee-ppt-layout-guide.txt"
+EXAMPLE_DECK = AGENT / "knowledge" / "example-deck.txt"   # 虚构示例 deck，整份是一份文稿
 INSTRUCTIONS = AGENT / "instructions.md"
 LIMIT = 15000
 # 版式小节的标题以版式名开头（小写英文），其余小节标题用中文
