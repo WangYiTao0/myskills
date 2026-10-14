@@ -85,6 +85,15 @@ def test_skill_md():
     check("SKILL.md 提到的包内文件都在包里", not missing, missing)
 
 
+def test_agent_instructions():
+    """配合技能包用的 agent 指令：长度在 Instructions 上限内，按技能名引用技能、不抄技能细节。"""
+    text = (AGENT / "skill" / "agent-instructions.md").read_text(encoding="utf-8")
+    name = re.search(r"(?m)^name:\s*(\S+)", skill_md()).group(1)
+    check("agent 指令 ≤ 8000 字符", len(text) <= 8000, len(text))
+    check(f"agent 指令按技能名 `{name}` 引用技能", f"`{name}`" in text)
+    check("agent 指令不抄技能里的版式细节", not layout_mentions(text), layout_mentions(text))
+
+
 def test_runs_from_package():
     """解开 zip，按 SKILL.md 的流程先跑自检、再用示例文稿生成，模拟沙箱里的执行。"""
     work = Path(tempfile.mkdtemp(prefix="skill-run-"))
@@ -108,6 +117,7 @@ if __name__ == "__main__":
     test_up_to_date()
     test_limits()
     test_skill_md()
+    test_agent_instructions()
     test_runs_from_package()
     test_no_private_paths()
     finish()

@@ -18,7 +18,7 @@
 ## 第 1 步：建 agent，上传技能包
 
 1. 打开 Copilot（m365.cloud.microsoft），选 **Agents & Skills** → **New agent**，再选 **Skip to configure**（手动配置）。
-2. **Name**：`Milwaukee PPT 测试`。**Instructions** 只写一句：`用户要做汇报 PPT 时，使用 milwaukee-ppt 技能。`
+2. **Name**：`Milwaukee PPT 测试`。**Instructions**：打开 `copilot-agent/skill/agent-instructions.md`，全选复制，整份粘贴。
 3. **不要**在 Knowledge 里上传任何文件。官方文档说明，技能和直接上传的知识文件目前不能放在同一个 agent 里。
 4. 在 **Configure** 页展开 **Skills**，点 **Add**，上传 `milwaukee-ppt-skill.zip`。
 5. 看上传结果：能不能看到技能名 `milwaukee-ppt`、说明和包含的文件。**看不到 Skills 区、上传报错，或提示需要许可证 / Frontier**：把提示原文记进记录表，测试到此结束。
