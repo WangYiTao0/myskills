@@ -1,6 +1,6 @@
 ---
 name: milwaukee-ppt
-description: Milwaukee Tool 工作汇报 PPT 的格式、视觉规范与 pptx 生成器。当用户撰写或生成任何 Milwaukee 内部汇报类 PPT（项目汇报、月报、阶段汇报、客户简报、复盘、展会/外出参观汇报、培训分享等），或提到"Milwaukee 汇报格式 / MS 汇报模板 / 工作汇报 / 项目总结 / 月报"时使用。本 skill 分两层：①【始终生效】PPT 视觉与排版规范（品牌锚点、设计系统、标题结构、内容硬约束）；②【仅项目汇报生效】固定 Agenda 顺序 + PDCA 标注 + "已落地 vs 未来"分离 —— 仅当任务是"项目汇报 / 项目总结 / 月报"，或用户明确要求 Agenda/PDCA 时才套用，其他汇报场景不强制。附带 md → pptx 生成器：把带 Layout 标记的 md 文稿按 Milwaukee 模板生成可编辑 pptx（封面、8 种正文版式、收尾页）；用户要直接出 pptx 文件时也用它。
+description: Milwaukee Tool 工作汇报 PPT 的格式、视觉规范与 pptx 生成器。当用户撰写或生成任何 Milwaukee 内部汇报类 PPT（项目汇报、月报、阶段汇报、客户简报、复盘、展会/外出参观汇报、培训分享等），或提到"Milwaukee 汇报格式 / MS 汇报模板 / 工作汇报 / 项目总结 / 月报"时使用。本 skill 分两层：①【始终生效】PPT 视觉与排版规范（品牌锚点、设计系统、标题结构、内容硬约束）；②【仅项目汇报生效】固定 Agenda 顺序 + PDCA 标注 + "已落地 vs 未来"分离 —— 仅当任务是"项目汇报 / 项目总结 / 月报"，或用户明确要求 Agenda/PDCA 时才套用，其他汇报场景不强制。附带 md → pptx 生成器：把带 Layout 标记的 md 文稿按 Milwaukee 模板生成可编辑 pptx（封面、9 种正文版式、收尾页）；用户要直接出 pptx 文件时也用它。
 ---
 
 # Milwaukee Tool 工作汇报格式规范
@@ -77,8 +77,9 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 | `timeline` | 3–6 个时间节点，可按状态着色 | 6 | `- [!]日期 \| 标题 \| 说明 [\| 状态]`，`!` = 关键里程碑；状态全写或全不写，不写为黑白灰 |
 | `timeline-phase` | 3–6 个阶段的箭头阶段条 | 6 | `- [!]日期 \| 标题 \| 说明 \| 状态`，每条必须写状态 |
 | `image-text` | 左图右文 | 7 | 一张图 + ≤5 条 `- 要点` |
+| `section` | 隔断页（章节过渡） | 0 | 一行 `编号 \| 中文名 \| 英文名`；不放结论红条 |
 
-生成器不做的事：Agenda 顺序、PDCA 图标、上表以外的版式（Agenda 八宫格、团队、表格等）。这些在生成后的 pptx 里按 §1–§2、§6 和 `references/layout-patterns.md` 手工补。
+生成器不做的事：Agenda 顺序、PDCA 图标、上表以外的版式（Agenda 八宫格、团队、表格等）；隔断页只画章节编号和名字，不自动生成章节目录、不高亮当前章节。这些在生成后的 pptx 里按 §1–§2、§6 和 `references/layout-patterns.md` 手工补。
 
 ### 生成后细调
 
@@ -480,7 +481,7 @@ banner 以下的正文区用色遵循 §6.2 色板。
 milwaukee-ppt/
 ├── SKILL.md                      # 本文件
 ├── references/
-│   ├── layouts.md                # 生成器 8 个版式的字段写法、适用场景、反例、报错与警告、形状命名约定
+│   ├── layouts.md                # 生成器 9 个版式的字段写法、适用场景、反例、报错与警告、形状命名约定
 │   ├── layout-patterns.md        # 已验证案例参考(项目汇报 15 种 + 月报 5 种),非版式白名单
 │   └── before-after.md           # Before/After 布局的 slot 契约与事实对比验收
 ├── scripts/

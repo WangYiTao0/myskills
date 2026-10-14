@@ -27,6 +27,7 @@ VOICE = ["赋能", "打通", "闭环", "抓手", "拉通", "组合拳", "打造"
          "散乱", "低效", "容易出错", "混乱"]
 _NUMBER = re.compile(r"^\s*(?:约|~|≈|≥|≤|>|<|\+/-)?\s*[$+\-]?\d")
 MAX_PAGES = 10
+NO_CONCLUSION = {"section"}   # 按设计不放结论红条的版式（隔断页），不报缺结论行
 BANNER_BOTTOM = 914400   # 模板顶部红 banner 占 0–1.0"（EMU）
 REDRAW = "不要自己写代码画幻灯片；改 md 文稿后用 generate_ppt.py 重新生成"
 
@@ -65,7 +66,7 @@ def review_md(doc):
         if len(title) < 8 or title == chinese(page.title):
             issues.append(("目录式副标题", where(page), f"副标题「{title}」没有给出结论",
                            "改成一句结论，如「试点 8 周，检验单全部电子化」"))
-        if not page.conclusion:
+        if not page.conclusion and page.layout not in NO_CONCLUSION:
             issues.append(("缺结论行", where(page), "没有普通文字结论行，页底没有红条",
                            "在版式字段后加一行本页结论，最好带数字"))
         bad_layouts = MISFIT.get(english(page.title), set())
