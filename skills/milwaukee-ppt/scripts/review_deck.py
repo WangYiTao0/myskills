@@ -348,6 +348,45 @@ def check_overflow(slide, place):
     return issues
 
 
+def _cell_height_in(cell, width_emu):
+    """单元格文字估算高度（英寸，含上下内边距）；字号读不到返回 None。"""
+    tf = cell.text_frame
+    width = (width_emu - cell.margin_left - cell.margin_right) / EMU_PER_IN
+    total = (cell.margin_top + cell.margin_bottom) / EMU_PER_IN
+    for para in tf.paragraphs:
+        m = _para_metrics(para, None)
+        if m is None:
+            return None
+        runs, spacing, before, _ = m
+        if not runs:
+            continue
+        pt = max(p for _, p in runs)
+        lines = max(1, -(-sum(text_width_in(t, p) for t, p in runs) // width))
+        total += lines * pt * LINE_HEIGHT * spacing / 72 + before / 72
+    return total
+
+
+def check_table_overflow(slide, place):
+    """原生表格（table 版式的 Data Table）：某行文字估计高过行高。PowerPoint 会把行撑高、
+    表格往下长，压到红条或页脚；按和文本框同一口径估算，超出 OVERFLOW_TOL 才报。"""
+    issues = []
+    for sh in _placed(slide):
+        if not getattr(sh, "has_table", False):
+            continue
+        tbl = sh.table
+        for r, row in enumerate(tbl.rows):
+            need = [_cell_height_in(tbl.cell(r, c), col.width)
+                    for c, col in enumerate(tbl.columns)]
+            need = max((n for n in need if n is not None), default=0)
+            room = row.height / EMU_PER_IN
+            if (need - room) * EMU_PER_IN > OVERFLOW_TOL:
+                issues.append(("文字溢出", place,
+                               f"形状「{sh.name}」第 {r + 1} 行的文字估计要 {need:.2f}\"高，"
+                               f"行高只有 {room:.2f}\"",
+                               "精简文稿里对应的单元格后重新生成；不要缩字号或拉高行挤进去"))
+    return issues
+
+
 def review_geometry(doc, path):
     """几何检查（只用 python-pptx 和计算）：逐页查正文页。返回 [(规则, 位置, 问题, 怎么改)]。"""
     from pptx import Presentation
@@ -360,6 +399,7 @@ def review_geometry(doc, path):
         issues += check_overlap(slide, place)
         issues += check_alignment(slide, place)
         issues += check_overflow(slide, place)
+        issues += check_table_overflow(slide, place)
     return issues
 
 

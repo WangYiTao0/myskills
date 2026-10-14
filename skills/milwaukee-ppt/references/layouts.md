@@ -1,6 +1,6 @@
 # 生成器版式参考
 
-把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（evidence 到 image-text 8 个版式各一页；agenda、section、team 的写法见本文件对应小节）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
+把文稿整理成生成器能读的 md 时读本文件：每个版式怎么写、什么时候选、什么时候别选、生成器会报什么错和警告。完整示例见 `examples/demo/deck.md`（evidence 到 image-text 8 个版式各一页；agenda、section、team、table 的写法见本文件对应小节）。生成后要按形状改细节时，形状名见文末「形状命名约定」。Before/After 的槽位几何与事实对比验收另见 `before-after.md`。
 
 ## 文稿格式
 
@@ -341,6 +341,33 @@ Layout: team
 - 报错：少于 2 人或多于 8 人；某行不是三段；某段为空；姓名、角色一行放不下；职责超过 3 行；成员行漏写列表符号（`陈雨 | 数据复盘 | …`，免得悄悄进红条）；标了 `!`；写了缩进子列表。报错信息带页标题。
 - 审核：`review_deck.py` 对 team 和其他有红条的版式一样检查「缺结论行」「目录式副标题」；几何检查不需要另加豁免（卡片和卡片里的文字同属 `Member … N` 一个组件）。
 
+## table · 表格页
+
+模板 layout 0（和 evidence、section、agenda、team 共用；inspect 靠 `Data Table` 认出 table）。md 管道表格转成原生 pptx 表格，生成后在 PowerPoint 里照常按单元格改。
+
+```markdown
+# 充电等待 / WAITING
+## B 仓等待最长，排班先从 B 仓调
+Layout: table
+| 仓库 | 叉车数 | 平均等待 | 高峰时段 |
+| --- | --- | --- | --- |
+| A 仓 | 12 台 | 18 分钟 | 8:00–9:00 |
+| !B 仓 | 20 台 | 35 分钟 | 13:00–14:00 |
+| C 仓 | 9 台 | 12 分钟 | 8:00–9:00 |
+B 仓高峰等待 35 分钟，是 A 仓的两倍
+```
+
+- 字段：一个 md 管道表格，每行以 `|` 开头；第一行是表头，表头下的分隔行（`| --- |`）可写可不写。每行列数和表头相同；表头每格必填，正文格可以空。最多一行在**第一格开头**写 `!` 标重点。其余普通文字行进底部红条（一句结论），`Next:`、`Tag:` 照常可用。
+- 容量：2–6 列；表头以外 2–8 行。每格最多 2 行，列等宽，按列数算每格约多少字：2 列约 60 个汉字、3 列约 39、4 列约 29、5 列约 22、6 列约 18（英文字母约是汉字的 1.8 倍）。行高按该行最多的行数定，整张表还要放进正文区（1.30–5.60"，写了 Tag 时从 1.50" 起）：例如 6 列 × 8 行带 Tag 时，最多 3 行有两行字的格子。超出时报错，按提示拆页、删次要列或把格子写短。
+- 主标题、副标题照常填 idx 0 / 10；副标题写表格要说明的结论（哪一行最突出），不要写成「数据汇总」。
+- 结论红条：保留。表格页通常有一句读表结论，写在表格后面；没写时审核照常报「缺结论行」。
+- 画法：表格占正文区全宽（左边留 0.12" 给红竖条），从正文区上沿排起，写了 Tag 时下移到月份标识下面；列等宽。全表 14pt #1A1A1A：表头加粗、#E5E5E5 底、下边 1.5pt #1A1A1A；正文无底色，每行下边 0.75pt #BFBFBF 细线，没有竖线；单元格内边距左右 0.1"、上下 0.06"，文字垂直居中。表格不引用主题表格样式（主题样式会带出 accent 色），底色、边框都显式写。
+- `!` 强调（SKILL.md §6.3 红色纪律）：标了 `!` 的那一行文字加粗，左侧一条 0.06" 宽的品牌红竖条（和这一行同高）；表格本身只用黑白灰，不把整行染红、不加红底。成果页标最该被记住的一行，问题页标风险最高的一行。
+- 适用：同一组对象在几个维度上的对比（各仓库 / 车间 / 供应商的数量、耗时、状态）、试点范围清单、问题清单的现状和负责人。
+- 反例：只有 2–4 个数字要讲（用 stats，数字更醒目）；有先后顺序的步骤（用 process）；时间节点（用 timeline）；表格超过 8 行 6 列（拆页，或只留关键行列，完整明细放附件）；单元格里写成一段话（表格只放短词和数字，解释写进结论红条）。
+- 报错：没有表格；列数不在 2–6、表头以外行数不在 2–8；某行列数和表头不同；表头有空格；某格超过 2 行；表格总高放不进正文区；`!` 多于一行、写在表头或非第一格、写成 `!!`；表格行漏写开头 `|`（免得悄悄进红条）；写了列表行。报错信息带页标题。
+- 审核：`review_deck.py` 对 table 和其他有红条的版式一样检查「缺结论行」「目录式副标题」；几何检查不需要另加豁免（表格是一个形状 `Data Table`，红竖条在表格左边、不和它重叠）。文字溢出另按单元格估算：某行文字估计高过行高时报「文字溢出」（PowerPoint 会把行撑高，表格往下压到红条）。
+
 ## section · 隔断页
 
 模板 layout 0（和 evidence 共用；inspect 靠 `Section Number` 认出 section）。章节之间的过渡页：章节编号 + 中文名 + 英文名是页面主体。
@@ -377,7 +404,8 @@ Layout: section
 | 开场列出本次汇报的 3–8 个章节 | agenda |
 | 章节之间的过渡（编号 + 章节名） | section |
 | 2–8 个成员的角色和分工 | team |
-| 都不匹配（表格等） | 生成器没有对应版式；先用最接近的生成，再在 PowerPoint 里按 SKILL.md §6 和 `layout-patterns.md` 手工调整 |
+| 同一组对象在几个维度上的对比（≤8 行 × ≤6 列） | table |
+| 都不匹配（Agenda 八宫格等） | 生成器没有对应版式；先用最接近的生成，再在 PowerPoint 里按 SKILL.md §6 和 `layout-patterns.md` 手工调整 |
 
 ## 形状命名约定
 
@@ -396,6 +424,7 @@ Layout: section
 | timeline（不写状态） | `Timeline Line`、`Timeline Node N`、`Timeline Date N`、`Timeline Text N` |
 | agenda | `Agenda Number N`（章节编号；`Agenda Number 1` 也是 inspect 区分 agenda / section / evidence 的标记形状）、`Agenda Rule N`（竖线）、`Agenda Name N`（中文名）、`Agenda English N`（英文名） |
 | team | `Member Card N`（卡片底；`Member Card 1` 也是 inspect 区分 team / agenda / section / evidence 的标记形状）、`Member Name N`（姓名）、`Member Role N`（角色）、`Member Rule N`（角色和职责之间的细线）、`Member Duty N`（职责） |
+| table | `Data Table`（原生表格，graphicFrame；第一行是表头，单元格按 `shape.table.cell(行, 列)` 取，行列从 0 起；`Data Table` 也是 inspect 区分 table / team / agenda / section / evidence 的标记形状）、`Table Key Bar`（`!` 行左侧的红竖条，只在标了 `!` 时有） |
 | section | `Section Number`（章节编号，也是 inspect 区分 section / evidence 的标记形状）、`Section Rule`（竖线）、`Section Name`（中文名）、`Section English`（英文名） |
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
 
@@ -410,4 +439,5 @@ Layout: section
   - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"）；
   - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
   - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）。
+- 原生表格（table 的 `Data Table`）整张算一个形状，出界、重叠照常按外框查；单元格不另加豁免。文字溢出按单元格估算（同文本框口径：字宽 `text_width_in`、行高字号 × 1.2），某行估计高过行高才报。
 - 错位只比同类形状：名字去掉末尾编号后相同（如 `Process Card 1–4`、`Side Card 1–3`；占位框不比）。同一行比上沿 / 中线 / 下沿，同一列比左沿 / 中线 / 右沿，有一条对齐（差不到半像素）就算对齐；都没对齐且最近的差值小于 5 像素时报告。大小不同、中线对齐的节点（关键里程碑、进行中）不算错位。

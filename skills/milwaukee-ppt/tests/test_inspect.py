@@ -45,7 +45,7 @@ check("文字只取前 30 字",
       and "超出部分不应出现" not in r.stdout, r.stdout)
 
 # 页标题行除模板 layout 名外还给生成器版式名；共用模板 layout 的版式（stats / stats-side、
-# timeline / timeline-phase、evidence / section / agenda / team）也要分得出来。占位框给出 idx。
+# timeline / timeline-phase、evidence / section / agenda / team / table）也要分得出来。占位框给出 idx。
 LAYOUTS_MD = """
 ---
 title: Mock Deck
@@ -105,16 +105,24 @@ Layout: agenda
 Layout: team
 - 林晓 | 项目负责人 | 统筹进度
 - 周航 | 现场推进 | 贴码和培训
+
+# Mock Table
+Layout: table
+| 车间 | 工具数 |
+| 一车间 | 120 件 |
+| 二车间 | 80 件 |
 """
 res = generate(LAYOUTS_MD, images={"img/a.png": (800, 450)})
 r = run(res.path)
 heads = [l for l in r.stdout.splitlines() if l.startswith("== ")]
 want = ["-", "evidence", "stats", "stats-side", "timeline", "timeline", "timeline-phase",
-        "process", "section", "agenda", "team", "-"]
+        "process", "section", "agenda", "team", "table", "-"]
 got = [re.search(r"\| 版式: (\S+)$", h).group(1) if re.search(r"\| 版式: (\S+)$", h) else None
        for h in heads]
 check("页标题行：模板 layout 名之后给生成器版式名（封面 / 收尾为 -）", got == want, heads)
 check("页标题行：模板 layout 名仍在", "layout: Stats |" in r.stdout, heads)
+check("表格页：原生表格一行，类型 TABLE", any(l.startswith("Data Table | TABLE |")
+                                          for l in r.stdout.splitlines()), r.stdout[-800:])
 check("占位框给出 idx", any("PLACEHOLDER idx=0 |" in l for l in r.stdout.splitlines()),
       r.stdout[:800])
 check("非占位框不带 idx", all("idx=" not in l for l in r.stdout.splitlines()
