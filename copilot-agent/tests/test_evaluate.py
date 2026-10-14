@@ -88,6 +88,8 @@ RENDERED = (GOOD.split("```markdown\n")[1].split("```")[0]
             .replace("![](img/看板截图.png)", "img/看板截图.png")
             .replace("\n# ", "\n\\# ").replace("\n## ", "\n\\## ").replace("\n- ", "\n\\- ")
             .replace("---\n", "\\---\n").replace("\n", "\n\n"))
+# 渲染文字里的 > 变成 HTML 实体
+RENDERED_SIDE = """\\---\n\ntitle: 样例\n\n\\---\n\n\\# 结论 / FINDINGS\n\n\\## 两个数字撑起结论\n\nLayout: stats-side\n\n\\- 工具 | 120 件 | 全部手持工具\n\n\\- 完整率 | 100% | 改前约 70%\n\n&gt; 记录不再缺页\n\n完整率达到 100%\n"""
 
 NO_BLOCK = "抱歉，我需要更多信息才能写文稿：项目开始时间是？"
 
@@ -118,6 +120,8 @@ def test_single_answers():
     check("渲染后粘贴的回答：还原后可生成，并标为没用代码块",
           rendered.found and rendered.generated and not rendered.fenced
           and rendered.layouts == ["process", "image-text"], rendered)
+    side = evaluate.evaluate_answer(write(tmp, {"06.md": RENDERED_SIDE})[0])
+    check("渲染文字里的 &gt; 还原成 >，可生成", side.generated, side.error)
     check("代码块回答：标为用了代码块", good.fenced, good)
     check("没有文稿的回答：报告找不到文稿", not none.found and not none.generated, none)
 

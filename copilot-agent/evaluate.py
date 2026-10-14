@@ -10,6 +10,7 @@ r"""评测 Copilot 的回答：同一道题的多份回答，逐份看能否生�
 - 文稿里的图片一律换成现生成的纯色占位图，评测只看文稿结构，不看图。
 - 输出 Markdown 报告，可直接贴成 issue 评论；报告里不含本机路径。
 """
+import html
 import re
 import subprocess
 import sys
@@ -70,7 +71,8 @@ class Drift:
 
 def unrender(text):
     """渲染后复制的文字还原成 md：去掉行首转义、空行，单独一行的图片路径补回图片写法。"""
-    text = re.sub(r"(?m)^\\([-#>*!\[])", r"\1", text)
+    text = html.unescape(text)                                   # &gt; → >
+    text = re.sub(r"(?m)^(\s*)\\([-#>*!\[])", r"\1\2", text)
     text = re.sub(r"(?mi)^(\S+\.(?:png|jpe?g|gif))\s*$", r"![](\1)", text)
     return "\n".join(line for line in text.splitlines() if line.strip()) + "\n"
 
