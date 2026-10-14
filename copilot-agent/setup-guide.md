@@ -11,6 +11,7 @@
 | `instructions.md` | 助手指令，整份粘贴到 Agent Builder 的 Instructions |
 | `knowledge/milwaukee-ppt-layout-guide.txt` | 精简版知识文件：8 个版式的写法、反例和示例 |
 | `knowledge/example-deck.txt` | 虚构示例 deck：一份完整文稿，覆盖 8 个版式 |
+| `test-card.md`、`reference-answer.md` | 发给同事手工执行的测试卡和参考答案（不上传） |
 | `evaluate.py`、`runs/` | 评测 Copilot 回答的脚本和回答收集说明（不上传） |
 
 ## 在 Agent Builder 里建立
