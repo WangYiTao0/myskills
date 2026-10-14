@@ -6,7 +6,8 @@
 """
 import re
 
-from deckcheck import check, finish, generate, layouts_in, registered_layouts, review
+from deckcheck import (check, finish, generate, layouts_in, lines_with, registered_layouts,
+                       review, reviewed)
 
 IMAGES = {"img/site.png": (1600, 900), "img/before.png": (1600, 900),
           "img/after.png": (1600, 900), "img/screen.png": (1600, 900)}
@@ -143,18 +144,6 @@ def plain_full():
     return re.sub(r"^PDCA: .*\n", "", md, flags=re.M)
 
 
-def run(md, images=IMAGES):
-    """生成 pptx 并审核 → 审核输出（生成失败时抛出，带生成器的 stderr）。"""
-    r = generate(md, images=images)
-    if r.rc != 0:
-        raise RuntimeError(r.stderr)
-    return review(r.workdir / "deck.md", r.path)
-
-
-def lines_with(out, rule):
-    return [line for line in out.splitlines() if line.startswith(f"[{rule}]")]
-
-
 def test_full_samples_cover_every_layout():
     """新版式登记进注册表后，必须在两份全版式正样本里各补一页，否则这里失败。"""
     want = set(registered_layouts())
@@ -166,7 +155,7 @@ def test_full_samples_cover_every_layout():
 
 def test_full_samples_pass():
     for label, md in (("项目模式", PROJECT_FULL), ("非项目模式", plain_full())):
-        r = run(md)
+        r = reviewed(md, IMAGES)
         check(f"全版式正样本（{label}）：只打印 REVIEW OK", r.stdout.strip() == "REVIEW OK",
               r.stdout + r.stderr)
 
@@ -186,7 +175,7 @@ def test_chapter_order():
     order = list(pages)
     i, j = order.index("BACKGROUND"), order.index("TARGET")
     order[i], order[j] = order[j], order[i]
-    out = run(join(head, pages, order)).stdout
+    out = reviewed(join(head, pages, order), IMAGES).stdout
     lines = lines_with(out, "章节顺序")
     check("项目模式章节乱序：报出「章节顺序」，指明排错的页",
           any("BACKGROUND" in line and " → " in line for line in lines), out)
@@ -201,7 +190,7 @@ def edited(key, old, new):
 
 
 def test_missing_pdca():
-    out = run(edited("TARGET", "PDCA: P\n", "")).stdout
+    out = reviewed(edited("TARGET", "PDCA: P\n", ""), IMAGES).stdout
     check("项目模式缺 PDCA：报出「缺 PDCA」，指明页",
           any("TARGET" in line for line in lines_with(out, "缺 PDCA")), out)
     check("项目模式缺 PDCA：团队页、目录页、隔断页不报缺 PDCA",
@@ -210,20 +199,20 @@ def test_missing_pdca():
 
 
 def test_team_page_with_pdca():
-    out = run(edited("TEAM", "Layout: team\n", "Layout: team\nPDCA: D\n")).stdout
+    out = reviewed(edited("TEAM", "Layout: team\n", "Layout: team\nPDCA: D\n"), IMAGES).stdout
     check("项目模式团队页带 PDCA：报出「团队页带 PDCA」",
           any("TEAM" in line for line in lines_with(out, "团队页带 PDCA")), out)
 
 
 def test_pdca_mismatch():
-    out = run(edited("BACKGROUND", "PDCA: P", "PDCA: D")).stdout
+    out = reviewed(edited("BACKGROUND", "PDCA: P", "PDCA: D"), IMAGES).stdout
     check("项目背景标 D：报出「PDCA 和章节不符」，说明该节应标 P",
           any("BACKGROUND" in line and "P" in line
               for line in lines_with(out, "PDCA 和章节不符")), out)
-    out = run(edited("BEFORE-AFTER", "PDCA: D", "PDCA: D/C")).stdout
+    out = reviewed(edited("BEFORE-AFTER", "PDCA: D", "PDCA: D/C"), IMAGES).stdout
     check("第 06 节一页标 D/C：报出「PDCA 和章节不符」（一页只放一个）",
           any("BEFORE-AFTER" in line for line in lines_with(out, "PDCA 和章节不符")), out)
-    out = run(edited("FINDINGS", "PDCA: C", "PDCA: D")).stdout
+    out = reviewed(edited("FINDINGS", "PDCA: C", "PDCA: D"), IMAGES).stdout
     check("第 06 节的子页标 D 或 C 都不报",
           not lines_with(out, "PDCA 和章节不符"), out)
 
@@ -231,7 +220,7 @@ def test_pdca_mismatch():
 def test_missing_chapter():
     head, pages = split(PROJECT_FULL)
     del pages["SCOPE"]
-    out = run(join(head, pages)).stdout
+    out = reviewed(join(head, pages), IMAGES).stdout
     check("项目模式少一节：报出「缺章节」并点名 SCOPE",
           any("SCOPE" in line for line in lines_with(out, "缺章节")), out)
 
@@ -243,7 +232,7 @@ TARGET_AS_PROCESS = ("Layout: stats\nPDCA: P\n- 高峰排队 | 3 台以内 | 改
 
 
 def test_misfit_only_in_project_mode():
-    out = run(edited("TARGET", *TARGET_AS_PROCESS)).stdout
+    out = reviewed(edited("TARGET", *TARGET_AS_PROCESS), IMAGES).stdout
     check("项目模式目标页用 process：报出「章节和版式不配」",
           any("TARGET" in line for line in lines_with(out, "章节和版式不配")), out)
 
@@ -256,7 +245,7 @@ def test_plain_mode_skips_project_rules():
     order = list(pages)
     i, j = order.index("BACKGROUND"), order.index("TARGET")
     order[i], order[j] = order[j], order[i]
-    out = run(join(head, pages, order)).stdout
+    out = reviewed(join(head, pages, order), IMAGES).stdout
     for rule in ("章节顺序", "缺章节", "缺 PDCA", "团队页带 PDCA", "PDCA 和章节不符",
                  "章节和版式不配"):
         check(f"非项目模式（乱序、缺节、目标页用 process）：不报「{rule}」",
@@ -267,7 +256,7 @@ def test_evidence_without_image():
     for label, md in (("项目模式", PROJECT_FULL), ("非项目模式", plain_full())):
         head, pages = split(md)
         pages["BACKGROUND"] = pages["BACKGROUND"].replace("![](img/site.png)\n", "")
-        out = run(join(head, pages)).stdout
+        out = reviewed(join(head, pages), IMAGES).stdout
         check(f"{label}证据页没放图：报出「缺配图」，指明页",
               any("BACKGROUND" in line and " → " in line for line in lines_with(out, "缺配图")),
               out)
@@ -290,7 +279,8 @@ def test_image_file_missing():
 
 
 def test_section_not_in_agenda():
-    out = run(edited("OUTCOMES", "06 | 项目行动与成果 | OUTCOMES", "06 | 行动与结果 | OUTCOMES")).stdout
+    out = reviewed(edited("OUTCOMES", "06 | 项目行动与成果 | OUTCOMES", "06 | 行动与结果 | OUTCOMES"),
+                   IMAGES).stdout
     check("隔断页章节名不在目录里：报出「目录和隔断页不一致」，指明隔断页",
           any("OUTCOMES" in line and "行动与结果" in line
               for line in lines_with(out, "目录和隔断页不一致")), out)
@@ -299,11 +289,12 @@ def test_section_not_in_agenda():
 def test_agenda_order_in_project_mode():
     swapped = PROJECT_FULL.replace("01 | 项目背景 | BACKGROUND\n02 | 项目目标 | TARGET",
                                    "01 | 项目目标 | TARGET\n02 | 项目背景 | BACKGROUND")
-    out = run(swapped).stdout
+    out = reviewed(swapped, IMAGES).stdout
     check("项目模式目录页顺序不对：报出「章节顺序」，指明目录页",
           any("AGENDA" in line for line in lines_with(out, "章节顺序")), out)
-    out = run(plain_full().replace("01 | 项目背景 | BACKGROUND\n02 | 项目目标 | TARGET",
-                                   "01 | 项目目标 | TARGET\n02 | 项目背景 | BACKGROUND")).stdout
+    out = reviewed(plain_full().replace("01 | 项目背景 | BACKGROUND\n02 | 项目目标 | TARGET",
+                                        "01 | 项目目标 | TARGET\n02 | 项目背景 | BACKGROUND"),
+                   IMAGES).stdout
     check("非项目模式目录页顺序随意：不报「章节顺序」", not lines_with(out, "章节顺序"), out)
 
 
@@ -311,14 +302,15 @@ def test_consecutive_sections():
     extra = ("# 项目节点 / MILESTONE\n## 6 月立项，8 月完成试运行\nLayout: section\n"
              "05 | 项目节点 | MILESTONE\n\n")
     md = plain_full().replace("# 项目行动与成果 / OUTCOMES", extra + "# 项目行动与成果 / OUTCOMES")
-    out = run(md).stdout
+    out = reviewed(md, IMAGES).stdout
     check("连着两张隔断页：不报「相邻两页版式相同」", not lines_with(out, "相邻两页版式相同"), out)
 
 
 def test_short_conclusion_subtitle():
-    out = run(edited("FINDINGS", "试运行 3 周，两项指标都达到目标", "两项指标均达标")).stdout
+    out = reviewed(edited("FINDINGS", "试运行 3 周，两项指标都达到目标", "两项指标均达标"),
+                   IMAGES).stdout
     check("副标题是短结论（7 字）：不报「目录式副标题」", not lines_with(out, "目录式副标题"), out)
-    out = run(edited("TARGET", "高峰排队降到 3 台以内", "项目目标介绍")).stdout
+    out = reviewed(edited("TARGET", "高峰排队降到 3 台以内", "项目目标介绍"), IMAGES).stdout
     check("副标题是主标题加两三个字（项目目标介绍）：仍报「目录式副标题」",
           any("TARGET" in line for line in lines_with(out, "目录式副标题")), out)
 

@@ -12,8 +12,8 @@ from pathlib import Path
 
 from pptx.util import Inches
 
-from deckcheck import (GENERATOR, SKILL, check, finish, generate, open_pptx, placeholder,
-                       review)
+from deckcheck import (GENERATOR, SKILL, broken, check, finish, generate, generated, lines_with,
+                       placeholder, review)
 
 DEMO = SKILL / "examples" / "demo" / "deck.md"
 
@@ -62,14 +62,6 @@ Layout: timeline
 """
 
 
-def generated(md):
-    """生成器按文稿出 pptx → (文稿路径, pptx 路径)。"""
-    r = generate(md)
-    if r.rc != 0:
-        raise RuntimeError(r.stderr)
-    return r.workdir / "deck.md", r.path
-
-
 def test_good_deck_passes():
     r = review(*generated(GOOD))
     check("合格文稿：退出码 0", r.returncode == 0, r.stderr)
@@ -113,10 +105,6 @@ Layout: timeline
 - !May | 全员切换 | 全部切换 | 完成
 试点复盘 6 月完成
 """
-
-
-def lines_with(out, rule):
-    return [line for line in out.splitlines() if line.startswith(f"[{rule}]")]
 
 
 def test_bad_deck_flags():
@@ -173,15 +161,6 @@ def test_number_prefixes_same_as_generator():
     check("～ ＞ ＜ ± 等前缀的数字：不报「数字卡不是数字」", not lines_with(out, "数字卡不是数字"), out)
 
 
-def broken_copy(pptx, name, change):
-    """把生成器的输出另存一份，用 change(prs) 改坏。"""
-    prs = open_pptx(pptx)
-    change(prs)
-    out = pptx.parent / name
-    prs.save(str(out))
-    return out
-
-
 def hand_drawn_title(prs):
     """模仿“模型自己画页面”：第 3 页（流程页）清空标题占位框，在 banner 上另画文本框写标题。"""
     slide = prs.slides[2]
@@ -206,17 +185,17 @@ def test_pptx_authenticity():
     check("生成器做的 pptx：不报不是生成脚本做的", not lines_with(good.stdout, "不是生成脚本做的"),
           good.stdout)
 
-    r = review(md, broken_copy(pptx, "hand.pptx", hand_drawn_title))
+    r = review(md, broken(pptx, hand_drawn_title))
     lines = lines_with(r.stdout, "不是生成脚本做的")
     check("标题画在普通文本框里：报出不是生成脚本做的，指明第 3 页",
           any("第 3 页" in line for line in lines), r.stdout)
     check("标题画在普通文本框里：退出码仍为 0", r.returncode == 0, r.stderr)
 
-    r = review(md, broken_copy(pptx, "banner.pptx", textbox_on_banner))
+    r = review(md, broken(pptx, textbox_on_banner))
     check("banner 上另画文本框：报出不是生成脚本做的，指明第 2 页",
           any("第 2 页" in line for line in lines_with(r.stdout, "不是生成脚本做的")), r.stdout)
 
-    r = review(md, broken_copy(pptx, "short.pptx", drop_last_slide))
+    r = review(md, broken(pptx, drop_last_slide))
     check("pptx 少一页：报出页数不符", any("文稿应生成 5 页" in line
                                        for line in lines_with(r.stdout, "页数不符")), r.stdout)
 

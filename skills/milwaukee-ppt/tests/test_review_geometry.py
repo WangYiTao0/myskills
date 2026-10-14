@@ -11,7 +11,7 @@ from pathlib import Path
 
 from pptx.util import Emu, Inches
 
-from deckcheck import (GENERATOR, SKILL, check, finish, generate, layouts_in, open_pptx,
+from deckcheck import (GENERATOR, SKILL, broken, check, finish, generate, layouts_in,
                        registered_layouts, review)
 
 DEMO = SKILL / "examples" / "demo" / "deck.md"
@@ -246,15 +246,6 @@ def shape(prs, page, name):
     found = [sh for sh in prs.slides[page - 1].shapes if sh.name == name]
     assert len(found) == 1, (page, name, [sh.name for sh in prs.slides[page - 1].shapes])
     return found[0]
-
-
-def broken(pptx, change):
-    """生成器输出另存一份，用 change(prs) 改坏 → 新路径。"""
-    prs = open_pptx(pptx)
-    change(prs)
-    out = Path(tempfile.mkdtemp(prefix="mppt-geom-bad-")) / "bad.pptx"
-    prs.save(str(out))
-    return out
 
 
 def reported(md, pptx, rule, page, name):

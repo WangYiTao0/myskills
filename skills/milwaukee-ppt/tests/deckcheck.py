@@ -19,6 +19,9 @@
 - slide_xmls(path)              各页 slide XML 字节，和改动前的输出逐字节比较
 - deck_error(r, title, *needles) 报错退出且信息含页标题（和 needles）
 - review(md, pptx=None)         调审核脚本 review_deck.py → (退出码, stdout, stderr)
+- generated(md, images=None)    生成 → (文稿路径, pptx 路径)，失败抛出；reviewed(md, images=None) 生成后再审
+- lines_with(out, rule)         审核输出里「[rule]」开头的行
+- broken(pptx, change)          生成结果另存一份、用 change(prs) 改坏 → 新路径（审核负样本）
 - registered_layouts()          生成器注册表里的全部版式名（从未知版式的报错信息里读）
 - layouts_in(md)                文稿各页用到的版式名（不写 Layout: 的页算 evidence），查正样本覆盖
 - 常量：STATUS_COLORS / DONE_GREEN / DOING_AMBER / DOING_INK、UNIT_PT / UNIT_COLOR
@@ -381,6 +384,33 @@ def review(md, pptx=None):
     """跑审核脚本：md、pptx 为路径（pptx 可省略，只审文稿）→ CompletedProcess（rc / stdout / stderr）。"""
     cmd = [sys.executable, str(REVIEWER), str(md)] + ([str(pptx)] if pptx is not None else [])
     return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def generated(md, images=None):
+    """生成器按文稿出 pptx → (文稿路径, pptx 路径)；生成失败时抛出，带生成器的 stderr。"""
+    r = generate(md, images=images)
+    if r.rc != 0:
+        raise RuntimeError(r.stderr)
+    return r.workdir / "deck.md", r.path
+
+
+def reviewed(md, images=None):
+    """生成 pptx 再审核 → 审核的 CompletedProcess（生成失败时抛出）。"""
+    return review(*generated(md, images))
+
+
+def lines_with(out, rule):
+    """审核输出里以「[rule]」开头的行。"""
+    return [line for line in out.splitlines() if line.startswith(f"[{rule}]")]
+
+
+def broken(pptx, change):
+    """把生成器的输出另存一份（临时目录），用 change(prs) 改坏 → 新路径；原文件不动。"""
+    prs = open_pptx(pptx)
+    change(prs)
+    out = Path(tempfile.mkdtemp(prefix="mppt-bad-")) / "bad.pptx"
+    prs.save(str(out))
+    return out
 
 
 def registered_layouts():
