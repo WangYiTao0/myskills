@@ -21,6 +21,7 @@ sys.path.insert(0, HERE)
 import mdparse  # noqa: E402
 from layouts.common import (conclusion_text, is_number, next_text,  # noqa: E402
                             text_width_in)  # 和生成器同一套结论 / Next 文字、数字判定、字宽估算
+from layouts.process import desc_wrap_problem  # noqa: E402  和生成器的折行警告同一判断
 from mdparse import DeckError  # noqa: E402
 
 # 项目汇报模式下，章节 → 不适合放的版式（目标、范围要写目标和边界，不放流程和改前改后；应用场景不放改前改后）
@@ -116,6 +117,17 @@ def check_lead(page):
     return issues
 
 
+def check_process_wrap(page):
+    """方向 C 的流程页：说明折行难看（超过两行或末行只剩 ≤2 字），和生成器的警告同一判断。"""
+    if page.layout != "process":
+        return []
+    steps = page.fields["steps"]
+    return [("流程说明折行", where(page), f"步骤「{name}」的说明「{desc}」{problem}",
+             "改短或改写说明，让它一行写完或两行大致等长")
+            for name, desc in steps
+            for problem in [desc and desc_wrap_problem(desc, len(steps))] if problem]
+
+
 def review_md(doc):
     """内容检查：只看文稿（版式字段由版式模块解析好）。返回 [(规则, 位置, 问题, 怎么改)]。"""
     issues = []
@@ -141,7 +153,7 @@ def review_md(doc):
                            "没有普通文字结论行，" + ("标题下没有 lead" if lead else "页底没有红条"),
                            "在版式字段后加一行本页结论，最好带数字"))
         if lead:
-            issues += check_lead(page)
+            issues += check_lead(page) + check_process_wrap(page)
         if page.layout == "process":
             names = {name for name, _ in page.fields["steps"]}
             for other_title, other in seen_steps:

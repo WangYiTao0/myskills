@@ -99,7 +99,55 @@ def test_common_shape_names():
               (doc, got))
 
 
+PROCESS_PAGE = """---
+title: Mock Deck
+---
+
+# 新流程 / PROCESS
+## 排班改为系统分配
+Layout: process
+1. 登记 | 交班时登记电量
+2. 排队 | 系统按电量排序
+3. 充电 | 到点去充电位
+三步完成排班，司机不再凭经验排队
+"""
+
+
+def _full_style_row(label):
+    """样式表里 label 一行开头的「NNpt [bold ]#RRGGBB」→ (字号, 粗体, 颜色)；没有返回 None。"""
+    m = re.search(rf"(?m)^\| {re.escape(label)} \| (\d+)pt (bold )?#(\w{{6}})",
+                  DOC.read_text(encoding="utf-8"))
+    return (float(m.group(1)), bool(m.group(2)), m.group(3).upper()) if m else None
+
+
+def _table_row(label):
+    m = re.search(rf"(?m)^\| {re.escape(label)} \| (.*) \|$", DOC.read_text(encoding="utf-8"))
+    return m.group(1) if m else ""
+
+
+def test_process_general_mode():
+    """process 方向 C：形状命名表的名字生成器都会画；步骤名 / 说明 / 编号的字号、颜色和代码一致。"""
+    names = re.findall(r"`([^`]+)`", _table_row("process（通用 / 项目模式）"))
+    check("layouts.md：形状命名表有 process（通用 / 项目模式）一行，列出编号圆、连接线、标题和说明",
+          {"Process Mark N", "Process Line N", "Process Title N", "Process Desc N"} <= set(names),
+          names)
+    r = generate(PROCESS_PAGE)
+    s = r.slides[1] if r.rc == 0 else None
+    drawn = {sh.name for sh in s.shapes} if s is not None else set()
+    want = {n.replace(" N", " 1") for n in names}
+    check("layouts.md：process（通用 / 项目模式）的形状名生成器都会画", want and want <= drawn,
+          sorted(want - drawn))
+    for label, shape in (("流程编号（通用 / 项目模式）", "Process Mark 1"),
+                         ("流程步骤名（通用 / 项目模式）", "Process Title 1"),
+                         ("流程说明（通用 / 项目模式）", "Process Desc 1")):
+        doc = _full_style_row(label)
+        got = run_style(one(s, shape)) if s is not None and one(s, shape) else None
+        check(f"layouts.md：{label} 的字号、粗体、颜色和生成器一致",
+              doc is not None and doc == got, (doc, got))
+
+
 if __name__ == "__main__":
     test_doc_examples_generate()
     test_common_shape_names()
+    test_process_general_mode()
     finish()

@@ -7,7 +7,7 @@ lead 和副标题相同、对比页两个 lead。
 """
 from deckcheck import broken, check, finish, generated, lines_with, review
 
-RULES = ("结论没画出来", "Next 没画出来", "lead 和副标题相同", "对比页两个 lead")
+RULES = ("结论没画出来", "Next 没画出来", "lead 和副标题相同", "对比页两个 lead", "流程说明折行")
 
 PAGES = """
 # 现场证据 / EVIDENCE
@@ -114,9 +114,28 @@ def test_before_after_two_leads():
           not lines_with(r.stdout, "对比页两个 lead"), r.stdout)
 
 
+# 3 步流程页：说明框每行约 14 个汉字（和生成器同一估算）
+WIDOW = "每班交接时登记叉车剩余电量和位置"      # 末行只剩 2 字
+TOO_LONG = "交班时由司机在终端登记剩余电量，系统按电量和到达时间排序，再推送充电时段"
+
+
+def test_process_desc_wrap():
+    for label, desc in (("末行只剩两字", WIDOW), ("超过两行", TOO_LONG)):
+        md = GENERAL.replace("交班时登记剩余电量", desc)
+        r = review(*generated(md, IMAGES))
+        hits = lines_with(r.stdout, "流程说明折行")
+        check(f"通用模式说明{label}：报「流程说明折行」（含页和步骤名）",
+              len(hits) == 1 and "新流程 / PROCESS" in hits[0] and "登记" in hits[0]
+              and " → " in hits[0] and "REVIEW: " in r.stdout, r.stdout)
+        r = review(*generated(MONTHLY.replace("交班时登记剩余电量", desc), IMAGES))
+        check(f"月报模式说明{label}：不报「流程说明折行」",
+              not lines_with(r.stdout, "流程说明折行"), r.stdout)
+
+
 if __name__ == "__main__":
     test_generator_output_passes()
     test_conclusion_not_drawn()
     test_lead_same_as_subtitle()
     test_before_after_two_leads()
+    test_process_desc_wrap()
     finish()

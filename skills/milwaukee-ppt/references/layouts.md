@@ -58,7 +58,8 @@ Next: 10 月底前完成全部工具贴码
 **警告**：打印 `警告: …` 到 stderr，照常生成。看到警告就去 PNG 里看对应那页，按提示精简文字。
 
 - 结论（lead）估计超过两行（通用 / 项目模式；正文区会被压低）
-- 文字估计溢出：红条、流程卡片、数据页的解读 / 卡片文字 / 结论要点 / 口径、时间线列、阶段条、Before/After 的短文、caption（超过一行）、lead（超过一行）
+- 流程说明折行难看（通用 / 项目模式）：说明超过两行，或末行只剩 2 个字以内；审核同样报「流程说明折行」
+- 文字估计溢出：红条、流程卡片 / 流程步骤名和说明、数据页的解读 / 卡片文字 / 结论要点 / 口径、时间线列、阶段条、Before/After 的短文、caption（超过一行）、lead（超过一行）
 - 数据页大数字放不下，整页统一缩小
 - 图多于版式能用的张数（多出的不用）、image-text 要点超过 5 条
 
@@ -80,7 +81,10 @@ Next: 10 月底前完成全部工具贴码
 | 正文 / 要点 | 16pt #1A1A1A（stats 的解读 14pt） |
 | 说明 | 14pt #6B6B6B |
 | 日期 / 口径 / 图例 | 12pt #6B6B6B，日期加粗（全套最小字号） |
-| 流程序号圆 | 直径 0.5"，#333333 底，白字 16pt bold |
+| 流程序号圆（月报模式） | 直径 0.5"，#333333 底，白字 16pt bold |
+| 流程编号（通用 / 项目模式） | 40pt bold #FFFFFF，编号圆直径 1.1"、#1A1A1A 底 |
+| 流程步骤名（通用 / 项目模式） | 24pt bold #1A1A1A |
+| 流程说明（通用 / 项目模式） | 18pt #333333 |
 | 底部红条（月报模式） | 14pt 白字 |
 | lead（通用 / 项目模式） | 22pt bold #1A1A1A |
 | Next 行（通用 / 项目模式） | 16pt bold #1A1A1A |
@@ -89,7 +93,7 @@ Next: 10 月底前完成全部工具贴码
 
 **底部红条**（月报模式各版式共用）：月报模板固定样式——品牌红底、0.75pt 黑描边、白字 ❖ 项目符号、行距 150%。底边固定在 7.08"，最低 1.2" 高；文字多时向上加高，最高顶到 5.60"（内容区下沿），再多就警告。结论一行、Next 一行最合适。
 
-**红色**：banner 以外只有这几处用品牌红——lead 竖线（月报为底部红条）、数据页标了 `!` 的那条（数字 + stats 的顶线 / stats-side 的竖条）、Before/After 的 AFTER 标题。流程序号圆一律黑白灰。时间线类版式写了状态时用状态色（SKILL.md §6.3「时间线状态色」例外）：已完成 #2E7D32、进行中 #F2A900（上面的字 #1A1A1A）、未完成用品牌红但只描边或空心；不写状态的时间线仍是黑白灰。
+**红色**：banner 以外只有这几处用品牌红——lead 竖线（月报为底部红条）、数据页标了 `!` 的那条（数字 + stats 的顶线 / stats-side 的竖条）、Before/After 的 AFTER 标题。流程序号圆（月报）和编号圆（通用 / 项目模式）一律黑白灰。时间线类版式写了状态时用状态色（SKILL.md §6.3「时间线状态色」例外）：已完成 #2E7D32、进行中 #F2A900（上面的字 #1A1A1A）、未完成用品牌红但只描边或空心；不写状态的时间线仍是黑白灰。
 
 ## evidence（默认）· 证据页
 
@@ -151,11 +155,12 @@ Layout: process
 ```
 
 - 字段：3–5 条有序列表「步骤名 | 一句说明」，说明可省；序号写 `1.` `1)` `1、` 都行。
-- 画法：等宽卡片（#F5F5F5 底、#E5E5E5 细描边），间距 0.3"；序号圆压在卡片上沿、靠左；不画箭头。卡片等高、最低 2.0"，整组在槽位里垂直居中。
+- 画法（通用 / 项目模式，方向 C）：不画卡片。正文区按步数等分成列，每列一个黑底白字编号圆（`Process Mark N`，直径 1.1"，#1A1A1A 底、40pt bold 白字），相邻两圆之间一条灰色连接线（`Process Line N`，#BFBFBF 2.25pt，两端离圆 0.12"）；圆下 0.35" 居中放步骤名（`Process Title N`，24pt bold #1A1A1A，框比列宽左右各窄 0.15"），再下 0.12" 居中放说明（`Process Desc N`，18pt #333333，框比列宽左右各窄 0.2"）。行高按字号 × 1.25 估，各列标题框、说明框等高（取最多的那列）。编号圆 + 标题 + 说明整组在正文区里垂直居中。不用红。
+- 画法（月报模式，不变）：等宽卡片（#F5F5F5 底、#E5E5E5 细描边），间距 0.3"；序号圆压在卡片上沿、靠左；不画箭头。卡片等高、最低 2.0"，整组在槽位里垂直居中。
 - 适用：有先后顺序的 3–5 个步骤。
-- 反例：步骤之间没有顺序（并列要点用 image-text 或拆页）；6 步以上（合并步骤或拆两页）；说明写成一段话。卡片宽度下说明每行约 12 个汉字（4 步时），写到两行以内。
+- 反例：步骤之间没有顺序（并列要点用 image-text 或拆页）；6 步以上（合并步骤或拆两页）；说明写成一段话。通用 / 项目模式下说明每行约 14 个汉字（3 步）/ 10 个（4 步）/ 8 个（5 步），写到两行以内，第二行别只剩一两个字。
 - 报错：步骤少于 3 或多于 5。
-- 警告：某步的说明估计溢出卡片。
+- 警告：说明折行难看（通用 / 项目模式：按 `text_width_in` 字宽估算断行，超过两行或末行只剩 ≤2 个字；审核报「流程说明折行」）；步骤名和说明估计溢出正文区（通用 / 项目模式）；某步的说明估计溢出卡片（月报模式）。
 
 ## stats · 数据对比 / Key Results
 
@@ -438,6 +443,8 @@ Layout: section
 | 范围 | 形状名 |
 | --- | --- |
 | 各版式共用 | `Caption Bar`（底部红条，月报模式）、`Lead`（结论 lead，通用 / 项目模式）、`Lead Accent`（lead 左侧红竖线）、`Next Rule`（页底 Next 行上方细线）、`Next Line`（页底 Next 行）、`Month Tag`（`Tag:` 月份标识）、`PDCA Icon N`（`PDCA:` 图标，图片形状，N 按文稿里字母的顺序从左到右） |
+| process（通用 / 项目模式） | `Process Mark N`（黑底白字编号圆）、`Process Line N`（第 N 步和第 N+1 步之间的灰色连接线）、`Process Title N`（步骤名）、`Process Desc N`（说明，没写说明的步骤没有） |
+| process（月报模式） | `Process Card N`（卡片，步骤名一段 + 说明一段）、`Process Number N`（序号圆） |
 | stats | `Stat Rule N`（顶部粗线）、`Stat Label N`、`Stat Number N`（前缀、数字、单位是同一段里的几个 run）、`Stat Note N`、`Stat Divider N`、`Stat Points N`（这张卡的全部解读，一条一段）、`Stat Source`（口径）；旧写法没有 Divider / Points |
 | stats-side | `Side Card N`（卡片底）、`Side Accent N`（只有重点卡）、`Side Number N`、`Side Text N`（标签一段 + 说明一段）、`Side Conclusion Title`、`Side Conclusion Rule`、`Side Points`（全部结论要点，一条一段）、`Stat Source` |
 | timeline（写了状态） | `Milestone Node N`、`Milestone Check N`（只在已完成节点上）、`Milestone Date N`、`Milestone Text N`（标题一段 + 说明一段）、`Progress Line`（绿色已完成段）、`Remaining Line`（灰色虚线）、`Current Ring`、`Current Tag`；图例 `Legend Icon 1–4`、`Legend Label 1–4`（1 已完成、2 进行中、3 未完成、4 关键里程碑）、`Legend Check 1`（已完成图标上的对勾） |
@@ -448,7 +455,7 @@ Layout: section
 | section | `Section Number`（章节编号，也是 inspect 区分 section / evidence 的标记形状）、`Section Rule`（竖线）、`Section Name`（中文名）、`Section English`（英文名） |
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
 
-其他版式的形状名（如 `Process Card N`、before-after 月报模式的 `Lead`）以 `inspect_ppt.py` 的输出为准。
+其他版式的形状名（如 before-after 月报模式的 `Lead`）以 `inspect_ppt.py` 的输出为准。
 
 ### 审核的几何豁免
 
@@ -457,8 +464,8 @@ Layout: section
 - 重叠不报：
   - 模板占位框（主标题、action title、各版式槽位，包括被图片盖住的 Before/After 13 / 14）；
   - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"；有 PDCA 图标时框让到图标左侧，不和图标相压）；
-  - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
+  - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Process Mark 2` 和 `Process Title 2` / `Process Desc 2` / `Process Line 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
   - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）；
   - `Lead` 和 `Lead Accent`、`Next Rule` 和 `Next Line`（两两豁免；它们和正文形状相压照样报）。
 - 原生表格（table 的 `Data Table`）整张算一个形状，出界、重叠照常按外框查；单元格不另加豁免。文字溢出按单元格估算（同文本框口径：字宽 `text_width_in`、行高字号 × 1.2），某行估计高过行高才报。
-- 错位只比同类形状：名字去掉末尾编号后相同（如 `Process Card 1–4`、`Side Card 1–3`；占位框不比）。同一行比上沿 / 中线 / 下沿，同一列比左沿 / 中线 / 右沿，有一条对齐（差不到半像素）就算对齐；都没对齐且最近的差值小于 5 像素时报告。大小不同、中线对齐的节点（关键里程碑、进行中）不算错位。
+- 错位只比同类形状：名字去掉末尾编号后相同（如 `Process Card 1–4`、`Process Mark 1–4`、`Side Card 1–3`；占位框不比）。同一行比上沿 / 中线 / 下沿，同一列比左沿 / 中线 / 右沿，有一条对齐（差不到半像素）就算对齐；都没对齐且最近的差值小于 5 像素时报告。大小不同、中线对齐的节点（关键里程碑、进行中）不算错位。

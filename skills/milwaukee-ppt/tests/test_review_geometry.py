@@ -300,7 +300,7 @@ def test_out_of_page():
     md, pptx = demo()
 
     def move_right(prs):
-        sh = shape(prs, 5, "Process Card 4")
+        sh = shape(prs, 5, "Process Mark 4")
         sh.left = prs.slide_width - sh.width // 2
 
     def move_up(prs):
@@ -310,7 +310,7 @@ def test_out_of_page():
         sh = shape(prs, 12, "Milestone Text 3")
         sh.top = Inches(7.4) - sh.height
 
-    expect("形状挪出页面右边", md, pptx, move_right, "出界", 5, "Process Card 4")
+    expect("形状挪出页面右边", md, pptx, move_right, "出界", 5, "Process Mark 4")
     expect("形状挪进 banner", md, pptx, move_up, "压 banner", 8, "Stat Label 2")
     expect("形状挪进页脚", md, pptx, move_down, "压页脚", 12, "Milestone Text 3")
 
@@ -319,34 +319,47 @@ def test_overlap():
     md, pptx = demo()
 
     def push_left(prs):
-        card = shape(prs, 5, "Process Card 2")
-        card.left -= Inches(0.8)
+        mark = shape(prs, 5, "Process Mark 2")
+        mark.left -= Inches(2.5)
 
-    lines, out = reported(md, broken(pptx, push_left), "重叠", 5, "Process Card 2")
+    lines, out = reported(md, broken(pptx, push_left), "重叠", 5, "Process Mark 2")
     check("两个形状互压：报出「重叠」，带第 5 页和形状名",
-          any("Process Card 1" in line for line in lines), out)
+          any("Process Mark 1" in line for line in lines), out)
+
+    def title_into(n):
+        def change(prs):
+            shape(prs, 5, "Process Title 2").top = shape(prs, 5, f"Process Mark {n}").top
+            shape(prs, 5, "Process Title 2").left = shape(prs, 5, f"Process Mark {n}").left
+        return change
+
+    r = review(md, broken(pptx, title_into(2)))
+    check("流程步骤名压到同编号的编号圆（同一组件）：不报重叠",
+          not [ln for ln in r.stdout.splitlines() if ln.startswith("[重叠]") and "第 5 页" in ln],
+          r.stdout)
+    expect("流程步骤名压到下一步的编号圆", md, pptx, title_into(3), "重叠", 5, "Process Title 2")
 
 
 def test_pdca_icon_not_exempt():
-    """PDCA 图标不在重叠豁免里：挪进内容区压到流程卡片要报出来。"""
+    """PDCA 图标不在重叠豁免里：挪进内容区压到流程编号圆要报出来。"""
     md, pptx = project_variants()
 
     def push_down(prs):
-        shape(prs, 4, "PDCA Icon 1").top = shape(prs, 4, "Process Card 5").top + Inches(0.2)
+        icon, mark = shape(prs, 4, "PDCA Icon 1"), shape(prs, 4, "Process Mark 5")
+        icon.top, icon.left = mark.top + Inches(0.2), mark.left + Inches(0.2)
 
-    expect("PDCA 图标挪进流程卡片", md, pptx, push_down, "重叠", 4, "PDCA Icon 1")
+    expect("PDCA 图标挪进流程编号圆", md, pptx, push_down, "重叠", 4, "PDCA Icon 1")
 
 
 def test_misaligned():
     md, pptx = demo()
 
     def nudge_down(prs):
-        shape(prs, 5, "Process Card 3").top += 3 * PX
+        shape(prs, 5, "Process Mark 3").top += 3 * PX
 
     def nudge_left(prs):
         shape(prs, 9, "Side Card 2").left -= 2 * PX
 
-    expect("同一行的卡片下移 3 像素", md, pptx, nudge_down, "错位", 5, "Process Card 3")
+    expect("同一行的编号圆下移 3 像素", md, pptx, nudge_down, "错位", 5, "Process Mark 3")
     expect("同一列的卡片左移 2 像素", md, pptx, nudge_left, "错位", 9, "Side Card 2")
 
 
@@ -361,8 +374,8 @@ def test_text_overflow():
     md, pptx = demo()
     expect("数据解读塞满", md, pptx, lambda prs: stuff(shape(prs, 8, "Stat Points 2")),
            "文字溢出", 8, "Stat Points 2")
-    expect("流程卡片说明塞满", md, pptx, lambda prs: stuff(shape(prs, 5, "Process Card 1")),
-           "文字溢出", 5, "Process Card 1")
+    expect("流程说明塞满", md, pptx, lambda prs: stuff(shape(prs, 5, "Process Desc 1")),
+           "文字溢出", 5, "Process Desc 1")
     expect("lead 塞满", md, pptx, lambda prs: stuff(shape(prs, 4, "Lead")),
            "文字溢出", 4, "Lead")
     expect("Next 行塞满", md, pptx, lambda prs: stuff(shape(prs, 4, "Next Line")),
@@ -388,9 +401,9 @@ def test_lead_pairs_exempt_but_not_body():
                                          if ln.startswith("[重叠]") and "第 4 页" in ln], r.stdout)
 
     def card_into_lead(prs):
-        shape(prs, 4, "Process Card 1").top = shape(prs, 4, "Lead").top
+        shape(prs, 4, "Process Mark 1").top = shape(prs, 4, "Lead").top
 
-    expect("流程卡片挪到 lead 上", md, pptx, card_into_lead, "重叠", 4, "Lead")
+    expect("流程编号圆挪到 lead 上", md, pptx, card_into_lead, "重叠", 4, "Lead")
 
 
 if __name__ == "__main__":
