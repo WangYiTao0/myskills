@@ -6,7 +6,7 @@ from deckcheck import (CONTENT_SLOT_IN, EMU, LAYOUT_INDEX, body_slide, caption_b
                        caption_style_problems, check, deck_error, fill_color, finish, generate,
                        inside, inside_shape, line_color, one, out_of_bounds, paragraphs,
                        placeholder, red_elements, run_styles, runs, shapes_named, tag_shape,
-                       warnings)
+                       warnings, review)
 
 NAME = "stats-side"
 TITLE = "Mock Stats Side Page"
@@ -264,6 +264,100 @@ def test_overflow_warnings():
           and any(TITLE in x and "缩小" in x for x in warnings(r.stderr)), r.stderr)
 
 
+# ---- 方向 C（通用 / 项目汇报模式）：数字 72pt、标签 / 说明放大、右侧要点 18pt ----
+
+NEAR_BLACK = "333333"
+
+
+def general_md(items, points, title=TITLE, next_line=True, conclusion="Mock conclusion."):
+    body = "\n".join(list(items) + [f"> {p}" for p in points])
+    nxt = "Next: Mock next step.\n" if next_line else ""
+    return f"""
+---
+title: Mock Deck
+date: 14 Oct 2026
+---
+
+# {title}
+## Mock Action Title
+Layout: stats-side
+{body}
+### Mock findings
+口径：Mock source note.
+{conclusion}
+{nxt}"""
+
+
+def body_bounds(s):
+    lead, rule = one(s, "Lead"), one(s, "Next Rule")
+    top = lead.top + lead.height + int(0.19 * EMU)
+    low = rule.top - int(0.10 * EMU) if rule is not None else int(6.95 * EMU)
+    return top, low
+
+
+def test_general_mode_sizes():
+    """C 模式：大数字 72pt，标签 20pt bold，说明 16pt #333333；结论区小标题 20pt bold，
+    要点 18pt；卡片撑满正文区高度、口径贴正文区底。"""
+    r, s = page(general_md(["- Lead time | 5 d | Mock average", "- !Rework | -40% | Mock drop"],
+                           ["Mock finding one.", "Mock finding two."]))
+    if s is None:
+        return
+    check("C stats-side：没有警告", not warnings(r.stderr), r.stderr)
+    nums = shapes_named(s, "Side Number")
+    check("C stats-side：大数字 72pt bold（重点品牌红），单位 28pt 灰",
+          [runs(x) for x in nums] == [[("5", 72.0, True, "1A1A1A"), (" d", 28.0, False, "6B6B6B")],
+                                      [("-40", 72.0, True, "DB011C"), ("%", 28.0, False, "6B6B6B")]],
+          [runs(x) for x in nums])
+    texts = shapes_named(s, "Side Text")
+    check("C stats-side：标签 20pt bold #1A1A1A、说明 16pt #333333",
+          all([run_styles_para(t, 0), run_styles_para(t, 1)]
+              == [{(20.0, True, "1A1A1A")}, {(16.0, False, NEAR_BLACK)}] for t in texts),
+          [[run_styles_para(t, 0), run_styles_para(t, 1)] for t in texts])
+    head = one(s, "Side Conclusion Title")
+    check("C stats-side：结论区小标题 20pt bold",
+          head is not None and run_styles(head) == {(20.0, True, "1A1A1A")},
+          head is not None and run_styles(head))
+    pts = one(s, "Side Points")
+    check("C stats-side：要点 18pt #1A1A1A",
+          pts is not None and run_styles(pts) == {(18.0, False, "1A1A1A")},
+          pts is not None and run_styles(pts))
+    top, low = body_bounds(s)
+    cards = shapes_named(s, "Side Card")
+    check("C stats-side：卡片撑满正文区高度",
+          abs(cards[0].top - top) <= 2 and abs(cards[-1].top + cards[-1].height - low) <= 2,
+          (top / EMU, low / EMU, cards[0].top / EMU, (cards[-1].top + cards[-1].height) / EMU))
+    src = one(s, "Stat Source")
+    check("C stats-side：口径底边贴正文区下沿",
+          src is not None and abs(src.top + src.height - low) <= 2)
+
+
+def test_general_mode_capacity():
+    """C 模式写满（3 张卡、4 条要点、口径、两行 lead、Next）：不警告、都在正文区里、
+    审核 REVIEW OK（正文区变矮时大数字跟着卡片高缩小，不溢出）。"""
+    items = ["- 试点工具 | 120 件 | 覆盖试点车间全部手持工具", "- !记录完整率 | 100% | 改前约 70%",
+             "- 单次登记用时 | 15 秒 | 改前手写约 1 分钟"]
+    points = ["记录完整率达到 100%，抽查不再缺页", "逾期提醒起作用，逾期件数明显下降",
+              "登记用时下降主要来自扫码自动带出信息", "二车间 11 月切换，沿用同一套标签"]
+    two_lines = "试点四周记录完整率达到百分之百，单次登记用时降到十五秒，两项都达到推广条件，" \
+                "二车间十一月起切换为扫码登记"
+    r, s = page(general_md(items, points, title="Full Side", conclusion=two_lines))
+    if s is None:
+        return
+    check("C stats-side 写满：没有警告", not warnings(r.stderr), r.stderr)
+    top, low = body_bounds(s)
+    out = [x.name for x in s.shapes if x.name.startswith(("Side ", "Stat "))
+           and (x.top < top - 2 or x.top + x.height > low + 2)]
+    check("C stats-side 写满：形状都在正文区里", not out, out)
+    out = review(r.workdir / "deck.md", r.path)
+    check("C stats-side 写满：审核 REVIEW OK",
+          out.returncode == 0 and out.stdout.strip() == "REVIEW OK", out.stdout + out.stderr)
+
+
+def run_styles_para(shape, n):
+    p = shape.text_frame.paragraphs[n]
+    return {(r.font.size.pt, bool(r.font.bold), str(r.font.color.rgb)) for r in p.runs}
+
+
 if __name__ == "__main__":
     test_chrome()
     test_cards()
@@ -272,4 +366,6 @@ if __name__ == "__main__":
     test_red_and_units()
     test_errors()
     test_overflow_warnings()
+    test_general_mode_sizes()
+    test_general_mode_capacity()
     finish()

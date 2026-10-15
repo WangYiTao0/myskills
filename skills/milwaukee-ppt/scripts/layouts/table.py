@@ -8,7 +8,9 @@
 排版：表格占正文区全宽（左边留出红竖条的位置），从正文区上沿排起（写了 Tag 时下移到
 Month Tag 下面）；列等宽。14pt，表头加粗、#E5E5E5 底、下边 1.5pt #1A1A1A；正文 #1A1A1A、
 无底色、每行下边 0.75pt #BFBFBF 细线。每格最多 2 行，行高按该行最多的行数定，
-表格总高放不进正文区报错。`!` 行文字加粗，左侧一条品牌红竖条（Table Key Bar）——
+月报模式表格总高放不进正文区报错（渲染时按 body_area 判断）。方向 C（通用 / 项目模式）
+字号按 GENERAL_TIERS 从 18pt 往下取放得下的一档，整表在正文区里垂直居中，最小一档也放不下
+只警告。`!` 行文字加粗，左侧一条品牌红竖条（Table Key Bar）——
 红色只作锚点（SKILL.md §6.3），表格本身只用黑白灰。表格不引用主题表格样式（主题样式会带出
 accent 色），边框、底色全部显式写。和 evidence、section、agenda、team 共用模板 layout 0，
 inspect 靠 MARK_SHAPE 区分。
@@ -22,7 +24,7 @@ from pptx.util import Inches
 
 from mdparse import DeckError
 
-from .common import (BRAND_RED, IMG_H, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, LIST_ITEM, RULE,
+from .common import (BRAND_RED, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, LIST_ITEM, RULE,
                      add_page_chrome, add_run, add_shape, body_area, fill_titles, key_mark,
                      text_lines, warn)
 
@@ -47,7 +49,9 @@ TABLE_W = IMG_W - KEY_BAR_W - KEY_GAP
 CELL_PAD_X, CELL_PAD_Y = 0.1, 0.06
 TAG_BOTTOM = 1.42               # common.add_month_tag 的框下沿
 TAG_GAP = 0.08
-LINE_H = FONT_PT * LINE_SPACING / 72   # 行高口径（1.25）见 common.LINE_SPACING
+# 方向 C（通用 / 项目模式，#51）字号随行数放大：(字号 pt, 单元格上下内边距 ")，从大到小取
+# 第一档「每格不超过 2 行、整表放得进正文区」的；最小一档就是月报的 14pt / 0.06"。
+GENERAL_TIERS = ((18, 0.09), (16, 0.08), (FONT_PT, CELL_PAD_Y))
 
 _ROW = re.compile(r"^\|(.*?)\|?$")
 _SEP_CELL = re.compile(r"^:?-+:?$")
@@ -66,15 +70,27 @@ def col_text_w(ncols):
 
 
 def table_top(page, ctx=None):
-    """表格上沿（英寸）：正文区上沿；月报模式下写了 Tag 时下移到 Month Tag 下面。
-    ctx 为 None（解析时还不知道模式）按月报口径算，放得下的表格在方向 C 下通常也放得下。"""
+    """表格可排区域的上沿（英寸）：正文区上沿；写了 Tag 时不高于 Month Tag 下面。
+    ctx 为 None 按月报口径算。方向 C 下整表在这里到正文区下沿之间垂直居中。"""
     if ctx is not None and ctx.lead:
         return max(body_area(page, ctx).top, TAG_BOTTOM + TAG_GAP if page.tag else 0)
     return TAG_BOTTOM + TAG_GAP if page.tag else IMG_TOP
 
 
-def row_height(lines):
-    return lines * LINE_H + 2 * CELL_PAD_Y
+def row_height(lines, pt=FONT_PT, pad=CELL_PAD_Y):
+    return lines * pt * LINE_SPACING / 72 + 2 * pad
+
+
+def _heights(rows, pt, pad):
+    """各行行高（英寸）；有单元格超过 MAX_CELL_LINES 行返回 None。"""
+    width = col_text_w(len(rows[0]))
+    out = []
+    for cells in rows:
+        lines = [text_lines(c, pt, width) for c in cells]
+        if max(lines) > MAX_CELL_LINES:
+            return None
+        out.append(row_height(max(1, *lines), pt, pad))
+    return out
 
 
 def parse(page):
@@ -129,10 +145,6 @@ def parse(page):
                             f"{int(width * MAX_CELL_LINES / (FONT_PT / 72))} 个汉字）；"
                             f"精简文字，或减少列数")
         heights.append(row_height(max(1, *lines)))
-    room = IMG_TOP + IMG_H - table_top(page)
-    if sum(heights) > room + 1e-9:
-        _fail(page, f"表格太高（约 {sum(heights):.2f}\"，正文区只有 {room:.2f}\"）；"
-                    f"把多行的格子写短，或拆成两页")
     page.fields = {"header": header, "rows": body, "key": key_row, "heights": heights}
 
 
@@ -147,14 +159,14 @@ def _cell_border(tcPr, tag, color, pt):
     return ln
 
 
-def _style_cell(cell, text, bold, fill, rule, rule_pt):
+def _style_cell(cell, text, bold, fill, rule, rule_pt, pt=FONT_PT, pad=CELL_PAD_Y):
     cell.margin_left = cell.margin_right = Inches(CELL_PAD_X)
-    cell.margin_top = cell.margin_bottom = Inches(CELL_PAD_Y)
+    cell.margin_top = cell.margin_bottom = Inches(pad)
     cell.vertical_anchor = MSO_ANCHOR.MIDDLE
     tf = cell.text_frame
     tf.word_wrap = True
     if text:
-        add_run(tf.paragraphs[0], text, FONT_PT, bold, INK)
+        add_run(tf.paragraphs[0], text, pt, bold, INK)
     tcPr = cell._tc.get_or_add_tcPr()
     for child in list(tcPr):
         tcPr.remove(child)
@@ -175,13 +187,25 @@ def render(prs, page, ctx):
     f = page.fields
     header, body, heights = f["header"], f["rows"], f["heights"]
     ncols = len(header)
-    top = Inches(table_top(page, ctx))
-    if ctx.lead:
-        area = body_area(page, ctx)
-        room = area.bottom - table_top(page, ctx)
+    y0 = table_top(page, ctx)
+    room = body_area(page, ctx).bottom - y0
+    pt, pad = FONT_PT, CELL_PAD_Y
+    if not ctx.lead:
+        if sum(heights) > room + 1e-9:
+            _fail(page, f"表格太高（约 {sum(heights):.2f}\"，正文区只有 {room:.2f}\"）；"
+                        f"把多行的格子写短，或拆成两页")
+    else:
+        # 方向 C：字号从 18pt 往下试，取放得下的最大一档；整表在正文区里垂直居中
+        for pt, pad in GENERAL_TIERS:
+            hs = _heights([header] + body, pt, pad)
+            if hs is not None and sum(hs) <= room + 1e-9:
+                heights = hs
+                break
         if sum(heights) > room + 1e-9:
             warn(f"页「{page.title}」表格太高（约 {sum(heights):.2f}\"，正文区只有 {room:.2f}\"），"
                  f"会压到页底的 Next 行；把多行的格子写短，或精简结论 / Next")
+        y0 += max(0, room - sum(heights)) / 2
+    top = Inches(y0)
     row_emu = [Inches(h) for h in heights]
     col_emu = Inches(TABLE_W / ncols)
     frame = slide.shapes.add_table(len(heights), ncols, Inches(TABLE_LEFT), top,
@@ -199,7 +223,7 @@ def render(prs, page, ctx):
         bold = head or (r - 1 == f["key"])
         for c, text in enumerate(cells):
             _style_cell(tbl.cell(r, c), text, bold, HEAD_FILL if head else None,
-                        INK if head else RULE, HEAD_RULE_PT if head else RULE_PT)
+                        INK if head else RULE, HEAD_RULE_PT if head else RULE_PT, pt, pad)
     if f["key"] is not None:
         r = f["key"] + 1
         add_shape(slide, MSO_SHAPE.RECTANGLE, "Table Key Bar", Inches(IMG_LEFT),

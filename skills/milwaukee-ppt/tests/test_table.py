@@ -4,7 +4,7 @@
 形状名约定：Data Table（原生表格，graphicFrame；第一行是表头）、Table Key Bar（`!` 行左侧的红竖条，
 只在标了 `!` 时有）。
 """
-from deckcheck import (A, CONTENT_SLOT_IN, LAYOUT_INDEX, RED_COLORS, body_slide, caption_bar,
+from deckcheck import (A, EMU, CONTENT_SLOT_IN, LAYOUT_INDEX, RED_COLORS, body_slide, caption_bar,
                        check, deck_error, finish, generate, inside, one, out_of_bounds,
                        placeholder, red_elements, review, tag_shape, warnings)
 
@@ -234,10 +234,89 @@ def test_review():
           any(line.startswith("[缺结论行]") for line in out.stdout.splitlines()), out.stdout)
 
 
+# ---- 方向 C（通用 / 项目汇报模式）：字号随行数放大、整表在正文区垂直居中 ----
+
+def general_md(body, title=TITLE, extra="", next_line=True):
+    nxt = "Next: 9 月先在 B 仓试行新排班\n" if next_line else ""
+    return f"""
+---
+title: Mock Deck
+date: 14 Oct 2026
+---
+
+# {title}
+## {SUBTITLE}
+Layout: table
+{extra}{body}
+{CONCLUSION}
+{nxt}"""
+
+
+def c_bounds(s):
+    """C 模式正文区上下沿（EMU）：lead 下沿 + 0.19"、Next 细线上方 0.10"。"""
+    lead, rule = one(s, "Lead"), one(s, "Next Rule")
+    return lead.top + lead.height + int(0.19 * EMU), rule.top - int(0.10 * EMU)
+
+
+def cell_pts(frame):
+    tbl = frame.table
+    return {run.font.size.pt for r in range(len(tbl.rows)) for c in range(len(tbl.columns))
+            for p in tbl.cell(r, c).text_frame.paragraphs for run in p.runs}
+
+
+def test_general_mode_few_rows():
+    """C 模式行少（3 行）：全表 18pt、行高跟着字号放大；整表在正文区里垂直居中，
+    下方不留大片空白；红竖条仍贴着 ! 行。"""
+    r = generate(general_md(table_lines(HEADER, ROWS), extra="Tag: Oct\n"))
+    check("C table 3 行：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    s = body_slide(r)
+    frame = one(s, "Data Table") if s is not None else None
+    if frame is None:
+        return
+    check("C table 3 行：全表 18pt", cell_pts(frame) == {18.0}, cell_pts(frame))
+    check("C table 3 行：行高放得下 18pt 一行（≥ 18pt × 1.25）",
+          all(row.height >= 18 * 1.25 / 72 * EMU for row in frame.table.rows),
+          [row.height / EMU for row in frame.table.rows])
+    top, low = c_bounds(s)
+    up, down = frame.top - top, low - (frame.top + frame.height)
+    check("C table 3 行：整表在正文区里垂直居中", up >= 0 and down >= 0
+          and abs(up - down) <= 0.02 * EMU, (up / EMU, down / EMU))
+    bar = one(s, "Table Key Bar")
+    rows = frame.table.rows
+    check("C table 3 行：红竖条和 ! 行同高、同位置",
+          bar is not None and bar.top == frame.top + rows[0].height + rows[1].height
+          and bar.height == rows[2].height,
+          bar is not None and (bar.top, bar.height))
+    out = review(r.workdir / "deck.md", r.path)
+    check("C table 3 行：审核 REVIEW OK",
+          out.returncode == 0 and out.stdout.strip() == "REVIEW OK", out.stdout + out.stderr)
+
+
+def test_general_mode_full():
+    """C 模式写满（6 列 × 8 行、3 行两行字、Tag、lead、Next）：字号降到放得下的一档，
+    不警告、在正文区里，审核不报表格 / 文字溢出。"""
+    r = generate(general_md(table_lines(*full_grid()), title="Full Table", extra="Tag: Oct\n"))
+    check("C table 写满：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    s = body_slide(r)
+    frame = one(s, "Data Table") if s is not None else None
+    if frame is None:
+        return
+    top, low = c_bounds(s)
+    check("C table 写满：整表在正文区里", frame.top >= top and frame.top + frame.height <= low,
+          (frame.top / EMU, (frame.top + frame.height) / EMU, top / EMU, low / EMU))
+    check("C table 写满：全表同一字号、14–18pt",
+          len(cell_pts(frame)) == 1 and 14 <= min(cell_pts(frame)) <= 18, cell_pts(frame))
+    out = review(r.workdir / "deck.md", r.path)
+    check("C table 写满：审核 REVIEW OK",
+          out.returncode == 0 and out.stdout.strip() == "REVIEW OK", out.stdout + out.stderr)
+
+
 if __name__ == "__main__":
     test_render()
     test_no_key_no_red()
     test_capacity_limits()
     test_capacity_errors()
     test_review()
+    test_general_mode_few_rows()
+    test_general_mode_full()
     finish()

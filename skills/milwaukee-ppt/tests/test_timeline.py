@@ -11,7 +11,7 @@ from deckcheck import (BRAND_RED, CONTENT_SLOT_IN, DOING_AMBER, DONE_GREEN, EMU,
                        body_slide, caption_bar, caption_style_problems, center_x, center_y,
                        check, deck_error, emu_rect, fill_color, finish, generate, geometry,
                        inside, line_color, named, out_of_bounds, paragraphs, placeholder,
-                       red_elements, run_style, shapes_named, slide_xmls, tag_shape, warnings)
+                       red_elements, review, run_style, shapes_named, slide_xmls, tag_shape, warnings)
 
 NAME = "timeline"
 TITLE = "Mock Timeline Page"
@@ -493,6 +493,97 @@ def test_legend_with_tag():
           cur and max(x.top + x.height for x in legend) <= cur[0].top)
 
 
+# ---- 方向 C（通用 / 项目汇报模式）：字号放大、整体在正文区垂直居中、图例让开 lead ----
+
+def general_deck(items, title=TITLE, extra="", conclusion="Mock one-line conclusion."):
+    body = "\n".join(f"- {x}" for x in items)
+    return f"""
+---
+title: Mock Deck
+date: 14 Oct 2026
+---
+
+# {title}
+## Mock Action Title
+Layout: timeline
+{extra}{body}
+{conclusion}
+Next: Mock next step.
+"""
+
+
+def c_bounds(s):
+    """C 模式正文区上下沿（EMU）：lead 下沿 + 0.19"、Next 细线上方 0.10"。"""
+    lead, rule = named(s, "Lead")[0], named(s, "Next Rule")[0]
+    return lead.top + lead.height + int(0.19 * EMU), rule.top - int(0.10 * EMU)
+
+
+def sizes(shape):
+    return [run_style(shape, i)[:2] for i in range(len(shape.text_frame.paragraphs))]
+
+
+def test_general_mode_plain():
+    """C 模式旧写法（不写状态）：日期 14pt、标题 22pt、说明 16pt；日期 + 节点 + 文字整组
+    在正文区里垂直居中。"""
+    r = generate(general_deck(SIX))
+    s = body_slide(r)
+    check("C timeline 旧写法：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    if s is None:
+        return
+    dates, texts = shapes_named(s, "Timeline Date"), shapes_named(s, "Timeline Text")
+    check("C timeline 旧写法：日期 14pt bold、标题 22pt bold、说明 16pt",
+          all(run_style(d)[:2] == (14.0, True) for d in dates)
+          and all(sizes(t) == [(22.0, True), (16.0, False)] for t in texts),
+          (run_style(dates[0]), sizes(texts[0])))
+    top, low = c_bounds(s)
+    grp_top = min(d.top for d in dates)
+    grp_bot = max(t.top + t.height for t in texts)
+    check("C timeline 旧写法：整组在正文区里、垂直居中",
+          grp_top >= top and grp_bot <= low
+          and abs((grp_top - top) - (low - grp_bot)) <= 0.05 * EMU,
+          ((grp_top - top) / EMU, (low - grp_bot) / EMU))
+
+
+def test_general_mode_status():
+    """C 模式写了状态：普通日期 14pt、进行中日期 16pt、普通标题 20pt、关键 / 进行中标题 22pt、
+    说明 16pt、“当前” 14pt；图例在正文区右上角（lead 以下）；其余整组在图例以下的区域里
+    垂直居中；6 条写满 + Tag + Next 不警告，审核 REVIEW OK。"""
+    r = generate(general_deck(STATUS6, extra="Tag: Oct\n"))
+    s = body_slide(r)
+    check("C timeline 状态：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    if s is None:
+        return
+    dates, texts = shapes_named(s, "Milestone Date"), shapes_named(s, "Milestone Text")
+    want_date = [(16.0, True) if st == "doing" else (14.0, True) for st in STATUS6_ST]
+    want_title = [(22.0, True) if (k or st == "doing") else (20.0, True)
+                  for st, k in zip(STATUS6_ST, STATUS6_KEY)]
+    check("C timeline 状态：日期 14pt（进行中 16pt）",
+          [run_style(d)[:2] for d in dates] == want_date, [run_style(d)[:2] for d in dates])
+    check("C timeline 状态：标题 20pt（关键 / 进行中 22pt）、说明 16pt",
+          [sizes(t) for t in texts] == [[w, (16.0, False)] for w in want_title],
+          [sizes(t) for t in texts])
+    cur = named(s, "Current Tag")
+    check("C timeline 状态：“当前” 14pt", cur and run_style(cur[0])[:2] == (14.0, True),
+          cur and run_style(cur[0]))
+    top, low = c_bounds(s)
+    legend = shapes_named(s, "Legend Icon") + shapes_named(s, "Legend Label")
+    leg_top = min(x.top for x in legend)
+    leg_bot = max(x.top + x.height for x in legend)
+    check("C timeline 状态：图例在 lead 以下、正文区上沿、右端对齐正文区右缘",
+          abs(leg_top - top) <= 0.02 * EMU
+          and abs(max(x.left + x.width for x in legend) - int(12.76 * EMU)) <= 0.03 * EMU,
+          (leg_top / EMU, top / EMU))
+    grp_top = min([d.top for d in dates] + [cur[0].top])
+    grp_bot = max(t.top + t.height for t in texts)
+    check("C timeline 状态：整组在图例以下、垂直居中",
+          grp_top >= leg_bot and grp_bot <= low
+          and abs((grp_top - leg_bot) - (low - grp_bot)) <= 0.05 * EMU,
+          ((grp_top - leg_bot) / EMU, (low - grp_bot) / EMU))
+    out = review(r.workdir / "deck.md", r.path)
+    check("C timeline 状态写满：审核 REVIEW OK",
+          out.returncode == 0 and out.stdout.strip() == "REVIEW OK", out.stdout + out.stderr)
+
+
 if __name__ == "__main__":
     test_chrome()
     test_nodes()
@@ -509,4 +600,6 @@ if __name__ == "__main__":
     test_status_red()
     test_key_without_status()
     test_legend_with_tag()
+    test_general_mode_plain()
+    test_general_mode_status()
     finish()

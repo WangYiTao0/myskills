@@ -188,9 +188,84 @@ def test_team_general_mode():
           f"inspect 靠 `{team.MARK_SHAPE}` 认出 team" in text, team.MARK_SHAPE)
 
 
+NUMBERS_DECK = """---
+title: Mock Deck
+---
+
+# 试点数据 / KEY RESULTS
+## 记录完整率达到 100%
+Layout: stats
+- 试点工具 | 120 件 | 覆盖试点车间
+  - 电动工具 86 件
+- !记录完整率 | 100% | 改前约 70%
+口径：系统导出
+试点 4 周记录完整率 100%
+
+# 试点结论 / FINDINGS
+## 两项指标都达到推广条件
+Layout: stats-side
+- 试点工具 | 120 件 | 覆盖试点车间
+- !记录完整率 | 100% | 改前约 70%
+> 记录完整率达到 100%
+记录完整率和登记用时都达到推广条件
+
+# 里程碑 / MILESTONES
+## 试点按计划推进
+Layout: timeline
+- 07 Jul | 立项 | 确定范围
+- 04 Aug | 上线 | 开放试用
+- 15 Sep | 试点 | 切换扫码
+贴码晚一周未影响试点开始
+
+# 充电等待 / WAITING
+## B 仓等待最长
+Layout: table
+| 仓库 | 叉车数 |
+| --- | --- |
+| A 仓 | 12 台 |
+| !B 仓 | 20 台 |
+B 仓高峰等待 35 分钟
+"""
+
+
+def _cell_style(frame, r, c):
+    run = frame.table.cell(r, c).text_frame.paragraphs[0].runs[0]
+    return run.font.size.pt, bool(run.font.bold), str(run.font.color.rgb)
+
+
+def test_numbers_general_mode():
+    """stats / stats-side / timeline / table 方向 C：样式表里「（通用 / 项目模式）」各行的
+    字号、粗体、颜色和生成器一致（取每行写的第一个值，即最大一档）。"""
+    r = generate(NUMBERS_DECK)
+    if r.rc != 0:
+        check("layouts.md：数字类版式探测文稿生成", False, r.stderr)
+        return
+    stats, side, tl, table = r.slides[1:5]
+    rows = [
+        ("stats 大数字（通用 / 项目模式）", run_style(one(stats, "Stat Number 1"))),
+        ("stats 标签（通用 / 项目模式）", run_style(one(stats, "Stat Label 1"))),
+        ("stats 说明 / 解读（通用 / 项目模式）", run_style(one(stats, "Stat Note 1"))),
+        ("stats 说明 / 解读（通用 / 项目模式）", run_style(one(stats, "Stat Points 1"))),
+        ("stats-side 大数字（通用 / 项目模式）", run_style(one(side, "Side Number 1"))),
+        ("stats-side 标签（通用 / 项目模式）", run_style(one(side, "Side Text 1"))),
+        ("stats-side 说明（通用 / 项目模式）", run_style(one(side, "Side Text 1"), 1)),
+        ("stats-side 结论区小标题（通用 / 项目模式）", run_style(one(side, "Side Conclusion Title"))),
+        ("stats-side 结论要点（通用 / 项目模式）", run_style(one(side, "Side Points"))),
+        ("时间线日期（通用 / 项目模式）", run_style(one(tl, "Timeline Date 1"))),
+        ("时间线标题（通用 / 项目模式）", run_style(one(tl, "Timeline Text 1"))),
+        ("时间线说明（通用 / 项目模式）", run_style(one(tl, "Timeline Text 1"), 1)),
+        ("表格（通用 / 项目模式）", _cell_style(one(table, "Data Table"), 1, 0)),
+    ]
+    for label, got in rows:
+        doc = _full_style_row(label)
+        check(f"layouts.md：{label} 的字号、粗体、颜色和生成器一致",
+              doc is not None and doc == got, (doc, got))
+
+
 if __name__ == "__main__":
     test_doc_examples_generate()
     test_common_shape_names()
     test_process_general_mode()
     test_team_general_mode()
+    test_numbers_general_mode()
     finish()
