@@ -24,6 +24,7 @@ import mdparse  # noqa: E402
 from layouts.common import (BRAND_RED, Context, conclusion_text, is_number,  # noqa: E402
                             next_text, text_width_in)  # 和生成器同一套结论 / Next 文字、数字判定、字宽估算
 from layouts.process import desc_wrap_problem  # noqa: E402  和生成器的折行警告同一判断
+from layouts.table import monthly_height_problem  # noqa: E402  和生成器的「表格太高」报错同一判断
 from layouts.team import duty_wrap_problems  # noqa: E402  同上
 from mdparse import DeckError  # noqa: E402
 
@@ -142,6 +143,14 @@ def check_team_wrap(page):
             for name, duty, problem in duty_wrap_problems(page, ctx)]
 
 
+def check_table_height(page):
+    """月报表格总高放不进正文区：生成器渲染时报错退出，审核按同一判断报出。"""
+    if page.layout != "table":
+        return []
+    problem = monthly_height_problem(page, Context(source_dir="", year="", lead=False))
+    return [("表格太高", where(page), problem, "把多行的格子写短，或按类别拆成两页")] if problem else []
+
+
 def review_md(doc):
     """内容检查：只看文稿（版式字段由版式模块解析好）。返回 [(规则, 位置, 问题, 怎么改)]。"""
     issues = []
@@ -168,6 +177,8 @@ def review_md(doc):
                            "在版式字段后加一行本页结论，最好带数字"))
         if lead:
             issues += check_lead(page) + check_process_wrap(page) + check_team_wrap(page)
+        else:
+            issues += check_table_height(page)
         if page.layout == "process":
             names = {name for name, _ in page.fields["steps"]}
             for other_title, other in seen_steps:
@@ -329,16 +340,16 @@ def body_names(slide):
 
 
 def rendered(doc):
-    """用生成器按当前文稿重新渲染一份（内存里，不落盘）；生成失败（如图片找不到，
-    已由配图检查报出）返回 None。生成器的警告不重复打印。"""
+    """用生成器按当前文稿重新渲染一份（内存里，不落盘）→ (prs, None)；生成失败（图片找不到、
+    月报表格太高等，文稿检查已报原因）→ (None, 生成器的报错)。生成器的警告不重复打印。"""
     import contextlib
     import io
     import generate_ppt
     try:
         with contextlib.redirect_stderr(io.StringIO()):
-            return generate_ppt.build(doc)
-    except DeckError:
-        return None
+            return generate_ppt.build(doc), None
+    except DeckError as e:
+        return None, str(e)
 
 
 def _names(names):
@@ -349,10 +360,12 @@ def _names(names):
 
 def check_redrawn(doc, slides):
     """正文形状被改过：逐页比较 pptx 和按当前 md 重新渲染的正文形状名集合，多出、缺少都报。
-    只比名字，不比几何和字号——挪位置、改字号的手工细调不报。"""
-    prs = rendered(doc)
+    只比名字，不比几何和字号——挪位置、改字号的手工细调不报。按当前文稿生成失败时报一条
+    「正文形状无法比对」，不静默跳过。"""
+    prs, error = rendered(doc)
     if prs is None:
-        return []
+        return [("正文形状无法比对", "pptx", f"生成器按当前文稿生成失败（{error}），没法比对正文形状",
+                 "先按报错改 md 文稿，再用 generate_ppt.py 重新生成后再审")]
     issues = []
     for n, (slide, want, page) in enumerate(zip(slides[1:], list(prs.slides)[1:], doc.pages),
                                             start=2):

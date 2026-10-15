@@ -311,12 +311,37 @@ def test_general_mode_full():
           out.returncode == 0 and out.stdout.strip() == "REVIEW OK", out.stdout + out.stderr)
 
 
+def test_review_monthly_too_tall():
+    """月报表格太高（#51 起在渲染时判断）：只审 md 也报「表格太高」，和生成器同一判断；
+    带 pptx 审时按当前 md 重新渲染失败，不静默跳过正文形状比对。"""
+    header, rows = grid(6, 8)
+    tall = [[f"{FULL_CELL}{c}" for c in range(1, 7)] for _ in range(4)] + rows[4:]
+    r = generate(MD)
+    check("table 太高审核：正常稿生成成功", r.rc == 0, r.stderr)
+    if r.rc != 0:
+        return
+    md = r.workdir / "deck.md"
+    md.write_text(table_md(table_lines(header, tall) + "\n" + CONCLUSION, extra="Tag: Oct\n"),
+                  encoding="utf-8")
+    only = review(md)
+    hit = [ln for ln in only.stdout.splitlines() if ln.startswith("[表格太高]")]
+    check("table 太高审核：只审 md 报「表格太高」，带页标题和拆页建议",
+          len(hit) == 1 and TITLE in hit[0] and "拆" in hit[0] and "REVIEW: " in only.stdout,
+          only.stdout + only.stderr)
+    both = review(md, r.path)
+    check("table 太高审核：带 pptx 审时照样报「表格太高」，并说明没法按当前 md 比对正文形状",
+          [ln for ln in both.stdout.splitlines() if ln.startswith("[表格太高]")]
+          and [ln for ln in both.stdout.splitlines() if ln.startswith("[正文形状无法比对]")],
+          both.stdout + both.stderr)
+
+
 if __name__ == "__main__":
     test_render()
     test_no_key_no_red()
     test_capacity_limits()
     test_capacity_errors()
     test_review()
+    test_review_monthly_too_tall()
     test_general_mode_few_rows()
     test_general_mode_full()
     finish()

@@ -181,6 +181,19 @@ def _style_cell(cell, text, bold, fill, rule, rule_pt, pt=FONT_PT, pad=CELL_PAD_
         tcPr.append(sf)
 
 
+def monthly_height_problem(page, ctx):
+    """月报模式下表格总高放不进正文区时返回原因（中文短句，带拆页建议），否则 None；
+    方向 C 不报错（只警告），也返回 None。生成器报错和审核「表格太高」都用它。"""
+    if ctx.lead:
+        return None
+    total = sum(page.fields["heights"])
+    room = body_area(page, ctx).bottom - table_top(page, ctx)
+    if total <= room + 1e-9:
+        return None
+    return (f"表格太高（约 {total:.2f}\"，正文区只有 {room:.2f}\"）；"
+            f"把多行的格子写短，或拆成两页")
+
+
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
@@ -191,9 +204,9 @@ def render(prs, page, ctx):
     room = body_area(page, ctx).bottom - y0
     pt, pad = FONT_PT, CELL_PAD_Y
     if not ctx.lead:
-        if sum(heights) > room + 1e-9:
-            _fail(page, f"表格太高（约 {sum(heights):.2f}\"，正文区只有 {room:.2f}\"）；"
-                        f"把多行的格子写短，或拆成两页")
+        problem = monthly_height_problem(page, ctx)
+        if problem:
+            _fail(page, problem)
     else:
         # 方向 C：字号从 18pt 往下试，取放得下的最大一档；整表在正文区里垂直居中
         for pt, pad in GENERAL_TIERS:
