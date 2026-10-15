@@ -365,6 +365,11 @@ def test_duty_wrap_docs():
           "团队职责折行" in team and "末行" in team and "3 行" in team, team[-800:])
     readme = (SKILL / "scripts" / "README.md").read_text(encoding="utf-8")
     check("scripts README：审核规则列出「团队职责折行」", "团队职责折行" in readme)
+    skill = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+    row = next((ln for ln in skill.splitlines() if ln.startswith("| `team` |")), "")
+    check("SKILL.md 版式表 team 行：写了通用 / 项目模式的头像，不再写「不带头像」",
+          "头像" in row and "不带头像" not in row, row)
+    check("SKILL.md：不再写「团队页不放头像」", "团队页不放头像" not in skill)
 
 
 if __name__ == "__main__":
