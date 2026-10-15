@@ -334,9 +334,11 @@ SHOW_NAMES = 6                     # 一条问题里最多列出的形状名
 
 
 def body_names(slide):
-    """一页的正文形状名集合：占位框和 DRAWN_SHAPES 以外的全部形状。"""
-    return {sh.name for sh in slide.shapes
-            if not sh.is_placeholder and sh.name not in DRAWN_SHAPES}
+    """一页的正文形状名计数（Counter）：占位框和 DRAWN_SHAPES 以外的全部形状；同名形状
+    按个数计，复制一个同名形状也算多出。"""
+    from collections import Counter
+    return Counter(sh.name for sh in slide.shapes
+                   if not sh.is_placeholder and sh.name not in DRAWN_SHAPES)
 
 
 def rendered(doc):
@@ -353,13 +355,13 @@ def rendered(doc):
 
 
 def _names(names):
-    names = sorted(names)
+    names = sorted(names.elements())
     more = f" 等 {len(names)} 个" if len(names) > SHOW_NAMES else ""
     return "、".join(names[:SHOW_NAMES]) + more
 
 
 def check_redrawn(doc, slides):
-    """正文形状被改过：逐页比较 pptx 和按当前 md 重新渲染的正文形状名集合，多出、缺少都报。
+    """正文形状被改过：逐页比较 pptx 和按当前 md 重新渲染的正文形状名（按个数），多出、缺少都报。
     只比名字，不比几何和字号——挪位置、改字号的手工细调不报。按当前文稿生成失败时报一条
     「正文形状无法比对」，不静默跳过。"""
     prs, error = rendered(doc)

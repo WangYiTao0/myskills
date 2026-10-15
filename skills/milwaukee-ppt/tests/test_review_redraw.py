@@ -6,6 +6,8 @@
 重画（原型 prototype/ppt-visual-directions 的后处理做法，报）；只挪位置、只改字号（细调，不报）。
 只看审核脚本的输出。文稿内容全部虚构。
 """
+import copy
+
 from pptx.util import Inches, Pt
 
 from deckcheck import SKILL, broken, check, finish, generated, lines_with, review
@@ -56,6 +58,15 @@ def drop_one(name, page=2):
     return change
 
 
+def duplicate(name, page=2):
+    """复制一个正文形状（同名）贴回同一页。"""
+    def change(prs):
+        slide = prs.slides[page - 1]
+        sh = [x for x in slide.shapes if x.name == name][0]
+        slide.shapes._spTree.append(copy.deepcopy(sh._element))
+    return change
+
+
 def fine_tune(page=2):
     """细调：每个正文形状往右下挪 0.05"，有文字的字号加 2pt。"""
     def change(prs):
@@ -101,6 +112,14 @@ def test_missing_shape_reported():
           len(found) == 1 and "Stat Number 2" in found[0], r.stdout)
 
 
+def test_duplicated_shape_reported():
+    md, pptx = generated(GENERAL)
+    r = review(md, broken(pptx, duplicate("Process Mark 1")))
+    found = hits(r.stdout, 2)
+    check(f"复制一个同名正文形状：报「{RULE}」，点名多出的形状",
+          len(found) == 1 and "多出 Process Mark 1" in found[0], r.stdout)
+
+
 def test_fine_tune_not_reported():
     for label, md in (("通用模式", GENERAL), ("月报模式", MONTHLY)):
         md_path, pptx = generated(md)
@@ -127,5 +146,6 @@ if __name__ == "__main__":
     test_generator_output_passes()
     test_redrawn_body_reported()
     test_missing_shape_reported()
+    test_duplicated_shape_reported()
     test_fine_tune_not_reported()
     finish()
