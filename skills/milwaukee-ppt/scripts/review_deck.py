@@ -11,6 +11,7 @@
 文字溢出、重叠、错位；只用 python-pptx 和计算，不依赖 LibreOffice）。
 需要判断的项（内容是否贴题、页序是否讲得通）留给审核清单，由模型逐条核对。
 """
+import math
 import os
 import re
 import sys
@@ -19,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import mdparse  # noqa: E402
-from layouts.common import (conclusion_text, is_number, next_text,  # noqa: E402
+from layouts.common import (BRAND_RED, conclusion_text, is_number, next_text,  # noqa: E402
                             text_width_in)  # 和生成器同一套结论 / Next 文字、数字判定、字宽估算
 from layouts.process import desc_wrap_problem  # noqa: E402  和生成器的折行警告同一判断
 from mdparse import DeckError  # noqa: E402
@@ -273,7 +274,9 @@ def review_pptx(doc, path):
     （idx 0 / 10）里，banner 上没有另画的文本框。返回 [(规则, 位置, 问题, 怎么改)]。"""
     from pptx import Presentation
     from pptx.enum.shapes import MSO_SHAPE_TYPE
-    slides = list(Presentation(path).slides)
+    prs = Presentation(path)
+    slides = list(prs.slides)
+    width, height = prs.slide_width, prs.slide_height
     closing = 1 if doc.meta.get("closing", "").strip() or mdparse.is_monthly(doc.meta) else 0
     want = 1 + len(doc.pages) + closing
     issues = []
@@ -294,7 +297,53 @@ def review_pptx(doc, path):
                 issues.append(("不是生成脚本做的", place,
                                f"banner 上另画了文本框「{sh.name}」", REDRAW))
         issues += check_drawn(slide, page, place, mdparse.uses_lead(doc.meta))
+        if mdparse.uses_lead(doc.meta):
+            issues += check_red_area(slide, page, place, width, height)
     return issues
+
+
+# 红色面积配额（SKILL.md §6.3 面积表）：通用 / 项目模式正文页 banner 以外红色 ≤ 5%；月报豁免。
+RED_QUOTA = 0.05
+STATUS_LAYOUTS = {"timeline", "timeline-phase"}   # §6.3 例外：时间线状态色（红描边）不计入
+_P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+
+
+def _red(el):
+    return el is not None and el.get("val", "").upper() == BRAND_RED
+
+
+def red_area(sh, page):
+    """一个形状 banner 以外的品牌红面积（EMU²）：填充或描边是品牌红时按外框算，直线按
+    长 × 线宽算；时间线类版式里只有描边是红的（状态色）不算。红色文字不计入。"""
+    sp = sh._element.find(f"{_P}spPr")
+    if sp is None or None in (sh.left, sh.top, sh.width, sh.height):
+        return 0
+    ln = sp.find(f"{_A}ln")
+    fill_red = _red(sp.find(f"{_A}solidFill/{_A}srgbClr"))
+    line_red = ln is not None and _red(ln.find(f"{_A}solidFill/{_A}srgbClr"))
+    if sh._element.tag == f"{_P}cxnSp":
+        if not line_red:
+            return 0
+        top, bottom = sh.top, sh.top + sh.height
+        if bottom <= top:                               # 横线：整条在 banner 上就不算
+            below = 1.0 if top >= BANNER_BOTTOM else 0.0
+        else:                                           # 斜线 / 竖线：按 banner 以下的比例算
+            below = max(0, bottom - max(top, BANNER_BOTTOM)) / (bottom - top)
+        return math.hypot(sh.width, sh.height) * int(ln.get("w", 12700)) * below
+    if not fill_red and not (line_red and page.layout not in STATUS_LAYOUTS):
+        return 0
+    return sh.width * max(0, sh.top + sh.height - max(sh.top, BANNER_BOTTOM))
+
+
+def check_red_area(slide, page, place, width, height):
+    """banner 以外的品牌红面积超过 §6.3 配额（方向 C：通用 / 项目模式）。"""
+    share = sum(red_area(sh, page) for sh in slide.shapes) / (width * height)
+    if share <= RED_QUOTA:
+        return []
+    return [("红色面积超配额", place,
+             f"banner 以外红色约占页面 {share:.1%}，超过 SKILL.md §6.3 配额 {RED_QUOTA:.0%}",
+             "红色只留 lead 竖线、1 个重点数字和 `!` 标记；去掉另加的红色块 / 红线，"
+             "改 md 后用 generate_ppt.py 重新生成")]
 
 
 def _texts(slide, name):
