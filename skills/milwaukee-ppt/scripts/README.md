@@ -61,7 +61,7 @@ python3 scripts/inspect_ppt.py deck.pptx
 
 每页一个标题行 `== 第 N 页 | layout: <模板 layout 名> | 版式: <生成器版式名>`，下面每个形状一行：`名字 | 类型 | L= T= W= H=（英寸，两位小数） | 文字前约 30 字`（换行替换成空格）；占位框的类型写成 `PLACEHOLDER idx=N`。文件不存在或不是 pptx 时，错误信息写到 stderr，退出码非零。
 
-生成器版式名不写进成稿：写进 slide（如 `cSld name`）会改动月报和旧 timeline 的逐字节输出。inspect 从模板 layout 推断：一个模板 layout 只对应一个版式时直接得出；共用模板 layout 的版式靠版式模块的 `MARK_SHAPE`（stats-side 的 `Side Card 1`、timeline-phase 的 `Phase Segment 1`、section 的 `Section Number`、agenda 的 `Agenda Number 1`、team 的 `Member Card 1`、table 的 `Data Table`）区分，没有该形状的算另一个（stats / timeline / evidence）。封面、收尾为 `-`。新增共用模板 layout 的版式时，给它定一个 `MARK_SHAPE`。
+生成器版式名不写进成稿：写进 slide（如 `cSld name`）会改动月报和旧 timeline 的逐字节输出。inspect 从模板 layout 推断：一个模板 layout 只对应一个版式时直接得出；共用模板 layout 的版式靠版式模块的 `MARK_SHAPE`（stats-side 的 `Side Card 1`、timeline-phase 的 `Phase Segment 1`、section 的 `Section Number`、agenda 的 `Agenda Number 1`、team 的 `Member Name 1`、table 的 `Data Table`）区分，没有该形状的算另一个（stats / timeline / evidence）。封面、收尾为 `-`。新增共用模板 layout 的版式时，给它定一个 `MARK_SHAPE`。
 
 ## 审核命令 `review_deck.py`
 
