@@ -199,6 +199,9 @@ def add_caption_bar(slide, page):
     return sp
 
 
+TAG_W, TAG_H = 1.7, 0.3       # add_month_tag 的框宽、框高（英寸）；lead 让位、before-after 都按它算
+
+
 def add_month_tag(slide, tag, year, right=None, top=None):
     """正文区右上角极简月份标识（无框、灰字）；只在页面写了 Tag 时显示。
 
@@ -207,7 +210,7 @@ def add_month_tag(slide, tag, year, right=None, top=None):
     if not tag:
         return None
     text = tag if re.search(r"\d{4}", tag) else f"{tag} {year}"
-    w, h = Inches(1.7), Inches(0.3)
+    w, h = Inches(TAG_W), Inches(TAG_H)
     right = Inches(IMG_LEFT + IMG_W) if right is None else right
     top = Inches(1.12) if top is None else top
     tb = slide.shapes.add_textbox(right - w, top, w, h)
@@ -259,7 +262,6 @@ ACCENT_W = 0.08               # 红竖线宽
 ACCENT_INSET = 0.06           # 红竖线比 lead 框上下各短
 LEAD_LEFT = IMG_LEFT + 0.24   # lead 文字左缘（竖线 → 文字留 0.16"）
 LEAD_TAG_GAP = 0.1            # lead 右端 → 月份标识框左缘
-TAG_W = 1.7                   # add_month_tag 的框宽
 LEAD_BODY_GAP = 0.19          # lead 下沿 → 正文区上沿
 # Next 行：页底一行黑色粗体 16pt，下沿固定 6.94"；上方一条 RULE 色细线（Next Rule）。
 # 一行时框 6.58–6.94"、细线在 6.50"，正文区下沿 6.40"；文字多一行框向上加高一行。

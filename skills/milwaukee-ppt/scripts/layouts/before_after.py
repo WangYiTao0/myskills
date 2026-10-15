@@ -20,7 +20,7 @@ from pptx.util import Emu, Inches
 
 from mdparse import DeckError
 
-from .common import (IMG_LEFT, IMG_W, add_page_chrome, add_run, body_area, caption_lines,
+from .common import (IMG_LEFT, IMG_W, TAG_W, add_page_chrome, add_run, body_area, caption_lines,
                      fill_titles, fit_picture, load_image, text_lines, text_width_in, warn)
 
 NAME = "before-after"
@@ -32,7 +32,7 @@ SLOTS = {"before": {"title": 11, "content": 13, "caption": 15},
 
 # 正文 lead：模板样例页「Lead」文本框的位置与样式（英寸）。写了 Tag 时右端让到月份标识左侧。
 LEAD_LEFT, LEAD_TOP, LEAD_W, LEAD_H = 0.56, 1.30, 11.90, 0.42
-TAG_LEFT = IMG_LEFT + IMG_W - 1.7          # common.add_month_tag 的文本框左缘
+TAG_LEFT = IMG_LEFT + IMG_W - TAG_W        # common.add_month_tag 的文本框左缘
 LEAD_PT = 20
 INK = "1A1A1A"
 CAPTION_PT = 16                            # 模板 caption 槽：16pt bold、不换行
