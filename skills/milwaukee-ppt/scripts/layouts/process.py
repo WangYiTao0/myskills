@@ -13,7 +13,7 @@
 每列一个黑底白字编号圆（Process Mark N，直径 1.1"，40pt bold），相邻两圆之间一条灰色连接线
 （Process Line N，#BFBFBF 2.25pt，两端离圆 0.12"）；圆下居中放步骤名（Process Title N，24pt bold
 #1A1A1A）和说明（Process Desc N，18pt #333333）。整组在正文区里垂直居中。
-说明折行难看（超过 DESC_MAX_LINES 行，或末行只剩 ≤ WIDOW_CHARS 个字）时警告；
+说明折行难看（超过 DESC_MAX_LINES 行，或末行只剩 ≤ common.WIDOW_CHARS 个字）时警告；
 审核脚本用同一个 desc_wrap_problem 报「流程说明折行」。
 """
 import re
@@ -27,7 +27,8 @@ from mdparse import DeckError
 
 from .common import (DESC_INK, IMG_W, INK as C_INK, LINE_SPACING as C_LINE_SPACING, RULE,
                      add_line, add_page_chrome, add_run, add_shape, add_textbox, body_area, fill_titles,
-                     strip_theme_style, fit_body, take_slot, text_lines, text_width_in, warn)
+                     strip_theme_style, fit_body, take_slot, text_lines, text_width_in, warn,
+                     wrap_lines, wrap_problem)
 
 NAME = "process"
 LAYOUT_INDEX = 4
@@ -58,7 +59,6 @@ DESC_GAP = 0.12             # 步骤名 → 说明
 DESC_PT = 18
 DESC_PAD = 0.2              # 说明框比列宽左右各窄
 DESC_MAX_LINES = 2          # 说明最多几行
-WIDOW_CHARS = 2             # 末行只剩这么几个字以内算折行难看
 
 _STEP = re.compile(r"^\d+[.)、]\s*(.+)$")
 
@@ -162,38 +162,10 @@ def desc_width_in(n):
     return IMG_W / n - 2 * DESC_PAD
 
 
-def _tokens(text):
-    """断行单位：CJK / 全角字符一个一个断，拉丁单词（连同后面的空白）整个断。"""
-    return re.findall(r"[\u2E80-\uFFFF]|[^\s\u2E80-\uFFFF]+\s*|\s+", text)
-
-
-def wrap_lines(text, pt, width_in):
-    """按 common.text_width_in 的字宽贪心断行，返回各行文字（估算，和 text_lines 同一口径）。
-    单个拉丁词宽过一行时按字符断。"""
-    lines, cur = [], ""
-    for tok in _tokens(text):
-        pieces = [tok] if text_width_in(tok.rstrip(), pt) <= width_in else list(tok)
-        for piece in pieces:
-            if cur and text_width_in((cur + piece).rstrip(), pt) > width_in:
-                lines.append(cur.rstrip())
-                cur = piece.lstrip()
-            else:
-                cur += piece
-    if cur.strip():
-        lines.append(cur.rstrip())
-    return lines
-
-
 def desc_wrap_problem(desc, n):
     """n 步的流程页上，这句说明折行难看时返回原因（中文短句），否则 None。生成器警告和
     审核「流程说明折行」都用它。"""
-    lines = wrap_lines(desc, DESC_PT, desc_width_in(n))
-    if len(lines) > DESC_MAX_LINES:
-        return f"估计折成 {len(lines)} 行（最多 {DESC_MAX_LINES} 行）"
-    tail = lines[-1].replace(" ", "") if len(lines) > 1 else ""
-    if tail and len(tail) <= WIDOW_CHARS:
-        return f"末行只剩「{tail}」{len(tail)} 个字"
-    return None
+    return wrap_problem(desc, DESC_PT, desc_width_in(n), DESC_MAX_LINES)
 
 
 def _line_h(pt):

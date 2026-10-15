@@ -21,9 +21,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import mdparse  # noqa: E402
-from layouts.common import (BRAND_RED, conclusion_text, is_number, next_text,  # noqa: E402
-                            text_width_in)  # 和生成器同一套结论 / Next 文字、数字判定、字宽估算
+from layouts.common import (BRAND_RED, Context, conclusion_text, is_number,  # noqa: E402
+                            next_text, text_width_in)  # 和生成器同一套结论 / Next 文字、数字判定、字宽估算
 from layouts.process import desc_wrap_problem  # noqa: E402  和生成器的折行警告同一判断
+from layouts.team import duty_wrap_problems  # noqa: E402  同上
 from mdparse import DeckError  # noqa: E402
 
 # 项目汇报模式下，章节 → 不适合放的版式（目标、范围要写目标和边界，不放流程和改前改后；应用场景不放改前改后）
@@ -130,6 +131,17 @@ def check_process_wrap(page):
             for problem in [desc and desc_wrap_problem(desc, len(steps))] if problem]
 
 
+def check_team_wrap(page):
+    """方向 C 的团队页：职责按生成器选中的那一档折行难看（超过 3 行或末行只剩 ≤2 字），
+    和生成器的警告同一判断。"""
+    if page.layout != "team":
+        return []
+    ctx = Context(source_dir="", year="", lead=True)
+    return [("团队职责折行", where(page), f"成员「{name}」的职责「{duty}」{problem}",
+             "改短或改写职责，让末行不只剩一两个字")
+            for name, duty, problem in duty_wrap_problems(page, ctx)]
+
+
 def review_md(doc):
     """内容检查：只看文稿（版式字段由版式模块解析好）。返回 [(规则, 位置, 问题, 怎么改)]。"""
     issues = []
@@ -155,7 +167,7 @@ def review_md(doc):
                            "没有普通文字结论行，" + ("标题下没有 lead" if lead else "页底没有红条"),
                            "在版式字段后加一行本页结论，最好带数字"))
         if lead:
-            issues += check_lead(page) + check_process_wrap(page)
+            issues += check_lead(page) + check_process_wrap(page) + check_team_wrap(page)
         if page.layout == "process":
             names = {name for name, _ in page.fields["steps"]}
             for other_title, other in seen_steps:

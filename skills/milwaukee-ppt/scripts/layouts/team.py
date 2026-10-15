@@ -1,4 +1,4 @@
-"""team 版式（团队页）：模板 layout 0「Blank Slide」，列出成员、角色和分工。本期不带头像。
+"""team 版式（团队页）：模板 layout 0「Blank Slide」，列出成员、角色和分工；不放照片。
 
 文稿写法：2–8 行无序列表「- 姓名 | 角色 | 职责」，一人一行，三段都必填，如
 `- 周航 | 现场推进 | 试点车间贴码、培训和巡检`；其余普通文字行进底部红条（分工结论），
@@ -19,6 +19,8 @@ inspect 靠 MARK_SHAPE（`Member Name 1`，两种模式都有）区分。以上�
 （不超过 3 人一行时的列宽）。头像和字号按 AVATAR_TIERS 从大到小试，取第一档
 「姓名、角色一行放得下，整组高度放得进正文区」的；最小一档也放不下才警告。
 整组在正文区（common.body_area）里垂直居中。
+职责按选中那一档折行难看（超过 MAX_DUTY_LINES 行，或末行只剩 ≤ common.WIDOW_CHARS 个字）时警告；
+审核脚本用同一个 duty_wrap_problems 报「团队职责折行」。
 """
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
@@ -28,7 +30,7 @@ from mdparse import DeckError
 
 from .common import (DESC_INK, IMG_W, INK, LINE_SPACING, LIST_ITEM, MUTED, RULE, add_line,
                      add_page_chrome, add_run, add_shape, add_textbox, body_area, fill_titles,
-                     text_lines, text_width_in, warn)
+                     text_lines, text_width_in, warn, wrap_problem)
 
 NAME = "team"
 LAYOUT_INDEX = 0
@@ -181,16 +183,35 @@ def _pick_tier(members, rows, col, area_h):
     return tier, _tier_layout(members, rows, col, tier) or (MAX_DUTY_LINES, 0, 0), False
 
 
-def _render_avatars(prs, page, ctx):
-    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
-    fill_titles(slide, page)
+def _plan(page, ctx):
+    """方向 C 的排布：(各行人数, 列宽, 正文区, 选中的档, (职责行数, 行高, 整组高), 放不放得下)。"""
     members = page.fields["members"]
     rows = _rows(len(members))
     area = body_area(page, ctx)
     col = area.width / max(rows[0], C_MIN_COLS)
-    tier, (duty_lines, row_h, group_h), fits = _pick_tier(members, rows, col, area.height)
+    tier, got, fits = _pick_tier(members, rows, col, area.height)
+    return rows, col, area, tier, got, fits
+
+
+def duty_wrap_problems(page, ctx):
+    """方向 C 的团队页：按生成器选中的那一档，职责折行难看的成员 → [(姓名, 职责, 原因)]
+    （超过 MAX_DUTY_LINES 行，或末行只剩 ≤ common.WIDOW_CHARS 个字）。生成器警告和
+    审核「团队职责折行」都用它。"""
+    _, col, _, tier, _, _ = _plan(page, ctx)
+    duty_pt, text_w = tier[4], col - 2 * C_TEXT_PAD
+    return [(m["name"], m["duty"], problem) for m in page.fields["members"]
+            for problem in [wrap_problem(m["duty"], duty_pt, text_w, MAX_DUTY_LINES)] if problem]
+
+
+def _render_avatars(prs, page, ctx):
+    slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
+    fill_titles(slide, page)
+    members = page.fields["members"]
+    rows, col, area, tier, (duty_lines, row_h, group_h), fits = _plan(page, ctx)
     if not fits:
         warn(f"页「{page.title}」团队成员的姓名、角色和职责估计溢出正文区, 建议精简职责")
+    for name, duty, problem in duty_wrap_problems(page, ctx):
+        warn(f"页「{page.title}」成员「{name}」的职责折行难看（{problem}）, 建议改短或改写: {duty}")
     d, initial_pt, name_pt, role_pt, duty_pt, gap = tier
     text_w = col - 2 * C_TEXT_PAD
     top0 = area.top + max(0, (area.height - group_h) / 2)

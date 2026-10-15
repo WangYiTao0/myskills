@@ -601,6 +601,43 @@ def text_lines(text, pt, width_in):
     return max(1, -(-text_width_in(text, pt) // width_in))
 
 
+def _tokens(text):
+    """断行单位：CJK / 全角字符一个一个断，拉丁单词（连同后面的空白）整个断。"""
+    return re.findall(r"[\u2E80-\uFFFF]|[^\s\u2E80-\uFFFF]+\s*|\s+", text)
+
+
+def wrap_lines(text, pt, width_in):
+    """按 text_width_in 的字宽贪心断行，返回各行文字（估算，和 text_lines 同一口径）。
+    单个拉丁词宽过一行时按字符断。"""
+    lines, cur = [], ""
+    for tok in _tokens(text):
+        pieces = [tok] if text_width_in(tok.rstrip(), pt) <= width_in else list(tok)
+        for piece in pieces:
+            if cur and text_width_in((cur + piece).rstrip(), pt) > width_in:
+                lines.append(cur.rstrip())
+                cur = piece.lstrip()
+            else:
+                cur += piece
+    if cur.strip():
+        lines.append(cur.rstrip())
+    return lines
+
+
+WIDOW_CHARS = 2                  # 末行只剩这么几个字以内算折行难看
+
+
+def wrap_problem(text, pt, width_in, max_lines):
+    """text 按 wrap_lines 断行后难看时返回原因（中文短句），否则 None：超过 max_lines 行，
+    或末行只剩 ≤ WIDOW_CHARS 个字。process 的「流程说明折行」、team 的「团队职责折行」都用它。"""
+    lines = wrap_lines(text, pt, width_in)
+    if len(lines) > max_lines:
+        return f"估计折成 {len(lines)} 行（最多 {max_lines} 行）"
+    tail = lines[-1].replace(" ", "") if len(lines) > 1 else ""
+    if tail and len(tail) <= WIDOW_CHARS:
+        return f"末行只剩「{tail}」{len(tail)} 个字"
+    return None
+
+
 # ---- 正文行：缩进子列表 ---------------------------------------------------------
 
 _SUB_ITEM = re.compile(r"^[-*+]\s+(.*)$")

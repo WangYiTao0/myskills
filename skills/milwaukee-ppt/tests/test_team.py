@@ -4,7 +4,7 @@
 形状名约定（N 从 1 起，与成员顺序一致）：Member Card N（卡片底）、Member Name N（姓名）、
 Member Role N（角色）、Member Rule N（角色和职责之间的细线）、Member Duty N（职责）。
 """
-from deckcheck import (CONTENT_SLOT_IN, EMU, INK, LAYOUT_INDEX, body_slide, bottom, caption_bar,
+from deckcheck import (SKILL, CONTENT_SLOT_IN, EMU, INK, LAYOUT_INDEX, body_slide, bottom, caption_bar, lines_with,
                        center_x, check, deck_error, fill_color, finish, generate, geometry, inside,
                        inside_shape, line_color, one, out_of_bounds, paragraphs, placeholder,
                        red_elements, review, run_style, run_styles, shapes_named, tag_shape,
@@ -192,6 +192,15 @@ Layout: team
 """
 
 
+# 4 人一行时第一档职责 18pt、每行约 10 个汉字（和生成器同一估算）
+CLEAN = [("林晓", "项目负责人", "统筹进度和车间对接"),
+         ("周航", "现场推进", "试点车间贴码和巡检"),
+         ("陈雨", "数据复盘", "汇总借还记录出周报"),
+         ("Alex Kim", "系统支持", "扫码小程序维护")]
+WIDOW_DUTY = "统筹进度，对接车间主任"                     # 末行只剩「任」
+LONG_DUTY = "试点车间贴码、培训和巡检，每周汇总借还记录并出周报和月报以及年度总结报告"  # 4 行
+
+
 C_ROLES = ["Member Avatar", "Member Name", "Member Role", "Member Rule", "Member Duty"]
 WHITE, MUTED, NEAR_BLACK, GRAY_LINE = "FFFFFF", "6B6B6B", "333333", "BFBFBF"
 
@@ -251,12 +260,12 @@ def check_avatars(s, members, label):
 def test_general_mode_avatars():
     """C 模式 4 人：一行头像，同一水平线、等大；整组在正文区里水平、垂直居中；只有 lead 竖线用红；
     正常稿没有警告。"""
-    r = generate(general_md(MEMBERS))
+    r = generate(general_md(CLEAN))
     check("C team：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
     s = body_slide(r)
     if s is None:
         return
-    check_avatars(s, MEMBERS, "C team 4 人")
+    check_avatars(s, CLEAN, "C team 4 人")
     avs = shapes_named(s, "Member Avatar")
     if len(avs) == 4:
         check("C team 4 人：头像同一水平线、等大、从左到右",
@@ -322,6 +331,42 @@ def test_general_mode_overflow_warning():
           r.stderr)
 
 
+def test_general_mode_duty_wrap():
+    """C 模式：职责末行只剩 ≤2 字或超过 3 行时，生成器警告（带页标题和姓名）、审核报
+    「团队职责折行」；折得干净的不警告不报；月报模式不查。"""
+    r = generate(general_md(CLEAN))
+    out = review(r.workdir / "deck.md", r.path)
+    check("C team 职责折得干净：不警告、不报「团队职责折行」",
+          r.rc == 0 and not warnings(r.stderr) and not lines_with(out.stdout, "团队职责折行"),
+          r.stderr + out.stdout)
+    for label, duty in (("末行只剩一字", WIDOW_DUTY), ("超过 3 行", LONG_DUTY)):
+        members = [CLEAN[0][:2] + (duty,)] + CLEAN[1:]
+        r = generate(general_md(members, title="Wrap Team"))
+        check(f"C team 职责{label}：生成器警告（带页标题和姓名）",
+              r.rc == 0 and any("Wrap Team" in w and "林晓" in w and "折行" in w
+                                for w in warnings(r.stderr)), r.stderr)
+        out = review(r.workdir / "deck.md", r.path)
+        hits = lines_with(out.stdout, "团队职责折行")
+        check(f"C team 职责{label}：审核报「团队职责折行」（含页和姓名）",
+              len(hits) == 1 and "Wrap Team" in hits[0] and "林晓" in hits[0] and " → " in hits[0],
+              out.stdout)
+    r = generate(team_md(lines([CLEAN[0][:2] + (WIDOW_DUTY,)] + CLEAN[1:]) + "\n" + CONCLUSION))
+    out = review(r.workdir / "deck.md", r.path)
+    check("月报 team 职责末行一字：不警告折行、不报「团队职责折行」",
+          not any("折行" in w for w in warnings(r.stderr))
+          and not lines_with(out.stdout, "团队职责折行"), r.stderr + out.stdout)
+
+
+def test_duty_wrap_docs():
+    """文档一致性：layouts.md 的 team 小节和 scripts README 的审核规则都写了「团队职责折行」。"""
+    layouts_md = (SKILL / "references" / "layouts.md").read_text(encoding="utf-8")
+    team = layouts_md.split("## team · 团队页", 1)[1].split("## table · 表格页", 1)[0]
+    check("layouts.md team 小节：警告和审核写了职责折行（末行 ≤2 字、超过 3 行）",
+          "团队职责折行" in team and "末行" in team and "3 行" in team, team[-800:])
+    readme = (SKILL / "scripts" / "README.md").read_text(encoding="utf-8")
+    check("scripts README：审核规则列出「团队职责折行」", "团队职责折行" in readme)
+
+
 if __name__ == "__main__":
     test_render()
     test_review()
@@ -330,4 +375,6 @@ if __name__ == "__main__":
     test_general_mode_avatars()
     test_general_mode_capacity()
     test_general_mode_overflow_warning()
+    test_general_mode_duty_wrap()
+    test_duty_wrap_docs()
     finish()
