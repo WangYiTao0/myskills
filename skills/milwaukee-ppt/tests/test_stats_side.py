@@ -12,7 +12,8 @@ NAME = "stats-side"
 TITLE = "Mock Stats Side Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -38,7 +39,8 @@ def side_md(items, points=("Mock finding.",), extra="", title=TITLE):
     body = "\n".join(list(items) + [f"> {p}" for p in points])
     return f"""
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 

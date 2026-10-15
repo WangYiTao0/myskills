@@ -29,7 +29,8 @@ def lines(members):
 def team_md(body, title=TITLE, extra=""):
     return f"""
 ---
-title: 虚构项目汇报
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 

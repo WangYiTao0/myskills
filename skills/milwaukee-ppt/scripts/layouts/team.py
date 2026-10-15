@@ -7,7 +7,7 @@ Next: 照常可用。没写列表符号的「姓名 | 角色 | 职责」行报�
 
 排版：每人一张卡片（#F5F5F5 底 + #E5E5E5 细描边），卡片宽固定为一行 4 张时的宽度：
 2–4 人排一行，5–8 人排两行（第一行 = 总数一半向上取整，第二行从同一左沿排起）；
-整组在正文区（1.30–5.60"）里水平、垂直居中。卡片里自上而下：姓名（20pt bold #1A1A1A）、
+整组在正文区（common.body_area；月报模式 1.30–5.60"）里水平、垂直居中。卡片里自上而下：姓名（20pt bold #1A1A1A）、
 角色（14pt #6B6B6B）、一条 #BFBFBF 细线、职责（12pt #1A1A1A，最多 3 行）。
 只用黑白灰，banner 和底部红条以外不用红。和 evidence、section、agenda 共用模板 layout 0，
 inspect 靠 MARK_SHAPE 区分。
@@ -18,8 +18,8 @@ from pptx.util import Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (IMG_H, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, LIST_ITEM, MUTED, RULE,
-                     add_line, add_page_chrome, add_run, add_shape, add_textbox, fill_titles,
+from .common import (IMG_W, INK, LINE_SPACING, LIST_ITEM, MUTED, RULE, add_line, add_page_chrome,
+                     add_run, add_shape, add_textbox, body_area, fill_titles,
                      text_lines, text_width_in)
 
 NAME = "team"
@@ -95,8 +95,9 @@ def render(prs, page, ctx):
     rows = -(-len(members) // per_row)
     group_w = per_row * CARD_W + (per_row - 1) * GAP
     group_h = rows * CARD_H + (rows - 1) * GAP
-    left0 = IMG_LEFT + (IMG_W - group_w) / 2
-    top0 = IMG_TOP + (IMG_H - group_h) / 2
+    area = body_area(page, ctx)
+    left0 = area.left + (area.width - group_w) / 2
+    top0 = area.top + (area.height - group_h) / 2
     for i, mb in enumerate(members):
         n = i + 1
         row, col = divmod(i, per_row)

@@ -23,7 +23,8 @@ from pptx.util import Inches
 from mdparse import DeckError
 
 from .common import (BRAND_RED, IMG_H, IMG_LEFT, IMG_TOP, IMG_W, INK, LINE_SPACING, LIST_ITEM, RULE,
-                     add_page_chrome, add_run, add_shape, fill_titles, key_mark, text_lines)
+                     add_page_chrome, add_run, add_shape, body_area, fill_titles, key_mark,
+                     text_lines, warn)
 
 NAME = "table"
 LAYOUT_INDEX = 0
@@ -64,7 +65,11 @@ def col_text_w(ncols):
     return TABLE_W / ncols - 2 * CELL_PAD_X
 
 
-def table_top(page):
+def table_top(page, ctx=None):
+    """表格上沿（英寸）：正文区上沿；月报模式下写了 Tag 时下移到 Month Tag 下面。
+    ctx 为 None（解析时还不知道模式）按月报口径算，放得下的表格在方向 C 下通常也放得下。"""
+    if ctx is not None and ctx.lead:
+        return max(body_area(page, ctx).top, TAG_BOTTOM + TAG_GAP if page.tag else 0)
     return TAG_BOTTOM + TAG_GAP if page.tag else IMG_TOP
 
 
@@ -170,7 +175,13 @@ def render(prs, page, ctx):
     f = page.fields
     header, body, heights = f["header"], f["rows"], f["heights"]
     ncols = len(header)
-    top = Inches(table_top(page))
+    top = Inches(table_top(page, ctx))
+    if ctx.lead:
+        area = body_area(page, ctx)
+        room = area.bottom - table_top(page, ctx)
+        if sum(heights) > room + 1e-9:
+            warn(f"页「{page.title}」表格太高（约 {sum(heights):.2f}\"，正文区只有 {room:.2f}\"），"
+                 f"会压到页底的 Next 行；把多行的格子写短，或精简结论 / Next")
     row_emu = [Inches(h) for h in heights]
     col_emu = Inches(TABLE_W / ncols)
     frame = slide.shapes.add_table(len(heights), ncols, Inches(TABLE_LEFT), top,

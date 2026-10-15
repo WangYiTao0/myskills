@@ -17,7 +17,7 @@ from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (add_page_chrome, add_run, fill_titles, strip_theme_style, take_slot,
+from .common import (add_page_chrome, add_run, fill_titles, strip_theme_style, fit_body, take_slot,
                      text_lines, warn)
 
 NAME = "process"
@@ -60,7 +60,8 @@ def parse(page):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    left, top, width, height = take_slot(slide, SLOT_IDX)
+    # 方向 C 下上下沿换成正文区（common.fit_body）
+    left, top, width, height = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
 
     steps = page.fields["steps"]
     n = len(steps)

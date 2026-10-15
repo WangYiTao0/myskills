@@ -84,7 +84,8 @@ def build(doc):
     prs = Presentation(TEMPLATE)
     delete_template_slides(prs)
     add_cover(prs, doc.meta)
-    ctx = layouts.Context(source_dir=doc.source_dir, year=deck_year(doc.meta))
+    ctx = layouts.Context(source_dir=doc.source_dir, year=deck_year(doc.meta),
+                          lead=mdparse.uses_lead(doc.meta))
     for page in doc.pages:
         layouts.render(prs, page, ctx)
     closing = closing_text(doc.meta)

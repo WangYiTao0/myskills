@@ -17,7 +17,8 @@ NAME = "timeline"
 TITLE = "Mock Timeline Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -100,7 +101,8 @@ def deck(items, title=TITLE, extra=""):
     body = "\n".join(f"- {x}" for x in items)
     return f"""
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 

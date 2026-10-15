@@ -29,7 +29,8 @@ def table_lines(header, rows, sep=True):
 def table_md(body, title=TITLE, extra=""):
     return f"""
 ---
-title: 虚构项目汇报
+month: 2026-10
+author: Mock.Author
 date: 14 Oct 2026
 ---
 

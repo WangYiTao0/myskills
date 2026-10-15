@@ -14,7 +14,8 @@ NAME = "process"
 TITLE = "Mock Process Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -65,7 +66,8 @@ def steps_md(steps, title=TITLE):
     body = "\n".join(f"{i}. {s}" for i, s in enumerate(steps, start=1))
     return f"""
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 

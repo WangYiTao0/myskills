@@ -19,7 +19,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import mdparse  # noqa: E402
-from layouts.common import is_number, text_width_in  # noqa: E402  和生成器同一套数字判定、字宽估算
+from layouts.common import (conclusion_text, is_number, next_text,  # noqa: E402
+                            text_width_in)  # 和生成器同一套结论 / Next 文字、数字判定、字宽估算
 from mdparse import DeckError  # noqa: E402
 
 # 项目汇报模式下，章节 → 不适合放的版式（目标、范围要写目标和边界，不放流程和改前改后；应用场景不放改前改后）
@@ -100,6 +101,21 @@ def check_agenda_sections(doc):
             for p in doc.pages if p.layout == "section" and p.fields["name"] not in names]
 
 
+def check_lead(page):
+    """方向 C（通用 / 项目汇报模式）下的 lead：不能和副标题一样；对比页只能有一句 lead。"""
+    issues = []
+    text = conclusion_text(page)
+    if text and text == page.action_title.strip():
+        issues.append(("lead 和副标题相同", where(page), f"结论行（lead）和副标题都是「{text}」",
+                       "副标题写本页结论，lead 重申结论并补上数据支撑（SKILL.md §4），两句不要一样"))
+    if page.layout == "before-after" and page.fields["lead"]:
+        issues.append(("对比页两个 lead", where(page),
+                       f"第一个 ### 前写了「{page.fields['lead']}」，结论行又是一句 lead；"
+                       f"前一句不会画出来",
+                       "合并成一句结论写在最后一个小节之后，删掉第一个 ### 前的文字"))
+    return issues
+
+
 def review_md(doc):
     """内容检查：只看文稿（版式字段由版式模块解析好）。返回 [(规则, 位置, 问题, 怎么改)]。"""
     issues = []
@@ -114,14 +130,18 @@ def review_md(doc):
                            f"和上一页「{prev.title}」都是 {page.layout}，连着看像同一页",
                            "合并两页，或给其中一页换更贴合内容的版式"))
     seen_steps = []
+    lead = mdparse.uses_lead(doc.meta)
     for page in pages:
         title = page.action_title.strip()
         if is_directory_subtitle(title, chinese(page.title)):
             issues.append(("目录式副标题", where(page), f"副标题「{title}」没有给出结论",
                            "改成一句结论，如「试点 8 周，检验单全部电子化」"))
         if not page.conclusion and page.layout not in NAV_LAYOUTS:
-            issues.append(("缺结论行", where(page), "没有普通文字结论行，页底没有红条",
+            issues.append(("缺结论行", where(page),
+                           "没有普通文字结论行，" + ("标题下没有 lead" if lead else "页底没有红条"),
                            "在版式字段后加一行本页结论，最好带数字"))
+        if lead:
+            issues += check_lead(page)
         if page.layout == "process":
             names = {name for name, _ in page.fields["steps"]}
             for other_title, other in seen_steps:
@@ -261,6 +281,32 @@ def review_pptx(doc, path):
                     and sh.top < BANNER_BOTTOM):
                 issues.append(("不是生成脚本做的", place,
                                f"banner 上另画了文本框「{sh.name}」", REDRAW))
+        issues += check_drawn(slide, page, place, mdparse.uses_lead(doc.meta))
+    return issues
+
+
+def _texts(slide, name):
+    """名为 name 的形状里的各段文字（去掉首尾空白、跳过空段）。"""
+    return [p.text.strip() for sh in slide.shapes if sh.name == name and sh.has_text_frame
+            for p in sh.text_frame.paragraphs if p.text.strip()]
+
+
+def check_drawn(slide, page, place, lead):
+    """结论和 Next 画进了 pptx：方向 C 下结论在 Lead、Next 在 Next Line（文字一致）；
+    月报模式下两句都要出现在底部红条 Caption Bar 里。"""
+    if page.layout in NAV_LAYOUTS:
+        return []
+    issues = []
+    for rule, want, shape, label in (
+            ("结论没画出来", conclusion_text(page), "Lead" if lead else "Caption Bar", "结论行"),
+            ("Next 没画出来", next_text(page), "Next Line" if lead else "Caption Bar", "Next")):
+        if not want:
+            continue
+        got = _texts(slide, shape)
+        if (got != [want]) if lead else (want not in got):
+            seen = "没有这个形状" if not got else f"里面是「{' / '.join(got)}」"
+            issues.append((rule, place, f"文稿的{label}「{want}」没画进「{shape}」（{seen}）",
+                           REDRAW))
     return issues
 
 
@@ -303,6 +349,8 @@ OVERLAP_EXEMPT = {
 }
 OVERLAP_PAIRS = {("Current Ring", "Milestone"),  # 进行中节点的外圈套在节点上
                  }
+# 两两豁免（名字完全相同才算）：方向 C 的 lead 和它左侧的红竖线、页底 Next 行和它上方的细线
+OVERLAP_TWINS = {frozenset({"Lead", "Lead Accent"}), frozenset({"Next Rule", "Next Line"})}
 _COMPONENT = re.compile(r"^(\S+) .*?(\d+)$")   # 「Process Card 2」→ 组件 (Process, 2)
 
 
@@ -313,6 +361,8 @@ def _component(name):
 
 def _overlap_exempt(a, b):
     if a.is_placeholder or b.is_placeholder or {a.name, b.name} & OVERLAP_EXEMPT:
+        return True
+    if frozenset({a.name, b.name}) in OVERLAP_TWINS:
         return True
     ca, cb = _component(a.name), _component(b.name)
     if ca is not None and ca == cb:

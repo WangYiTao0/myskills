@@ -53,6 +53,7 @@ CAPTION_BOTTOM = 6477000
 CAPTION_MIN_CY = 1097952
 
 BRAND_RED = "DB011C"
+INK = "1A1A1A"                 # 近黑：正文、lead、Next 行
 # 视为“红色”的颜色：品牌红 + 常见纯红/深红，防止有人另起一个红
 RED_COLORS = {BRAND_RED, "FF0000", "C00000", "E3000F", "D0021B", "CC0000"}
 

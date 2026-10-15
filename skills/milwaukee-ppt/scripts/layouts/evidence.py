@@ -6,8 +6,7 @@ import re
 
 from pptx.util import Inches
 
-from .common import (IMG_GAP, IMG_H, IMG_LEFT, IMG_TOP, IMG_W,
-                     add_page_chrome, fill_titles, load_image, warn)
+from .common import IMG_GAP, add_page_chrome, body_area, fill_titles, load_image, warn
 
 NAME = "evidence"
 LAYOUT_INDEX = 0          # 模板 layout 0「Blank Slide」：idx 0 主标题、idx 10 action title
@@ -32,7 +31,7 @@ def parse(page):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    place_images(slide, page.fields.get("images", []), ctx, page.title)
+    place_images(slide, page.fields.get("images", []), ctx, page.title, body_area(page, ctx))
     add_page_chrome(slide, page, ctx)
     return slide
 
@@ -61,28 +60,29 @@ def _cell_widths(files, usable):
     return [usable * s / total for s in shares]
 
 
-def place_images(slide, refs, ctx, page_title):
-    """1–3 张图：各自保持比例、在 cell 内居中；整行按最高图垂直居中。"""
+def place_images(slide, refs, ctx, page_title, area):
+    """1–3 张图排在正文区 area（common.Area，英寸）里：各自保持比例、在 cell 内居中；
+    整行按最高图垂直居中。"""
     if not refs:
         return
     if len(refs) > MAX_IMAGES:
         warn(f"页「{page_title}」有 {len(refs)} 张图, 仅使用前 {MAX_IMAGES} 张")
         refs = refs[:MAX_IMAGES]
     files = [load_image(r, ctx, page_title) for r in refs]
-    widths = _cell_widths(files, IMG_W - IMG_GAP * (len(files) - 1))
+    widths = _cell_widths(files, area.width - IMG_GAP * (len(files) - 1))
 
     placed = []
-    cell_left = IMG_LEFT
+    cell_left = area.left
     for p, cell_w in zip(files, widths):
-        pic = slide.shapes.add_picture(p, Inches(cell_left), Inches(IMG_TOP))
-        scale = min(Inches(cell_w) / pic.width, Inches(IMG_H) / pic.height)
+        pic = slide.shapes.add_picture(p, Inches(cell_left), Inches(area.top))
+        scale = min(Inches(cell_w) / pic.width, Inches(area.height) / pic.height)
         pic.width = int(pic.width * scale)
         pic.height = int(pic.height * scale)
         pic.left = Inches(cell_left) + int((Inches(cell_w) - pic.width) / 2)
         placed.append(pic)
         cell_left += cell_w + IMG_GAP
     row_h = max(pic.height for pic in placed)
-    row_top = Inches(IMG_TOP) + int((Inches(IMG_H) - row_h) / 2)
+    row_top = Inches(area.top) + int((Inches(area.height) - row_h) / 2)
     for pic in placed:
         pic.top = row_top
 

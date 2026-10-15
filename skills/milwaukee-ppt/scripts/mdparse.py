@@ -56,6 +56,12 @@ def is_monthly(meta):
     return not meta.get("title") and bool(meta.get("month"))
 
 
+def uses_lead(meta):
+    """方向 C（结论画成标题下的 lead、Next 画在页底一行）：通用模式和项目汇报模式都是；
+    月报模式仍画底部红条。"""
+    return not is_monthly(meta)
+
+
 PROJECT_REPORT = "project"
 PDCA_LETTERS = ("P", "D", "C", "A")
 

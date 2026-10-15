@@ -23,7 +23,7 @@ from mdparse import DeckError
 from .common import (BRAND_RED, DOING, DOING_AMBER, DOING_INK, DONE, DONE_GREEN, KEY_LABEL,
                      LIST_ITEM, STATUS_LABELS, TODO, add_legend, add_line, add_page_chrome,
                      add_run, add_shape, add_textbox, fill_titles, key_mark, parse_statuses,
-                     take_slot, text_lines, text_width_in, warn)
+                     fit_body, take_slot, text_lines, text_width_in, warn)
 
 NAME = "timeline-phase"
 LAYOUT_INDEX = 6
@@ -150,7 +150,8 @@ def _overflows(date, title, desc, st, seg_w, seg_h, text_w, text_h):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    left, top, width, slot_h = take_slot(slide, SLOT_IDX)   # 空槽位不留在页面上
+    # 空槽位不留在页面上；方向 C 下上下沿换成正文区
+    left, top, width, slot_h = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
 
     items = page.fields["items"]
     n = len(items)

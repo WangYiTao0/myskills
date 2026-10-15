@@ -26,7 +26,7 @@ from mdparse import DeckError
 
 from .common import (BRAND_RED, LATIN_FONT, UNIT_PT, add_line, add_number, add_page_chrome,
                      SOURCE_LINE, add_run, add_shape, add_textbox, check_stat_cards,
-                     fill_titles, parse_stat_card, split_number, sub_item, take_slot,
+                     fill_titles, parse_stat_card, split_number, sub_item, fit_body, take_slot,
                      text_lines, warn)
 
 NAME = "stats"
@@ -176,7 +176,8 @@ def _height_in(lines, pt):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    left, top, width, height = take_slot(slide, SLOT_IDX)
+    # 方向 C 下上下沿换成正文区（common.fit_body）
+    left, top, width, height = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
 
     items = page.fields["items"]
     n = len(items)

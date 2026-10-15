@@ -12,7 +12,8 @@ NAME = "stats"
 TITLE = "Mock Stats Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -67,7 +68,8 @@ def stats_md(items, title=TITLE):
     body = "\n".join(items)
     return f"""
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -254,7 +256,8 @@ def test_columns_fill_slot():
 
 POINTS_MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 

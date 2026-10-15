@@ -29,7 +29,7 @@ from mdparse import DeckError
 
 from .common import (DOING, DONE, DONE_GREEN, KEY_LABEL, LIST_ITEM, STATUS_COLORS, STATUS_LABELS,
                      TODO, add_legend, add_line, add_page_chrome, add_run, add_shape, add_textbox,
-                     fill_titles, key_mark, parse_statuses, strip_theme_style, take_slot,
+                     fill_titles, key_mark, parse_statuses, strip_theme_style, fit_body, take_slot,
                      text_lines, warn)
 
 NAME = "timeline"
@@ -116,7 +116,8 @@ def _line(slide, name, x1, x2, y, color, pt, dash=None):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    rect = take_slot(slide, SLOT_IDX)   # 空槽位不留在页面上
+    # 空槽位不留在页面上；方向 C 下上下沿换成正文区
+    rect = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
     if page.fields["statuses"] is None:
         _render_plain(slide, page, rect)
     else:

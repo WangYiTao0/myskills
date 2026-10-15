@@ -20,7 +20,8 @@ PX = 9525   # 96 dpi 下一个像素（EMU）
 
 # 正样本：各版式的常见写法（写了 / 没写 Tag、状态 / 旧写法、图 / 短文、条目数上下限、
 # 隔断页字数上限、目录页 8 条写满、团队页 8 人写满、
-# 表格页 6 列 × 8 行写满带 Tag 和一行 !）
+# 表格页 6 列 × 8 行写满带 Tag 和一行 !、写了 / 没写 Next:）。
+# 通用模式（方向 C：lead + 页底 Next 行）；同一批页面另有项目汇报模式和月报模式（底部红条）版本。
 VARIANTS = """\
 ---
 title: 仓库叉车充电排班优化 项目汇报
@@ -51,6 +52,7 @@ Tag: Aug
 4. 按时充电 | 到点去指定充电位
 5. 复核 | 班长每周复核一次
 五步流程在 B 仓试运行 3 周
+Next: 9 月推广到 A 仓
 
 # 试运行 / PILOT
 ## B 仓试运行 3 周，排队明显缩短
@@ -91,6 +93,7 @@ Tag: Aug
 系统按剩余电量分配充电时段，推送到手持终端
 
 高峰排队从 6 台降到 2 台
+Next: 9 月推广到 A 仓
 
 # 关键数据 / KEY RESULTS
 ## 试运行 3 周，高峰排队降到 2 台
@@ -105,6 +108,7 @@ Tag: Aug
 - 叉车数 | 18 台 | B 仓全部叉车
 口径：B 仓 8 月 3 周系统记录
 平均等待从约 22 分钟降到约 6 分钟
+下一步：9 月复核 A 仓同口径数据
 
 # 数据概览 / OVERVIEW
 ## 两项指标都达到目标
@@ -177,6 +181,7 @@ Tag: Aug
 - 欧阳试点七号成员 | 仓库叉车充电排班负责人 | 负责充电排班规则制定、试运行推进、每日巡检、问题登记和周报汇总，对接仓库主管
 - 欧阳试点八号成员 | 仓库叉车充电排班负责人 | 负责充电排班规则制定、试运行推进、每日巡检、问题登记和周报汇总，对接仓库主管
 分工按现场和数据两条线，周会对齐一次
+Next: 9 月加入 A 仓班组长
 
 # 充电等待 / WAITING
 ## B 仓高峰等待最长，排班先从 B 仓调
@@ -193,6 +198,7 @@ Tag: Aug
 | G 仓第1项 | G 仓第2项 | G 仓第3项 | G 仓第4项 | G 仓第5项 | G 仓第6项 |
 | 试点车间叉车充电排班调整记录1 | 试点车间叉车充电排班调整记录2 | 试点车间叉车充电排班调整记录3 | 试点车间叉车充电排班调整记录4 | 试点车间叉车充电排班调整记录5 | 试点车间叉车充电排班调整记录6 |
 B 仓高峰等待 35 分钟，是 A 仓的两倍
+Next: 9 月先调 B 仓排班
 """
 IMAGES = {"img/a.png": (1600, 900), "img/b.png": (1200, 900), "img/tall.png": (900, 1600)}
 
@@ -211,6 +217,12 @@ def project_variants_md():
     return "\n# ".join(pages)
 
 
+def monthly_variants_md():
+    """同一批页面的月报模式版本：结论和 Next 进底部红条（frontmatter 换成 month + author）。"""
+    head, body = VARIANTS.split("\n---\n", 1)
+    return "---\nmonth: 2026-08\nauthor: Mock.Author\ndate: 02 Sep 2026\n---\n" + body
+
+
 def geometry_lines(out):
     return [line for line in out.splitlines()
             if any(line.startswith(f"[{rule}]") for rule in GEOMETRY_RULES)]
@@ -227,6 +239,14 @@ def variants():
 def project_variants():
     """→ (文稿路径, pptx 路径)：各版式写法的项目汇报模式版本（带 PDCA 图标）。"""
     r = generate(project_variants_md(), images=IMAGES)
+    if r.rc != 0:
+        raise RuntimeError(r.stderr)
+    return r.workdir / "deck.md", r.path
+
+
+def monthly_variants():
+    """→ (文稿路径, pptx 路径)：各版式写法的月报模式版本（底部红条）。"""
+    r = generate(monthly_variants_md(), images=IMAGES)
     if r.rc != 0:
         raise RuntimeError(r.stderr)
     return r.workdir / "deck.md", r.path
@@ -265,7 +285,8 @@ def test_variants_cover_every_layout():
 
 def test_normal_decks_have_no_geometry_issues():
     for label, (md, pptx) in (("示例文稿", demo()), ("各版式写法", variants()),
-                              ("各版式写法（项目模式，带 PDCA 和 Tag）", project_variants())):
+                              ("各版式写法（项目模式，带 PDCA 和 Tag）", project_variants()),
+                              ("各版式写法（月报模式，底部红条）", monthly_variants())):
         r = review(md, pptx)
         check(f"{label}：没有几何问题", not geometry_lines(r.stdout), geometry_lines(r.stdout))
 
@@ -342,8 +363,34 @@ def test_text_overflow():
            "文字溢出", 8, "Stat Points 2")
     expect("流程卡片说明塞满", md, pptx, lambda prs: stuff(shape(prs, 5, "Process Card 1")),
            "文字溢出", 5, "Process Card 1")
-    expect("红条塞满", md, pptx, lambda prs: stuff(shape(prs, 4, "Caption Bar")),
-           "文字溢出", 4, "Caption Bar")
+    expect("lead 塞满", md, pptx, lambda prs: stuff(shape(prs, 4, "Lead")),
+           "文字溢出", 4, "Lead")
+    expect("Next 行塞满", md, pptx, lambda prs: stuff(shape(prs, 4, "Next Line")),
+           "文字溢出", 4, "Next Line")
+    md, pptx = monthly_variants()
+    expect("红条塞满（月报模式）", md, pptx, lambda prs: stuff(shape(prs, 2, "Caption Bar"), 20),
+           "文字溢出", 2, "Caption Bar")
+
+
+def test_lead_pairs_exempt_but_not_body():
+    """Lead / Lead Accent、Next Rule / Next Line 两两豁免重叠；正文形状压到 lead 照样报。"""
+    md, pptx = variants()
+
+    def accent_into_lead(prs):
+        shape(prs, 4, "Lead Accent").left = shape(prs, 4, "Lead").left
+
+    def rule_into_next(prs):
+        shape(prs, 4, "Next Rule").top = shape(prs, 4, "Next Line").top + Inches(0.1)
+
+    for label, change in (("竖线挪进 Lead", accent_into_lead), ("细线挪进 Next Line", rule_into_next)):
+        r = review(md, broken(pptx, change))
+        check(f"{label}：不报重叠", not [ln for ln in r.stdout.splitlines()
+                                         if ln.startswith("[重叠]") and "第 4 页" in ln], r.stdout)
+
+    def card_into_lead(prs):
+        shape(prs, 4, "Process Card 1").top = shape(prs, 4, "Lead").top
+
+    expect("流程卡片挪到 lead 上", md, pptx, card_into_lead, "重叠", 4, "Lead")
 
 
 if __name__ == "__main__":
@@ -354,4 +401,5 @@ if __name__ == "__main__":
     test_pdca_icon_not_exempt()
     test_misaligned()
     test_text_overflow()
+    test_lead_pairs_exempt_but_not_body()
     finish()

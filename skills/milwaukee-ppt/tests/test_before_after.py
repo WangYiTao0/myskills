@@ -12,7 +12,8 @@ NAME = "before-after"
 TITLE = "Mock Before / After Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -87,7 +88,8 @@ def test_text_slots():
 
 IMG_MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 ---
 
 # Mock Image Page
@@ -139,7 +141,8 @@ def test_image_slots():
 
 LEAD_MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 ---
 
 # Mock Lead Page

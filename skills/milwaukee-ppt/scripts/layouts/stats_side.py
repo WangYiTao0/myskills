@@ -28,7 +28,7 @@ from mdparse import DeckError
 
 from .common import (BRAND_RED, LATIN_FONT, add_number, add_page_chrome, add_run, add_shape,
                      SOURCE_LINE, add_textbox, check_stat_cards, fill_titles, number_width_in,
-                     parse_stat_card, sub_item, take_slot, text_lines, warn)
+                     parse_stat_card, sub_item, fit_body, take_slot, text_lines, warn)
 
 NAME = "stats-side"
 LAYOUT_INDEX = 5
@@ -206,7 +206,8 @@ def _conclusion(slide, fields, x, top, w, bottom, title):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    left, top, width, height = take_slot(slide, SLOT_IDX)
+    # 方向 C 下上下沿换成正文区（common.fit_body）
+    left, top, width, height = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
     _cards(slide, page.fields["items"], left, top, height, page.title)
     x = left + Inches(LEFT_W + COL_GAP)
     _conclusion(slide, page.fields, x, top, left + width - x, top + height, page.title)

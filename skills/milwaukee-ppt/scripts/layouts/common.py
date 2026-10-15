@@ -17,7 +17,7 @@ from xml.sax.saxutils import escape
 from pptx.oxml import parse_xml
 from pptx.oxml.ns import qn
 from pptx.dml.color import RGBColor
-from pptx.enum.shapes import MSO_CONNECTOR
+from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.util import Inches, Pt
 
@@ -94,6 +94,8 @@ CAPTION_P_XML = ('<a:p xmlns:a="http://schemas.openxmlformats.org/drawingml/2006
 class Context:
     source_dir: str      # 文稿所在目录，相对图片路径以它为基准
     year: str            # Tag 不含年份时补上的年份
+    lead: bool = False   # 方向 C（通用 / 项目汇报模式）：结论画成 lead、Next 画在页底一行；
+                         # False = 月报模式，结论和 Next 进底部红条
 
 
 def fill_titles(slide, page):
@@ -162,16 +164,22 @@ def _caption_geometry(lines, page_title):
     return y, cy
 
 
+def conclusion_text(page):
+    """本页一句话结论（普通文字行拼成一行）；没写为 ""。月报进红条，方向 C 画成 lead。"""
+    return " ".join(page.conclusion).strip()
+
+
+def next_text(page):
+    """「Next: …」/「下一步：…」一行（保留作者写的前缀）；没写 Next 为 ""。"""
+    if not page.next:
+        return ""
+    sep = "：" if page.next_label == "下一步" else ": "
+    return f"{page.next_label}{sep}{page.next}"
+
+
 def caption_lines(page):
     """页面的一句话结论 + 可选 Next，组成红条的各行。"""
-    lines = []
-    conclusion = " ".join(page.conclusion).strip()
-    if conclusion:
-        lines.append(conclusion)
-    if page.next:
-        sep = "：" if page.next_label == "下一步" else ": "
-        lines.append(f"{page.next_label}{sep}{page.next}")
-    return lines
+    return [line for line in (conclusion_text(page), next_text(page)) if line]
 
 
 def add_caption_bar(slide, page):
@@ -218,16 +226,155 @@ def add_month_tag(slide, tag, year, right=None, top=None):
 
 
 def add_page_chrome(slide, page, ctx):
-    """所有版式通用的页面装饰：右上 PDCA 图标和月份标识 + 底部红条（结论 / Next）。
+    """所有版式通用的页面装饰：右上 PDCA 图标和月份标识 + 结论 / Next。
 
-    版式渲染函数画完自己的内容后最后调用它，红条叠在最上层。"""
+    月报模式：结论和 Next 进底部红条（叠在最上层）。方向 C（ctx.lead）：结论画成标题下的
+    lead（add_lead），Next 画在页底一行（add_next_line）。版式渲染函数画完自己的内容后最后调用它；
+    内容要排在 body_area(page, ctx) 里，才不会和 lead / Next 行重叠。"""
     if page.pdca:
         left = add_pdca_icons(slide, page.pdca)
         add_month_tag(slide, page.tag, ctx.year, right=left - Inches(PDCA_TAG_GAP),
                       top=Inches(PDCA_TAG_TOP))
     else:
         add_month_tag(slide, page.tag, ctx.year)
-    add_caption_bar(slide, page)
+    if ctx.lead:
+        add_lead(slide, page)
+        add_next_line(slide, page)
+    else:
+        add_caption_bar(slide, page)
+
+
+# ---- 方向 C：lead、页底 Next 行、正文区 -------------------------------------------
+# lead：标题下、正文区顶部，黑色粗体 22pt；左侧一条品牌红短竖线（Lead Accent）。
+# 写了 Tag 时 lead 右端让到月份标识框左侧（PDCA 图标在 1.30" 以上，不用让）。
+# 一行时框高 0.56"（1.30–1.86"），正文区从 2.05" 起；多一行框加高一行、正文区跟着下移。
+LEAD_TOP = 1.30
+LEAD_PT = 22
+LEAD_ONE_LINE_H = 0.56
+LEAD_LINE_H = LEAD_PT * LINE_SPACING / 72
+LEAD_MAX_LINES = 2            # 超过就警告
+ACCENT_W = 0.08               # 红竖线宽
+ACCENT_INSET = 0.06           # 红竖线比 lead 框上下各短
+LEAD_LEFT = IMG_LEFT + 0.24   # lead 文字左缘（竖线 → 文字留 0.16"）
+LEAD_TAG_GAP = 0.1            # lead 右端 → 月份标识框左缘
+TAG_W = 1.7                   # add_month_tag 的框宽
+LEAD_BODY_GAP = 0.19          # lead 下沿 → 正文区上沿
+# Next 行：页底一行黑色粗体 16pt，下沿固定 6.94"；上方一条 RULE 色细线（Next Rule）。
+# 一行时框 6.58–6.94"、细线在 6.50"，正文区下沿 6.40"；文字多一行框向上加高一行。
+NEXT_PT = 16
+NEXT_BOTTOM = 6.94
+NEXT_ONE_LINE_H = 0.36
+NEXT_LINE_H = NEXT_PT * LINE_SPACING / 72
+NEXT_RULE_GAP = 0.08          # 细线 → Next 行
+NEXT_RULE_PT = 0.75
+NEXT_BODY_GAP = 0.10          # 正文区下沿 → 细线
+BODY_BOTTOM = 6.95            # 没有 Next 时正文区下沿
+
+
+@dataclass(frozen=True)
+class Area:
+    """矩形区域（英寸）。emu() → (left, top, width, height) 的 EMU 整数，可直接给 python-pptx。"""
+    left: float
+    top: float
+    width: float
+    height: float
+
+    @property
+    def right(self):
+        return self.left + self.width
+
+    @property
+    def bottom(self):
+        return self.top + self.height
+
+    def emu(self):
+        return tuple(int(Inches(v)) for v in (self.left, self.top, self.width, self.height))
+
+
+def _lead_right(page):
+    """lead 文字框右缘（英寸）：写了 Tag 时让到月份标识框左侧。"""
+    right = IMG_LEFT + IMG_W
+    if not page.tag:
+        return right
+    tag_right = right
+    if page.pdca:
+        n = len(page.pdca)
+        tag_right = right - n * PDCA_SIZE - (n - 1) * PDCA_GAP - PDCA_TAG_GAP
+    return min(right, tag_right - TAG_W - LEAD_TAG_GAP)
+
+
+def lead_area(page):
+    """方向 C 下 lead 文字框的矩形；本页没有结论返回 None。"""
+    text = conclusion_text(page)
+    if not text:
+        return None
+    width = _lead_right(page) - LEAD_LEFT
+    lines = int(text_lines(text, LEAD_PT, width))
+    return Area(LEAD_LEFT, LEAD_TOP, width, LEAD_ONE_LINE_H + (lines - 1) * LEAD_LINE_H)
+
+
+def next_area(page):
+    """方向 C 下 Next 行文字框的矩形；本页没写 Next 返回 None。"""
+    text = next_text(page)
+    if not text:
+        return None
+    lines = int(text_lines(text, NEXT_PT, IMG_W))
+    height = NEXT_ONE_LINE_H + (lines - 1) * NEXT_LINE_H
+    return Area(IMG_LEFT, NEXT_BOTTOM - height, IMG_W, height)
+
+
+def body_area(page, ctx):
+    """本页正文区（英寸 Area）：版式内容都排在这里面。
+
+    月报模式：原来的正文区 0.56 / 1.30"、12.20 × 4.30"（下面留给底部红条）。
+    方向 C：左右不变；上沿在 lead 下方（没有结论时 1.30"），下沿在 Next 细线上方
+    （没有 Next 时 6.95"）。导航版式（section / agenda）不用它，正文区不变。"""
+    if not ctx.lead:
+        return Area(IMG_LEFT, IMG_TOP, IMG_W, IMG_H)
+    lead, nxt = lead_area(page), next_area(page)
+    top = lead.bottom + LEAD_BODY_GAP if lead else IMG_TOP
+    bottom = nxt.top - NEXT_RULE_GAP - NEXT_BODY_GAP if nxt else BODY_BOTTOM
+    return Area(IMG_LEFT, top, IMG_W, bottom - top)
+
+
+def fit_body(rect, page, ctx):
+    """模板槽位矩形 (left, top, width, height)（EMU）→ 版式实际排内容的矩形：
+    月报模式原样返回；方向 C 下左右沿用槽位，上下沿换成 body_area。"""
+    if not ctx.lead:
+        return rect
+    area = body_area(page, ctx)
+    left, _, width, _ = rect
+    return left, int(Inches(area.top)), width, int(Inches(area.height))
+
+
+def add_lead(slide, page):
+    """方向 C 的 lead：结论文字（Lead）+ 左侧品牌红短竖线（Lead Accent）。没有结论不画。"""
+    area = lead_area(page)
+    if area is None:
+        return None
+    text = conclusion_text(page)
+    lines = text_lines(text, LEAD_PT, area.width)
+    if lines > LEAD_MAX_LINES:
+        warn(f"页「{page.title}」的结论（lead）估计 {int(lines)} 行, 正文区被压低, "
+             f"建议精简到 {LEAD_MAX_LINES} 行以内: {text}")
+    add_shape(slide, MSO_SHAPE.RECTANGLE, "Lead Accent", Inches(IMG_LEFT),
+              Inches(area.top + ACCENT_INSET), Inches(ACCENT_W),
+              Inches(area.height - 2 * ACCENT_INSET), BRAND_RED)
+    tf = add_textbox(slide, "Lead", *area.emu(), anchor=MSO_ANCHOR.MIDDLE)
+    add_run(tf.paragraphs[0], text, LEAD_PT, True, INK)
+    return tf
+
+
+def add_next_line(slide, page):
+    """方向 C 的页底 Next：细线（Next Rule）+ 一行黑色粗体（Next Line）。没写 Next 不画。"""
+    area = next_area(page)
+    if area is None:
+        return None
+    y = Inches(area.top - NEXT_RULE_GAP)
+    add_line(slide, "Next Rule", Inches(area.left), y, Inches(area.right), y, RULE, NEXT_RULE_PT)
+    tf = add_textbox(slide, "Next Line", *area.emu(), anchor=MSO_ANCHOR.MIDDLE)
+    add_run(tf.paragraphs[0], next_text(page), NEXT_PT, True, INK)
+    return tf
 
 
 # PDCA 图标（项目汇报模式，`PDCA:`）：assets/pdca/<字母>_icon.png（由同名 SVG 预转，

@@ -95,7 +95,6 @@ PDCA: D
 ## 排队改为系统分配，高峰不再扎堆
 Layout: before-after
 PDCA: D
-同一仓库、同一批叉车，改前改后各统计 3 周
 
 ### Before: 凭经验排队
 ![](img/before.png)

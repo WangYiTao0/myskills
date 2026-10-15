@@ -45,7 +45,6 @@ Layout: section
 # 借还登记 / BEFORE-AFTER
 ## 登记从手写改为扫码，记录自动留存
 Layout: before-after
-同一试点车间、同一批工具，改前改后各统计 4 周
 
 ### Before: 纸质登记
 ![](img/paper-log.png)
