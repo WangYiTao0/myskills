@@ -7,7 +7,8 @@
 每条问题一行：「[规则] 位置：问题 → 怎么改」。没有问题时最后一行打印 REVIEW OK，
 有问题时最后一行是「REVIEW: N 条问题」。只报告、不改文件；审完退出码总是 0，
 文稿本身读不了（找不到、写错）时为 1。和生成器共用解析器与版式注册表。
-给了 pptx 时另查真伪（是不是生成器按当前文稿做的）和几何（出界、压 banner / 页脚、
+给了 pptx 时另查真伪（是不是生成器按当前文稿做的、正文形状有没有被后处理改过）、
+红色面积配额（通用 / 项目模式）和几何（出界、压 banner / 页脚、
 文字溢出、重叠、错位；只用 python-pptx 和计算，不依赖 LibreOffice）。
 需要判断的项（内容是否贴题、页序是否讲得通）留给审核清单，由模型逐条核对。
 """
@@ -271,7 +272,8 @@ def _check_pdca(page, chapter):
 
 def review_pptx(doc, path):
     """真伪检查：pptx 是不是生成器按当前文稿做的——页数对得上，标题填在模板标题框
-    （idx 0 / 10）里，banner 上没有另画的文本框。返回 [(规则, 位置, 问题, 怎么改)]。"""
+    （idx 0 / 10）里，banner 上没有另画的文本框，结论 / Next 画出来了，正文形状和按当前 md
+    重新渲染的一致；通用 / 项目模式另查红色面积配额。返回 [(规则, 位置, 问题, 怎么改)]。"""
     from pptx import Presentation
     from pptx.enum.shapes import MSO_SHAPE_TYPE
     prs = Presentation(path)
@@ -299,6 +301,57 @@ def review_pptx(doc, path):
         issues += check_drawn(slide, page, place, mdparse.uses_lead(doc.meta))
         if mdparse.uses_lead(doc.meta):
             issues += check_red_area(slide, page, place, width, height)
+    issues += check_redrawn(doc, slides)
+    return issues
+
+
+# 正文形状比对时不看的形状：结论 / Next 的落点由 check_drawn 单独查，这里不重复报
+DRAWN_SHAPES = {"Lead", "Next Line", "Caption Bar"}
+SHOW_NAMES = 6                     # 一条问题里最多列出的形状名
+
+
+def body_names(slide):
+    """一页的正文形状名集合：占位框和 DRAWN_SHAPES 以外的全部形状。"""
+    return {sh.name for sh in slide.shapes
+            if not sh.is_placeholder and sh.name not in DRAWN_SHAPES}
+
+
+def rendered(doc):
+    """用生成器按当前文稿重新渲染一份（内存里，不落盘）；生成失败（如图片找不到，
+    已由配图检查报出）返回 None。生成器的警告不重复打印。"""
+    import contextlib
+    import io
+    import generate_ppt
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            return generate_ppt.build(doc)
+    except DeckError:
+        return None
+
+
+def _names(names):
+    names = sorted(names)
+    more = f" 等 {len(names)} 个" if len(names) > SHOW_NAMES else ""
+    return "、".join(names[:SHOW_NAMES]) + more
+
+
+def check_redrawn(doc, slides):
+    """正文形状被改过：逐页比较 pptx 和按当前 md 重新渲染的正文形状名集合，多出、缺少都报。
+    只比名字，不比几何和字号——挪位置、改字号的手工细调不报。"""
+    prs = rendered(doc)
+    if prs is None:
+        return []
+    issues = []
+    for n, (slide, want, page) in enumerate(zip(slides[1:], list(prs.slides)[1:], doc.pages),
+                                            start=2):
+        got, expect = body_names(slide), body_names(want)
+        if got == expect:
+            continue
+        diff = "；".join(part for part in (
+            got - expect and f"多出 {_names(got - expect)}",
+            expect - got and f"缺少 {_names(expect - got)}") if part)
+        issues.append(("正文形状被改过", f"pptx 第 {n} 页（{where(page)}）",
+                       f"正文形状和生成器按当前文稿画的不一样（{diff}）", REDRAW))
     return issues
 
 
