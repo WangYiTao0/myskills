@@ -8,7 +8,7 @@ import re
 from deckcheck import (CONTENT_SLOT_IN, EMU, INK, LAYOUT_INDEX, body_slide, bottom, caption_bar,
                        caption_style_problems, center_x, center_y, check, fill_color, finish,
                        generate, geometry, line_color, one, out_of_bounds, paragraphs,
-                       placeholder, red_elements, run_styles, shapes_named, tag_shape, warnings)
+                       placeholder, red_elements, run_styles, runs, shapes_named, tag_shape, warnings)
 
 NAME = "process"
 TITLE = "Mock Process Page"
@@ -95,6 +95,12 @@ def test_cards_text():
     check("process：序号圆 1、2、3",
           [n.text_frame.text for n in nums] == ["1", "2", "3"],
           [n.text_frame.text for n in nums])
+    # 月报卡片字号（#13 定稿）：步骤名 18pt bold #1A1A1A、说明 14pt #6B6B6B；
+    # 方向 C 的说明 18pt 不能覆盖月报值
+    check("月报 process：步骤名 18pt bold、说明 14pt #6B6B6B",
+          cards and all(runs(c, 0) and {x[1:] for x in runs(c, 0)} == {(18.0, True, "1A1A1A")}
+                        and {x[1:] for x in runs(c, 1)} == {(14.0, False, "6B6B6B")} for c in cards),
+          [(runs(c, 0), runs(c, 1)) for c in cards])
 
 
 SLOT = CONTENT_SLOT_IN     # 槽位 idx 17「Process Area」

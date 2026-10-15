@@ -56,7 +56,7 @@ TITLE_GAP = 0.35            # 圆下沿 → 步骤名
 TITLE_PT = 24
 TITLE_PAD = 0.15            # 步骤名框比列宽左右各窄
 DESC_GAP = 0.12             # 步骤名 → 说明
-DESC_PT = 18
+C_DESC_PT = 18              # 方向 C 说明字号（月报卡片说明仍用 DESC_PT = 14）
 DESC_PAD = 0.2              # 说明框比列宽左右各窄
 DESC_MAX_LINES = 2          # 说明最多几行
 
@@ -165,7 +165,7 @@ def desc_width_in(n):
 def desc_wrap_problem(desc, n):
     """n 步的流程页上，这句说明折行难看时返回原因（中文短句），否则 None。生成器警告和
     审核「流程说明折行」都用它。"""
-    return wrap_problem(desc, DESC_PT, desc_width_in(n), DESC_MAX_LINES)
+    return wrap_problem(desc, C_DESC_PT, desc_width_in(n), DESC_MAX_LINES)
 
 
 def _line_h(pt):
@@ -187,8 +187,8 @@ def _render_marks(prs, page, ctx):
             warn(f"页「{page.title}」第 {i} 步「{name}」的说明折行难看（{problem}）, "
                  f"建议改短或改写: {desc}")
     title_h = max(len(wrap_lines(name, TITLE_PT, title_w)) for name, _ in steps) * _line_h(TITLE_PT)
-    desc_lines = max(len(wrap_lines(desc, DESC_PT, desc_w)) for _, desc in steps)
-    desc_h = desc_lines * _line_h(DESC_PT)
+    desc_lines = max(len(wrap_lines(desc, C_DESC_PT, desc_w)) for _, desc in steps)
+    desc_h = desc_lines * _line_h(C_DESC_PT)
     group_h = MARK_D + TITLE_GAP + title_h + (DESC_GAP + desc_h if desc_lines else 0)
     if group_h > area.height:
         warn(f"页「{page.title}」流程的步骤名和说明估计溢出正文区, 建议精简")
@@ -214,7 +214,7 @@ def _render_marks(prs, page, ctx):
         _centered_text(slide, f"Process Title {i}", name, TITLE_PT, True, C_INK,
                        cx, title_top, title_w, title_h)
         if desc:
-            _centered_text(slide, f"Process Desc {i}", desc, DESC_PT, False, DESC_INK,
+            _centered_text(slide, f"Process Desc {i}", desc, C_DESC_PT, False, DESC_INK,
                            cx, desc_top, desc_w, desc_h)
     add_page_chrome(slide, page, ctx)
     return slide
