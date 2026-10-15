@@ -9,6 +9,7 @@ import re
 
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.dml.color import RGBColor
+from pptx.oxml.ns import qn
 from pptx.util import Emu, Pt
 
 from deckcheck import (BRAND_RED, SKILL, broken, check, finish, generated, lines_with, review)
@@ -43,6 +44,33 @@ def red_block(share, page=2, top_in=1.5):
         sp = prs.slides[page - 1].shapes.add_shape(MSO_SHAPE.RECTANGLE, Emu(int(0.6 * 914400)),
                                                    Emu(int(top_in * 914400)), w, h)
         sp.name = "My Red Block"
+        sp.fill.solid()
+        sp.fill.fore_color.rgb = RGBColor.from_string(BRAND_RED)
+        sp.line.fill.background()
+    return change
+
+
+def theme_red_block(share, page=2):
+    """同 red_block，但填充写成主题色 schemeClr accent1（模板主题里 accent1 就是品牌红）。"""
+    def change(prs):
+        red_block(share, page)(prs)
+        sp = [sh for sh in prs.slides[page - 1].shapes if sh.name == "My Red Block"][0]
+        fill = sp._element.spPr.find(qn("a:solidFill"))
+        for child in list(fill):
+            fill.remove(child)
+        fill.append(fill.makeelement(qn("a:schemeClr"), {"val": "accent1"}))
+    return change
+
+
+def grouped_red_block(share, page=2):
+    """在组合形状里放一块超配额的品牌红矩形（组本身没有填充）。"""
+    def change(prs):
+        w = prs.slide_width // 2
+        h = int(prs.slide_width * prs.slide_height * share / w)
+        group = prs.slides[page - 1].shapes.add_group_shape()
+        group.name = "My Group"
+        sp = group.shapes.add_shape(MSO_SHAPE.RECTANGLE, Emu(int(0.6 * 914400)),
+                                    Emu(int(1.5 * 914400)), w, h)
         sp.fill.solid()
         sp.fill.fore_color.rgb = RGBColor.from_string(BRAND_RED)
         sp.line.fill.background()
@@ -100,6 +128,20 @@ def test_big_red_block():
     check("项目模式加大红块：报", bool(page2_hits(r.stdout)), r.stdout)
 
 
+def test_theme_and_group_red_counted():
+    share = (quota() or 5) / 100
+    md, pptx = generated(GENERAL, IMAGES)
+    r = review(md, broken(pptx, theme_red_block(share + 0.01)))
+    check("大红块填充写成主题色 accent1（按母版主题解析成品牌红）：报",
+          len(page2_hits(r.stdout)) == 1, r.stdout)
+    r = review(md, broken(pptx, theme_red_block(share - 0.01)))
+    check("主题色红块在配额以内：不报", not lines_with(r.stdout, RULE), r.stdout)
+    r = review(md, broken(pptx, grouped_red_block(share + 0.01)))
+    check("大红块放进组合形状（grpSp，递归算）：报", len(page2_hits(r.stdout)) == 1, r.stdout)
+    r = review(md, broken(pptx, grouped_red_block(share - 0.01)))
+    check("组合形状里的红块在配额以内：不报", not lines_with(r.stdout, RULE), r.stdout)
+
+
 def test_red_lines_count_by_length():
     md, pptx = generated(GENERAL, IMAGES)
     # 12" 长、6pt 宽的线一条约 0.0833 平方英寸 × 12 = 1 平方英寸 ≈ 1% 页面；10 条 ≈ 10%
@@ -149,6 +191,7 @@ if __name__ == "__main__":
     test_quota_in_skill_md()
     test_generator_output_passes()
     test_big_red_block()
+    test_theme_and_group_red_counted()
     test_red_lines_count_by_length()
     test_banner_not_counted()
     test_timeline_status_not_counted()

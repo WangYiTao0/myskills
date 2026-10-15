@@ -386,36 +386,98 @@ STATUS_LAYOUTS = {"timeline", "timeline-phase"}   # §6.3 例外：时间线状�
 _P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 
 
-def _red(el):
-    return el is not None and el.get("val", "").upper() == BRAND_RED
+def theme_colors(slide):
+    """本页母版主题的配色：schemeClr 的 val（accent1、tx2、bg1 等，经母版 clrMap 映射）→ hex。"""
+    from lxml import etree
+    from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+    master = slide.slide_layout.slide_master
+    try:
+        theme = etree.fromstring(master.part.part_related_by(RT.THEME).blob)
+    except KeyError:
+        return {}
+    scheme = theme.find(f".//{_A}clrScheme")
+    if scheme is None:
+        return {}
+    colors = {}
+    for slot in scheme:
+        el = slot.find(f"{_A}srgbClr")
+        if el is None:
+            el = slot.find(f"{_A}sysClr")
+        val = el is not None and (el.get("val") if el.tag == f"{_A}srgbClr" else el.get("lastClr"))
+        if val:
+            colors[etree.QName(slot).localname] = val.upper()
+    clr_map = master._element.find(f"{_P}clrMap")
+    if clr_map is not None:
+        for alias, name in clr_map.attrib.items():
+            if name in colors:
+                colors[alias] = colors[name]
+    return colors
 
 
-def red_area(sh, page):
-    """一个形状 banner 以外的品牌红面积（EMU²）：填充或描边是品牌红时按外框算，直线按
-    长 × 线宽算；时间线类版式里只有描边是红的（状态色）不算。红色文字不计入。"""
+def _red(fill, theme):
+    """solidFill 元素的颜色是品牌红（srgbClr 直接写，或 schemeClr 按主题解析）。"""
+    if fill is None:
+        return False
+    rgb, scheme = fill.find(f"{_A}srgbClr"), fill.find(f"{_A}schemeClr")
+    if rgb is not None:
+        return rgb.get("val", "").upper() == BRAND_RED
+    return scheme is not None and theme.get(scheme.get("val", "")) == BRAND_RED
+
+
+def _group_children(sh, xf):
+    """组合形状 sh 的子形状和各自的坐标变换（子坐标 → 页坐标：X = ox + sx · x）。"""
+    ox, oy, sx, sy = xf
+    xfrm = sh._element.find(f"{_P}grpSpPr/{_A}xfrm")
+    if xfrm is None:
+        return []
+    off, ext = xfrm.find(f"{_A}off"), xfrm.find(f"{_A}ext")
+    ch_off, ch_ext = xfrm.find(f"{_A}chOff"), xfrm.find(f"{_A}chExt")
+    if None in (off, ext):
+        return []
+    ch_off = ch_off if ch_off is not None else off
+    ch_ext = ch_ext if ch_ext is not None else ext
+    kx = int(ext.get("cx")) / int(ch_ext.get("cx")) if int(ch_ext.get("cx")) else 1.0
+    ky = int(ext.get("cy")) / int(ch_ext.get("cy")) if int(ch_ext.get("cy")) else 1.0
+    gx = ox + sx * (int(off.get("x")) - kx * int(ch_off.get("x")))
+    gy = oy + sy * (int(off.get("y")) - ky * int(ch_off.get("y")))
+    return [(child, (gx, gy, sx * kx, sy * ky)) for child in sh.shapes]
+
+
+def red_area(sh, page, theme=None, xf=(0, 0, 1.0, 1.0)):
+    """一个形状 banner 以外的品牌红面积（EMU²）：填充或描边是品牌红（含按母版主题解析的
+    schemeClr）时按外框算，直线按长 × 线宽算；组合形状递归算各子形状；时间线类版式里只有
+    描边是红的（状态色）不算。红色文字不计入。xf 是组合形状里子坐标 → 页坐标的变换。"""
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    theme = {} if theme is None else theme
+    if sh.shape_type == MSO_SHAPE_TYPE.GROUP:
+        return sum(red_area(child, page, theme, cxf) for child, cxf in _group_children(sh, xf))
     sp = sh._element.find(f"{_P}spPr")
     if sp is None or None in (sh.left, sh.top, sh.width, sh.height):
         return 0
+    ox, oy, sx, sy = xf
+    left, top = ox + sx * sh.left, oy + sy * sh.top
+    width, height = sx * sh.width, sy * sh.height
     ln = sp.find(f"{_A}ln")
-    fill_red = _red(sp.find(f"{_A}solidFill/{_A}srgbClr"))
-    line_red = ln is not None and _red(ln.find(f"{_A}solidFill/{_A}srgbClr"))
+    fill_red = _red(sp.find(f"{_A}solidFill"), theme)
+    line_red = ln is not None and _red(ln.find(f"{_A}solidFill"), theme)
     if sh._element.tag == f"{_P}cxnSp":
         if not line_red:
             return 0
-        top, bottom = sh.top, sh.top + sh.height
+        bottom = top + height
         if bottom <= top:                               # 横线：整条在 banner 上就不算
             below = 1.0 if top >= BANNER_BOTTOM else 0.0
         else:                                           # 斜线 / 竖线：按 banner 以下的比例算
             below = max(0, bottom - max(top, BANNER_BOTTOM)) / (bottom - top)
-        return math.hypot(sh.width, sh.height) * int(ln.get("w", 12700)) * below
+        return math.hypot(width, height) * int(ln.get("w", 12700)) * below
     if not fill_red and not (line_red and page.layout not in STATUS_LAYOUTS):
         return 0
-    return sh.width * max(0, sh.top + sh.height - max(sh.top, BANNER_BOTTOM))
+    return width * max(0, top + height - max(top, BANNER_BOTTOM))
 
 
 def check_red_area(slide, page, place, width, height):
     """banner 以外的品牌红面积超过 §6.3 配额（方向 C：通用 / 项目模式）。"""
-    share = sum(red_area(sh, page) for sh in slide.shapes) / (width * height)
+    theme = theme_colors(slide)
+    share = sum(red_area(sh, page, theme) for sh in slide.shapes) / (width * height)
     if share <= RED_QUOTA:
         return []
     return [("红色面积超配额", place,
