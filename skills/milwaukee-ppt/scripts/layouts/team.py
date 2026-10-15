@@ -30,7 +30,7 @@ from mdparse import DeckError
 
 from .common import (DESC_INK, IMG_W, INK, LINE_SPACING, LIST_ITEM, MUTED, RULE, add_line,
                      add_page_chrome, add_run, add_shape, add_textbox, body_area, fill_titles,
-                     text_lines, text_width_in, warn, wrap_problem)
+                     text_lines, text_width_in, warn, wrap_lines, wrap_problem)
 
 NAME = "team"
 LAYOUT_INDEX = 0
@@ -167,7 +167,7 @@ def _tier_layout(members, rows, col, tier):
     if any(text_width_in(m["name"], name_pt) > text_w or text_width_in(m["role"], role_pt) > text_w
            for m in members):
         return None
-    duty_lines = max(int(text_lines(m["duty"], duty_pt, text_w)) for m in members)
+    duty_lines = max(len(wrap_lines(m["duty"], duty_pt, text_w)) for m in members)
     row_h = (d + gap + _h(name_pt) + C_ROLE_GAP + _h(role_pt) + gap
              + _h(duty_pt, duty_lines))
     return duty_lines, row_h, len(rows) * row_h + (len(rows) - 1) * 1.5 * gap

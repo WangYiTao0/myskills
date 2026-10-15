@@ -357,6 +357,29 @@ def test_general_mode_duty_wrap():
           and not lines_with(out.stdout, "团队职责折行"), r.stderr + out.stdout)
 
 
+LATIN_DUTY = "aaaaaaaaa bbbbbbbbb ccccccccc ddddddddd eeeeeeeee"   # 按词断行比按总宽估多一行
+
+
+def test_general_mode_duty_box_fits_wrap():
+    """C 模式：职责框高按实际断行（wrap_lines，和折行警告同一口径）的行数排，拉丁长词
+    按词断行多出的那一行也装得下。"""
+    import sys
+    sys.path.insert(0, str(SKILL / "scripts"))
+    from layouts.common import LINE_SPACING, wrap_lines  # noqa: E402
+    members = [CLEAN[0][:2] + (LATIN_DUTY,)] + CLEAN[1:3]     # 3 人一行：职责框约 3.67" 宽
+    r = generate(general_md(members, title="Latin Team"))
+    s = body_slide(r)
+    duty = one(s, "Member Duty 1") if s else None
+    if duty is None:
+        check("C team 拉丁职责：生成了 Member Duty 1", False, r.stderr)
+        return
+    pt = duty.text_frame.paragraphs[0].runs[0].font.size.pt
+    width = (duty.width - duty.text_frame.margin_left - duty.text_frame.margin_right) / EMU
+    need = len(wrap_lines(LATIN_DUTY, pt, width)) * pt * LINE_SPACING / 72
+    check("C team 拉丁职责：职责框高装得下按词断行的行数",
+          duty.height / EMU >= need - 0.01, (duty.height / EMU, need, wrap_lines(LATIN_DUTY, pt, width)))
+
+
 def test_duty_wrap_docs():
     """文档一致性：layouts.md 的 team 小节和 scripts README 的审核规则都写了「团队职责折行」。"""
     layouts_md = (SKILL / "references" / "layouts.md").read_text(encoding="utf-8")
@@ -381,5 +404,6 @@ if __name__ == "__main__":
     test_general_mode_capacity()
     test_general_mode_overflow_warning()
     test_general_mode_duty_wrap()
+    test_general_mode_duty_box_fits_wrap()
     test_duty_wrap_docs()
     finish()
