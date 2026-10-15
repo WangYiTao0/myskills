@@ -29,7 +29,7 @@
 - 放图时清空该槽文本，在槽的矩形内等比缩放、居中插入真实且已脱敏的图片；不用 `insert_picture()`。
 - 双框、灰色转换箭头是 layout 上的原生 shape；需要改框时在布局中编辑，不替换为整页图片。
 - 样例页的 `Lead` 与 `Conclusion` 是可直接编辑的原生 text box，不属于 placeholder。
-- 从 layout 3 新建时自行加正文 lead（0.56 / 1.30 / 11.90 / 0.42）与可选结论（0.56 / 6.68 / 12.21 / 0.36）。
+- 从 layout 3 新建时自行加正文 lead（0.56 / 1.30 / 11.90 / 0.42）与可选结论（0.56 / 6.68 / 12.21 / 0.36）。生成器的做法：月报模式按这个位置画第一个 `###` 前的 lead、结论进底部红条；通用 / 项目模式只画一句 lead（= 结论行，`Lead` + `Lead Accent`，见 `layouts.md`「共用排版」），第一个 `###` 前的文字不画。
 
 ```python
 slide = prs.slides.add_slide(prs.slide_layouts[3])

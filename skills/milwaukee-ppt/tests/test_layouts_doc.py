@@ -7,7 +7,7 @@
 """
 import re
 
-from deckcheck import LAYOUT_INDEX, SKILL, check, finish, generate
+from deckcheck import LAYOUT_INDEX, SKILL, check, finish, generate, one, run_style
 
 DOC = SKILL / "references" / "layouts.md"
 _BLOCK = re.compile(r"^```markdown\n(.*?)^```", re.S | re.M)
@@ -51,6 +51,55 @@ def test_doc_examples_generate():
     check(f"layouts.md：示例覆盖全部 {len(want)} 个已写文档的版式", used == want, used)
 
 
+COMMON_PAGE = """
+# 证据 / EVIDENCE
+## 试点两条线完成切换
+Tag: Aug
+PDCA: D
+![](img/a.png)
+两条试点线 3 周内切换到新点检表
+Next: 11 月前推广到其余 4 条线
+"""
+
+
+def _common_row():
+    m = re.search(r"(?m)^\| 各版式共用 \| (.*) \|$", DOC.read_text(encoding="utf-8"))
+    return m.group(1) if m else ""
+
+
+def _style_row(label):
+    m = re.search(rf"(?m)^\| {re.escape(label)} \| (\d+)pt (bold )?#?(\w+)? ?\|?",
+                  DOC.read_text(encoding="utf-8"))
+    return (float(m.group(1)), bool(m.group(2))) if m else None
+
+
+def test_common_shape_names():
+    """形状命名约定表「各版式共用」一行的名字，生成器真的会画（通用 / 项目模式 + 月报模式）。"""
+    names = [n for n in re.findall(r"`([^`]+)`", _common_row()) if not n.endswith(":")]
+    check("layouts.md：形状命名表有「各版式共用」一行，列出 lead / Next 的形状",
+          {"Lead", "Lead Accent", "Next Rule", "Next Line"} <= set(names), names)
+    drawn = set()
+    for head in ("---\ntitle: Mock Deck\nreport: project\n---\n",
+                 "---\nmonth: 2026-08\nauthor: Mock.Author\n---\n"):
+        md = head + (COMMON_PAGE if "report" in head else COMMON_PAGE.replace("PDCA: D\n", ""))
+        r = generate(md, images={"img/a.png": (1600, 900)})
+        if r.rc != 0:
+            check("layouts.md：共用形状探测文稿生成", False, r.stderr)
+            return
+        drawn |= {sh.name for sh in r.slides[1].shapes}
+    want = {n.replace(" N", " 1") for n in names}
+    check("layouts.md：「各版式共用」的形状名生成器都会画", want <= drawn, sorted(want - drawn))
+    r = generate("---\ntitle: Mock Deck\n---\n" + COMMON_PAGE.replace("PDCA: D\n", ""),
+                 images={"img/a.png": (1600, 900)})
+    s = r.slides[1] if r.rc == 0 else None
+    for label, shape in (("lead（通用 / 项目模式）", "Lead"), ("Next 行（通用 / 项目模式）", "Next Line")):
+        doc = _style_row(label)
+        got = run_style(one(s, shape))[:2] if s is not None and one(s, shape) else None
+        check(f"layouts.md：{label} 的字号、粗体和生成器一致", doc is not None and doc == got,
+              (doc, got))
+
+
 if __name__ == "__main__":
     test_doc_examples_generate()
+    test_common_shape_names()
     finish()

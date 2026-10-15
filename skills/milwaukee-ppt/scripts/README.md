@@ -2,10 +2,12 @@
 
 - 三层：`mdparse.py` 只切页并取通用字段（`#` `##` `Layout:` `Tag:` `PDCA:` `Next:`；`PDCA:` 解析成 `page.pdca`，如 `["D", "C"]`，frontmatter 没写 `report: project` 时报错），其余正文行去掉首尾空白后放进 `page.lines`，行首缩进宽度放进一一对应的 `page.indents`（空格算 1，tab 算 4，空行 0）；`layouts/<版式>.py` 解析本版式字段并渲染；`generate_ppt.py` 装配封面 / 各页 / 收尾。
 - 每个版式一个模块：`layouts/evidence.py`、`before_after.py`、`process.py`、`stats.py`、`stats_side.py`、`timeline.py`、`timeline_phase.py`、`image_text.py`、`section.py`、`agenda.py`、`team.py`、`table.py`，接口相同：`NAME`、`LAYOUT_INDEX`、`parse(page)`、`render(prs, page, ctx) -> slide`。
-- `parse(page)` 读 `page.lines`（空行为 `""`），写 `page.fields`，把红条结论行追加到 `page.conclusion`；文稿有错抛 `DeckError`，信息里带 `页「{page.title}」`。
-- `render` 用 `prs.slide_layouts[LAYOUT_INDEX]` 建页，`fill_titles` 填 idx 0/10，按 idx 取槽位画内容（槽位只用来定位的就 `take_slot` 取矩形并删掉占位框），最后调 `add_page_chrome(slide, page, ctx)` 画 Tag 和底部红条。
+- `parse(page)` 读 `page.lines`（空行为 `""`），写 `page.fields`，把结论行追加到 `page.conclusion`（月报进底部红条，通用 / 项目模式画成 lead）；文稿有错抛 `DeckError`，信息里带 `页「{page.title}」`。
+- `render` 用 `prs.slide_layouts[LAYOUT_INDEX]` 建页，`fill_titles` 填 idx 0/10，按 idx 取槽位画内容（槽位只用来定位的就 `take_slot` 取矩形并删掉占位框），最后调 `add_page_chrome(slide, page, ctx)` 画 Tag 和结论 / Next。内容排在 `body_area(page, ctx)` 给的正文区里（槽位类版式用 `fit_body(take_slot(...), page, ctx)`），不要写死 1.30" / 5.60"。
 - 共用部件只放 `layouts/common.py`，版式模块之间不互相 import：
-  - 页面：`warn`、`load_image`、`fill_titles`、`add_page_chrome`（PDCA 图标 + Tag + 底部红条）；版式模块不用管 PDCA：图标在 banner 下沿和正文区上沿之间的窄条（1.02–1.30"），各版式内容都从 1.30" 起排，不需要让位；有图标时 `add_month_tag` 由 `add_page_chrome` 让到图标左侧。
+  - 页面：`warn`、`load_image`、`fill_titles`、`add_page_chrome`（PDCA 图标 + Tag + 结论 / Next）；版式模块不用管 PDCA：图标在 banner 下沿和 1.30" 之间的窄条（1.02–1.30"），正文区不会高过 1.30"，不需要让位；有图标时 `add_month_tag` 由 `add_page_chrome` 让到图标左侧。
+  - 模式：`ctx.lead`（`mdparse.uses_lead(meta)`：通用模式和项目汇报模式为 True，月报为 False）。月报走原路径：`add_caption_bar` 画底部红条，输出逐字节不变（`MONTHLY_SHA`）。方向 C：`add_lead`（`Lead` + 左侧红竖线 `Lead Accent`）、`add_next_line`（`Next Rule` 细线 + `Next Line`）；文字由 `conclusion_text(page)` / `next_text(page)` 给，审核脚本用同一对函数核对。
+  - 正文区：`body_area(page, ctx) -> Area`（英寸；`left` / `top` / `width` / `height` / `right` / `bottom`，`emu()` 转 EMU 元组）。月报模式恒为 0.56 / 1.30 / 12.20 × 4.30"；方向 C 下上沿在 lead 下方（`lead_area(page)`），下沿在 Next 细线上方（`next_area(page)`）或 6.95"。`fit_body(rect, page, ctx)` 把模板槽位矩形（EMU）的上下沿换成正文区（月报原样返回）。section / agenda 不用它。
   - 形状：`slot` / `take_slot` / `remove_shape`（按 idx 取槽位、删形状）、`fit_picture`（矩形内等比放图）、`add_run`（Arial + 中文 PingFang SC 的 run）、`strip_theme_style`（去 p:style）；
   - 画形状：`add_textbox(slide, name, x, y, w, h, anchor=TOP, wrap=True) -> text_frame`（起名、内边距 0）、`add_shape(slide, kind, name, x, y, w, h, fill, line=None, line_pt=None)`（扁平自选图形：去主题样式、关阴影，`fill` / `line` 为 None 即无填充 / 无描边）、`add_line(slide, name, x1, y1, x2, y2, color, pt, dash=None)`（直线）。坐标都是 EMU，可为浮点。版式模块不要再各写一份；需要额外属性（如 timeline 的线关阴影、stats-side 的卡片段落左对齐）就在返回的形状上再设。
   - 估算：`text_width_in` / `text_lines`（CJK 1em、拉丁 0.55em），溢出警告一律用它；
@@ -41,6 +43,7 @@
   （bash / zsh 写法；在 fish 里先 `bash` 再贴。）转完和 SVG 并排看一眼（如用浏览器打开两者），确认圆弧、颜色、字母一致。
 - 形状命名：每个画出来的形状都 `name = "<角色> N"`（N 从 1 起，与条目顺序一致），这是生成后细调时对 AI 的契约；各版式的名字列在 `references/layouts.md`「形状命名约定」，改名时同步改那一节。
 - 测试：每个版式一个 `tests/test_<版式>.py`，只走“md 进、pptx 出”；辅助函数（`generate`、`body_slide`、`pictures`、`shapes_named`、`run_style` 等）和模板槽位常量都在 `tests/deckcheck.py`，测试文件里不要再各写一份。`python3 tests/run_all.py` 跑全部。
+  - 各版式测试文件的文稿用月报 frontmatter（`month` + `author`），守住月报的底部红条路径；方向 C（通用 / 项目模式）的 lead、Next 行、正文区在 `tests/test_lead.py` 里按全部内容版式统一查。版式改方向 C 样式时，在自己的测试文件里另加通用模式的用例。
   - 新增辅助：`runs(shape, para=0)` 返回一段里每个 run 的 `(文字, 字号, 粗体, 颜色)`，查单位拆分；`fill_color` / `line_color` 取形状纯色填充 / 描边 hex（没有为 `None`）；`geometry(shape)` 取预设几何名（`ellipse`、`diamond`、`homePlate`、`chevron`…）；`inside(shape, rect_in)` 判断形状落在英寸矩形内（如 `CONTENT_SLOT_IN`）；`slide_xmls(path)` 取各页 slide XML 字节，用于和改动前逐字节比较；`deck_error(r, title, *needles)` 判断报错退出且信息含页标题。`review(md, pptx=None)` 跑审核脚本、返回 `CompletedProcess`；`generated(md, images=None)` 生成并返回 `(文稿路径, pptx 路径)`（失败抛出），`reviewed(md, images=None)` 生成后再审；`lines_with(out, rule)` 取审核输出里 `[rule]` 开头的行；`broken(pptx, change)` 把生成结果另存一份、用 `change(prs)` 改坏，做审核负样本。`registered_layouts()` 从未知版式的报错信息里读出注册表全部版式名（只走外部切入点）。`inside_shape(inner, outer)` 判断形状落在另一个形状里；`center_x` / `center_y` / `bottom` 取中心坐标和底边；`named(slide, name)` 取名字恰为 name 的全部形状，`one(slide, name)` 恰好一个时返回它。常量 `STATUS_COLORS`、`DONE_GREEN`、`DOING_AMBER`、`DOING_INK`、`UNIT_PT`、`UNIT_COLOR`。
   - 守逐字节：`test_generate.py` 的 `MONTHLY_SHA`（月报各页 slide XML，取自 master e282570）、`test_timeline.py` 的 `LEGACY_SHA`（不写状态也不写 `!` 的旧 timeline）。改共用部件后这两项不过，就是改动了月报或旧写法的输出。
   - 跨版式不变量：`test_title_invariant.py` 给注册表里每个版式各生成一页，断言主标题、副标题在 idx 0 / 10 占位框里、banner 区（0–1.0"）上没有另画的形状。新版式登记进注册表后会自动纳入，在它的 `SAMPLES` 里补一页最小示例即可（漏补时测试失败）。
@@ -71,7 +74,7 @@ python3 scripts/review_deck.py deck.md deck.pptx
 - 输出：每条问题一行 `[规则] 位置：问题 → 怎么改`；全部通过时只打印一行 `REVIEW OK`，有问题时最后一行是 `REVIEW: N 条问题`。
 - 只报告、不改文件。审完退出码总是 0（有问题也是 0）；文稿读不了（找不到、写错）或 pptx 打不开时退出码 1，错误写到 stderr。
 - 和生成器共用 `mdparse` 与版式注册表：文稿按生成器同一套规则解析，生成器会报错的文稿审核也报错。
-- 内容检查（只看文稿，所有文稿都查）：页数过多（> 10 页，不含目录页、隔断页）、相邻两页版式相同（连着两张隔断页不报）、目录式副标题（不到 6 字，或只是主标题中文部分加两三个字，如「项目目标介绍」；6 字以上的短结论不报）、缺结论行（`NAV_LAYOUTS` 里的导航页不报，目前是按设计不放红条的 section、agenda）、内容重复（两页流程步骤名一半以上相同）、数字卡不是数字、数据缺失（`[数据缺失]` 占位）、用词（浮夸 / 空洞词表）、关键标记过多（时间线 3 个以上节点、超过一半标了 `!`）、目录和隔断页不一致（文稿有目录页时，隔断页的中文章节名不在目录里）。
+- 内容检查（只看文稿，所有文稿都查）：页数过多（> 10 页，不含目录页、隔断页）、相邻两页版式相同（连着两张隔断页不报）、目录式副标题（不到 6 字，或只是主标题中文部分加两三个字，如「项目目标介绍」；6 字以上的短结论不报）、缺结论行（`NAV_LAYOUTS` 里的导航页不报，目前是按设计不放结论的 section、agenda）、lead 和副标题相同（通用 / 项目模式：结论行和 action title 一字不差）、对比页两个 lead（通用 / 项目模式：before-after 第一个 `###` 前还写了文字，生成器不画它）、内容重复（两页流程步骤名一半以上相同）、数字卡不是数字、数据缺失（`[数据缺失]` 占位）、用词（浮夸 / 空洞词表）、关键标记过多（时间线 3 个以上节点、超过一半标了 `!`）、目录和隔断页不一致（文稿有目录页时，隔断页的中文章节名不在目录里）。
 - 配图检查（只看文稿，所有文稿都查）：缺配图（evidence 页没放图；evidence 是唯一"必须配图、但解析不强制"的版式）、图片不存在（evidence 的图、image-text 的图、before-after 两侧写了的图，本地路径相对文稿找不到；URL 不查）。image-text 没图在解析时就报错（和生成器同一条规则，审核退出码 1）；before-after 每侧按设计可放图或短文，不要求配图。
 - 项目汇报模式检查（只在 frontmatter 写了 `report: project` 时查，对应 SKILL.md §1、§2）：页按主标题英文部分（`中文 / 英文`）认 §1 八节 `BACKGROUND → TARGET → SCOPE → USE CASES → MILESTONE → OUTCOMES → TEAM → LESSONS`，英文名不在八节里的页是子节点，归到前面最近的一节。
   - 章节顺序：八节的页倒序出现；目录页列出的八节顺序不对。
@@ -80,6 +83,6 @@ python3 scripts/review_deck.py deck.md deck.pptx
   - 团队页带 PDCA：`team` 版式或 TEAM 节的页写了 `PDCA:`。
   - PDCA 和章节不符：标的阶段和所属节不对应（01–04 P、05 D、06 D 或 C、08 A），或一页标了多个阶段（§2：06 节一页只放一个；生成器允许 `D/C` 组合，由审核报）。还没进入八节的页不比对。
   - 章节和版式不配：TARGET / SCOPE 用 process / before-after，USE CASES 用 before-after。
-- 真伪检查（看 pptx，确认是生成器按当前文稿做的）：页数不符（封面 + 正文 + 收尾页）、不是生成脚本做的（正文页 idx 0 / 10 占位框里的文字和文稿的主标题、副标题不一致，或 banner 0–1.0" 上另画了文本框）。位置写成 `pptx 第 N 页（页「主标题」）`。
+- 真伪检查（看 pptx，确认是生成器按当前文稿做的）：页数不符（封面 + 正文 + 收尾页）、不是生成脚本做的（正文页 idx 0 / 10 占位框里的文字和文稿的主标题、副标题不一致，或 banner 0–1.0" 上另画了文本框）、结论没画出来 / Next 没画出来（导航页除外：通用 / 项目模式下 `Lead` / `Next Line` 的文字要和 `conclusion_text` / `next_text` 一致；月报模式下这两句要各是 `Caption Bar` 里的一段）。位置写成 `pptx 第 N 页（页「主标题」）`。
 - 几何检查（看 pptx 正文页，只用 python-pptx 和计算，不依赖 LibreOffice）：出界（超出页面）、压 banner（上沿高于 1.0"，idx 0 / 10 标题框除外）、压页脚（下沿低于 7.25"）、文字溢出（字宽用 `layouts/common.py` 的 `text_width_in`，行高 = 字号 × 1.2，与 process / stats / stats-side / timeline / timeline-phase / before-after 的溢出警告同一口径；section / agenda / team / table 按 `common.LINE_SPACING`（1.25）排框高，比审核宽 4%，生成器的框不会被报溢出；字号继承模板的占位框不估；原生表格按单元格估，某行估计高过行高才报）、重叠、错位。每条带页码和形状名。重叠豁免和错位比较按形状名，规则见 `references/layouts.md`「审核的几何豁免」；阈值是 `review_deck.py` 里的命名常量（`OVERLAP_TOL`、`MISALIGN_TOL`、`ALIGN_SNAP`、`OVERFLOW_TOL`），取值理由写在常量旁。几何检查的测试在 `tests/test_review_geometry.py`。
-- 测试在 `tests/test_review.py`（通用内容检查、真伪检查）和 `tests/test_review_project.py`（项目模式、配图、目录和隔断页）：正样本是生成器的正常输出（含示例文稿），负样本用 python-pptx 把正常输出改坏或改文稿。`test_review_project.py` 的 `PROJECT_FULL` 是全版式正样本（项目模式一份、去掉 `report: project` 和 PDCA 的非项目模式一份，都要打印 `REVIEW OK`），`test_review_geometry.py` 的 `VARIANTS` 是几何正样本；两者都强制覆盖 `registered_layouts()`，新增版式没补正样本时测试失败并提示补哪个版式。新增规则时规则名放进 `[]`，测试按 `[规则]` 行首匹配。
+- 测试在 `tests/test_review.py`（通用内容检查、真伪检查）、`tests/test_review_lead.py`（方向 C：结论 / Next 画出来、lead 和副标题、对比页两个 lead）和 `tests/test_review_project.py`（项目模式、配图、目录和隔断页）：正样本是生成器的正常输出（含示例文稿），负样本用 python-pptx 把正常输出改坏或改文稿。`test_review_project.py` 的 `PROJECT_FULL` 是全版式正样本（项目模式一份、去掉 `report: project` 和 PDCA 的非项目模式一份，都要打印 `REVIEW OK`），`test_review_geometry.py` 的 `VARIANTS` 是几何正样本；两者都强制覆盖 `registered_layouts()`，新增版式没补正样本时测试失败并提示补哪个版式。新增规则时规则名放进 `[]`，测试按 `[规则]` 行首匹配。

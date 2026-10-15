@@ -33,8 +33,9 @@ Next: 10 月底前完成全部工具贴码
 - `Tag:` 可选，正文区右上角灰字；没写年份时补上文稿年份。
 - `PDCA:` 可选，只在项目汇报模式下用：`P` / `D` / `C` / `A`，组合用 `/`（`PDCA: D/C`），不区分大小写；所有版式都支持。生成器在 banner 下沿和正文区上沿之间（1.02–1.30"）插 0.28" 见方的 PDCA 图标（`assets/pdca/` 的 PNG），右缘贴正文区右缘，组合按写的顺序从左到右排；不压任何版式的内容。同页写了 `Tag:` 时月份标识让到图标左侧、和图标纵向居中对齐。不写 `PDCA:` 的页没有图标。生成器只管画，不检查章节顺序和每节写没写 PDCA（交给审核，规则见 `scripts/README.md`「审核命令」）。
 - 版式字段（上例是 evidence 的图）见下文各小节。
-- 普通文字行是一句话结论，进底部红条。
-- `Next:` 可选，写已确定的下一步；写成「下一步：」时红条也显示「下一步」。
+- 普通文字行是一句话结论。通用模式和项目汇报模式下画成标题下的 lead（见「共用排版」）；月报模式进底部红条。
+- `Next:` 可选，写已确定的下一步；写成「下一步：」时页底 Next 行 / 红条也显示「下一步」。
+- 下文各版式说的「结论」「进红条」按模式理解：通用 / 项目模式是 lead + 页底 Next 行，月报模式是底部红条；md 写法两种模式一样。
 - 每个 `# ` 开一页；第一个 `# ` 之前的内容和 `<!-- -->` 注释都会被忽略。
 - 封面：主标题 = title；副标题第一行 subtitle，第二行「date   author」，空的省略。
 - 月报模式：frontmatter 不写 title、写 `month: YYYY-MM` + `author`（`date` 可选）。封面固定为「<Mon>. YYYY Working Summary」，结尾固定加 Thank You，Tag 年份取 month。旧月报 md 不用改。
@@ -56,13 +57,20 @@ Next: 10 月底前完成全部工具贴码
 
 **警告**：打印 `警告: …` 到 stderr，照常生成。看到警告就去 PNG 里看对应那页，按提示精简文字。
 
+- 结论（lead）估计超过两行（通用 / 项目模式；正文区会被压低）
 - 文字估计溢出：红条、流程卡片、数据页的解读 / 卡片文字 / 结论要点 / 口径、时间线列、阶段条、Before/After 的短文、caption（超过一行）、lead（超过一行）
 - 数据页大数字放不下，整页统一缩小
 - 图多于版式能用的张数（多出的不用）、image-text 要点超过 5 条
 
 ## 共用排版（各版式统一，生成器写死）
 
-内容区在 banner（0–1.0"）以下：上沿 1.30"，下沿 5.60"；左右边距 0.56"。块间距统一 0.3"，卡片内边距 0.2"。
+内容区（正文区）在 banner（0–1.0"）以下，左右边距 0.56"（宽 12.20"）；上下沿随模式变（生成器 `common.body_area` 统一算，各版式都排在里面）：
+
+- 月报模式：上沿 1.30"，下沿 5.60"（下面留给底部红条）。
+- 通用 / 项目模式（方向 C）：上沿在 lead 下方 0.19"（lead 一行时 2.05"；没有结论时 1.30"），下沿 6.95"；写了 `Next:` 时在 Next 细线上方 0.10"（Next 一行时 6.40"）。
+- section、agenda 不画 lead，正文区按月报口径（1.30–5.60"）居中，两种模式一样。
+
+块间距统一 0.3"，卡片内边距 0.2"。
 
 | 用途 | 字号与样式（Arial；中文 PingFang SC） |
 | --- | --- |
@@ -73,11 +81,15 @@ Next: 10 月底前完成全部工具贴码
 | 说明 | 14pt #6B6B6B |
 | 日期 / 口径 / 图例 | 12pt #6B6B6B，日期加粗（全套最小字号） |
 | 流程序号圆 | 直径 0.5"，#333333 底，白字 16pt bold |
-| 底部红条 | 14pt 白字 |
+| 底部红条（月报模式） | 14pt 白字 |
+| lead（通用 / 项目模式） | 22pt bold #1A1A1A |
+| Next 行（通用 / 项目模式） | 16pt bold #1A1A1A |
 
-**底部红条**（各版式共用）：月报模板固定样式——品牌红底、0.75pt 黑描边、白字 ❖ 项目符号、行距 150%。底边固定在 7.08"，最低 1.2" 高；文字多时向上加高，最高顶到 5.60"（内容区下沿），再多就警告。结论一行、Next 一行最合适。
+**lead 和 Next 行**（通用 / 项目模式各版式共用，section / agenda 除外）：lead 是本页结论，在标题下 1.30" 起，左缘 0.80"，一行框高 0.56"（每多一行加 0.38"），垂直居中；左侧 `Lead Accent` 红竖线 0.08" 宽，比 lead 框上下各短 0.06"。写了 Tag 时 lead 右端让到月份标识框左侧 0.1"（PDCA 图标在 1.30" 以上，不用让）。Next 行在页底，下沿 6.94"，一行框高 0.36"，上方 0.08" 处一条 0.75pt #BFBFBF 细线（`Next Rule`），左右和正文区一样宽。
 
-**红色**：banner 以外只有这几处用品牌红——底部红条、数据页标了 `!` 的那条（数字 + stats 的顶线 / stats-side 的竖条）、Before/After 的 AFTER 标题。流程序号圆一律黑白灰。时间线类版式写了状态时用状态色（SKILL.md §6.3「时间线状态色」例外）：已完成 #2E7D32、进行中 #F2A900（上面的字 #1A1A1A）、未完成用品牌红但只描边或空心；不写状态的时间线仍是黑白灰。
+**底部红条**（月报模式各版式共用）：月报模板固定样式——品牌红底、0.75pt 黑描边、白字 ❖ 项目符号、行距 150%。底边固定在 7.08"，最低 1.2" 高；文字多时向上加高，最高顶到 5.60"（内容区下沿），再多就警告。结论一行、Next 一行最合适。
+
+**红色**：banner 以外只有这几处用品牌红——lead 竖线（月报为底部红条）、数据页标了 `!` 的那条（数字 + stats 的顶线 / stats-side 的竖条）、Before/After 的 AFTER 标题。流程序号圆一律黑白灰。时间线类版式写了状态时用状态色（SKILL.md §6.3「时间线状态色」例外）：已完成 #2E7D32、进行中 #F2A900（上面的字 #1A1A1A）、未完成用品牌红但只描边或空心；不写状态的时间线仍是黑白灰。
 
 ## evidence（默认）· 证据页
 
@@ -118,14 +130,14 @@ Caption: 扫码自动带出工具信息，归还时扫码登记
 ```
 
 - 字段：
-  - 第一个 `###` 之前的普通文字 = lead（正文顶部一行，20pt bold）；
+  - 第一个 `###` 之前的普通文字 = 月报模式的 lead（正文顶部一行，20pt bold）。通用 / 项目模式下结论行就是 lead，这里不要再写：写了生成器报警告、不画这段文字，审核报「对比页两个 lead」；
   - `### Before` / `### After` 各一节，标题可写成 `### Before: 自定义标题`（不写显示 BEFORE / AFTER）；每节一张图或一段短文，再加一行 `Caption:`（可省）；
-  - 最后一节之后的普通文字 = 底部结论，和 `Next:` 一起进底部红条（与其他版式同一种红条）。
-- 画法：标题进 idx 11/12，图或短文进对比框里的 13/14（图等比缩放、居中，短文在框宽内换行），caption 进 15/16（16pt bold，一行）。没有红条时 caption 在框下 6.12"；有红条时红条会盖住那里，生成器把 caption 挪进对比框底部（5.20–5.55"），内容区缩到它上方；对比框底边被红条盖住约 0.04"，属正常。lead 在 0.56 / 1.30"，写了 Tag 时右端让开月份标识。
+  - 最后一节之后的普通文字 = 本页结论（通用 / 项目模式画成 lead，月报模式和 `Next:` 一起进底部红条）。
+- 画法：标题进 idx 11/12，图或短文进对比框里的 13/14（图等比缩放、居中，短文在框宽内换行），caption 进 15/16（16pt bold，一行）。没有红条时 caption 在框下 6.12"；有红条时红条会盖住那里，生成器把 caption 挪进对比框底部（5.20–5.55"），内容区缩到它上方；对比框底边被红条盖住约 0.04"，属正常。月报模式的 lead 在 0.56 / 1.30"，写了 Tag 时右端让开月份标识。通用 / 项目模式：左右标题下移到正文区上沿（不早于模板的 1.96"）；写了 `Next:` 时 caption 会压到页底 Next 行，同样挪进对比框底部。
 - 适用：同一件事改前、改后的对应事实（流程、系统、现场）。
 - 反例：两侧对象、时间窗口或统计口径不同；只有改后没有改前；BEFORE 写成贬低旧方案的话。
 - 报错：缺 `### Before` 或 `### After`、小节名不是这两个、同一节写两次、某节没有内容、一节里既有图又有短文或有两张图、两节之间夹了普通文字。
-- 警告：caption 超过一行；短文溢出内容区；lead 超过一行；红条文字顶到 5.60"。
+- 警告：caption 超过一行；短文溢出内容区；lead 超过一行（月报）；红条文字顶到 5.60"；通用 / 项目模式第一个 `###` 前写了文字；lead 太长、左右标题压到对比框。
 
 ## process · 流程
 
@@ -425,7 +437,7 @@ Layout: section
 
 | 范围 | 形状名 |
 | --- | --- |
-| 各版式共用 | `Caption Bar`（底部红条）、`Month Tag`（`Tag:` 月份标识）、`PDCA Icon N`（`PDCA:` 图标，图片形状，N 按文稿里字母的顺序从左到右） |
+| 各版式共用 | `Caption Bar`（底部红条，月报模式）、`Lead`（结论 lead，通用 / 项目模式）、`Lead Accent`（lead 左侧红竖线）、`Next Rule`（页底 Next 行上方细线）、`Next Line`（页底 Next 行）、`Month Tag`（`Tag:` 月份标识）、`PDCA Icon N`（`PDCA:` 图标，图片形状，N 按文稿里字母的顺序从左到右） |
 | stats | `Stat Rule N`（顶部粗线）、`Stat Label N`、`Stat Number N`（前缀、数字、单位是同一段里的几个 run）、`Stat Note N`、`Stat Divider N`、`Stat Points N`（这张卡的全部解读，一条一段）、`Stat Source`（口径）；旧写法没有 Divider / Points |
 | stats-side | `Side Card N`（卡片底）、`Side Accent N`（只有重点卡）、`Side Number N`、`Side Text N`（标签一段 + 说明一段）、`Side Conclusion Title`、`Side Conclusion Rule`、`Side Points`（全部结论要点，一条一段）、`Stat Source` |
 | timeline（写了状态） | `Milestone Node N`、`Milestone Check N`（只在已完成节点上）、`Milestone Date N`、`Milestone Text N`（标题一段 + 说明一段）、`Progress Line`（绿色已完成段）、`Remaining Line`（灰色虚线）、`Current Ring`、`Current Tag`；图例 `Legend Icon 1–4`、`Legend Label 1–4`（1 已完成、2 进行中、3 未完成、4 关键里程碑）、`Legend Check 1`（已完成图标上的对勾） |
@@ -436,16 +448,17 @@ Layout: section
 | section | `Section Number`（章节编号，也是 inspect 区分 section / evidence 的标记形状）、`Section Rule`（竖线）、`Section Name`（中文名）、`Section English`（英文名） |
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
 
-其他版式的形状名（如 `Process Card N`、`Lead`）以 `inspect_ppt.py` 的输出为准。
+其他版式的形状名（如 `Process Card N`、before-after 月报模式的 `Lead`）以 `inspect_ppt.py` 的输出为准。
 
 ### 审核的几何豁免
 
-`scripts/review_deck.py` 的几何检查按上面的形状名判断哪些叠放是有意的。改形状名时同步这里和 `review_deck.py` 的 `OVERLAP_EXEMPT` / `OVERLAP_PAIRS`。
+`scripts/review_deck.py` 的几何检查按上面的形状名判断哪些叠放是有意的。改形状名时同步这里和 `review_deck.py` 的 `OVERLAP_EXEMPT` / `OVERLAP_PAIRS` / `OVERLAP_TWINS`。
 
 - 重叠不报：
   - 模板占位框（主标题、action title、各版式槽位，包括被图片盖住的 Before/After 13 / 14）；
   - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"；有 PDCA 图标时框让到图标左侧，不和图标相压）；
   - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
-  - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）。
+  - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）；
+  - `Lead` 和 `Lead Accent`、`Next Rule` 和 `Next Line`（两两豁免；它们和正文形状相压照样报）。
 - 原生表格（table 的 `Data Table`）整张算一个形状，出界、重叠照常按外框查；单元格不另加豁免。文字溢出按单元格估算（同文本框口径：字宽 `text_width_in`、行高字号 × 1.2），某行估计高过行高才报。
 - 错位只比同类形状：名字去掉末尾编号后相同（如 `Process Card 1–4`、`Side Card 1–3`；占位框不比）。同一行比上沿 / 中线 / 下沿，同一列比左沿 / 中线 / 右沿，有一条对齐（差不到半像素）就算对齐；都没对齐且最近的差值小于 5 像素时报告。大小不同、中线对齐的节点（关键里程碑、进行中）不算错位。
