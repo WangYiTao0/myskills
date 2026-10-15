@@ -4,9 +4,11 @@
 形状名约定（N 从 1 起，与成员顺序一致）：Member Card N（卡片底）、Member Name N（姓名）、
 Member Role N（角色）、Member Rule N（角色和职责之间的细线）、Member Duty N（职责）。
 """
-from deckcheck import (CONTENT_SLOT_IN, LAYOUT_INDEX, body_slide, caption_bar, check,
-                       deck_error, finish, generate, inside, inside_shape, one, out_of_bounds,
-                       placeholder, red_elements, review, run_style, tag_shape, warnings)
+from deckcheck import (CONTENT_SLOT_IN, EMU, INK, LAYOUT_INDEX, body_slide, bottom, caption_bar,
+                       center_x, check, deck_error, fill_color, finish, generate, geometry, inside,
+                       inside_shape, line_color, one, out_of_bounds, paragraphs, placeholder,
+                       red_elements, review, run_style, run_styles, shapes_named, tag_shape,
+                       warnings)
 
 TITLE = "项目团队 / TEAM"
 SUBTITLE = "四人小组，现场推进和数据复盘分开负责"
@@ -171,9 +173,161 @@ def test_review():
           any(line.startswith("[缺结论行]") for line in out.stdout.splitlines()), out.stdout)
 
 
+# ---- 方向 C（通用 / 项目汇报模式）：姓名首字圆形头像，不画卡片 ----
+
+def general_md(members, title=TITLE, lead=CONCLUSION, next_line="Next: 9 月加入 A 仓班组长",
+               extra=""):
+    return f"""
+---
+title: Mock Deck
+date: 14 Oct 2026
+---
+
+# {title}
+## {SUBTITLE}
+Layout: team
+{extra}{lines(members)}
+{lead}
+{next_line}
+"""
+
+
+C_ROLES = ["Member Avatar", "Member Name", "Member Role", "Member Rule", "Member Duty"]
+WHITE, MUTED, NEAR_BLACK, GRAY_LINE = "FFFFFF", "6B6B6B", "333333", "BFBFBF"
+
+
+def body_bounds(s):
+    """C 模式正文区上下沿（英寸）：lead 下沿 +0.19"，Next 细线上方 0.10"（没有 Next 时 6.95"）。"""
+    lead, rule = one(s, "Lead"), one(s, "Next Rule")
+    top = bottom(lead) / EMU + 0.19 if lead else 1.30
+    low = rule.top / EMU - 0.10 if rule else 6.95
+    return top, low
+
+
+def check_avatars(s, members, label):
+    """C 模式 N 人：不画卡片；每人头像（黑底圆、白色粗体姓名首字）+ 姓名 / 角色 / 短线 / 职责，
+    自上而下居中在头像下；整组在正文区里、不越出。"""
+    names = [sh.name for sh in s.shapes]
+    check(f"{label}：不画卡片", not shapes_named(s, "Member Card"), names)
+    got = {r: shapes_named(s, r) for r in C_ROLES}
+    n = len(members)
+    check(f"{label}：五类形状各 {n} 个", all(len(v) == n for v in got.values()),
+          {r: len(v) for r, v in got.items()})
+    if not all(len(v) == n for v in got.values()):
+        return
+    top, low = body_bounds(s)
+    for i, (name, role, duty) in enumerate(members):
+        av, nm, rl, rule, dt = (got[r][i] for r in C_ROLES)
+        check(f"{label}：第 {i + 1} 人头像是黑底正圆、白色粗体姓名首字",
+              geometry(av) == "ellipse" and fill_color(av) == INK and av.width == av.height
+              and av.text_frame.text == name[0]
+              and {(b, c) for _, b, c in run_styles(av)} == {(True, WHITE)},
+              (geometry(av), fill_color(av), av.text_frame.text, run_styles(av)))
+        check(f"{label}：第 {i + 1} 人文字 = 姓名 / 角色 / 职责",
+              [paragraphs(x) for x in (nm, rl, dt)] == [[name], [role], [duty]],
+              [paragraphs(x) for x in (nm, rl, dt)])
+        check(f"{label}：第 {i + 1} 人自上而下 头像 → 姓名 → 角色 → 短线 → 职责，都居中对齐头像",
+              bottom(av) <= nm.top and bottom(nm) <= rl.top and bottom(rl) <= rule.top
+              and rule.top <= dt.top and rule.height == 0
+              and all(abs(center_x(x) - center_x(av)) <= 2 for x in (nm, rl, rule, dt))
+              and all(x.text_frame.paragraphs[0].alignment == 2 for x in (nm, rl, dt)),
+              [(x.name, x.top / EMU, center_x(x) / EMU) for x in (av, nm, rl, rule, dt)])
+        check(f"{label}：第 {i + 1} 人短线灰色、比文字框窄",
+              line_color(rule) == GRAY_LINE and rule.width < nm.width, line_color(rule))
+        n_pt, n_b, n_c = run_style(nm)
+        r_pt, r_b, r_c = run_style(rl)
+        d_pt, d_b, d_c = run_style(dt)
+        check(f"{label}：第 {i + 1} 人姓名粗体近黑最大、角色灰、职责 #333333",
+              n_b and n_c == INK and r_c == MUTED and not r_b and d_c == NEAR_BLACK and not d_b
+              and n_pt > r_pt and n_pt > d_pt,
+              (run_style(nm), run_style(rl), run_style(dt)))
+        check(f"{label}：第 {i + 1} 人形状都在正文区里",
+              all(x.top / EMU >= top - 0.01 and bottom(x) / EMU <= low + 0.01
+                  and x.left >= 0.56 * EMU - 2 and x.left + x.width <= (0.56 + 12.2) * EMU + 2
+                  for x in (av, nm, rl, rule, dt)),
+              [(x.name, x.top / EMU, bottom(x) / EMU) for x in (av, nm, rl, rule, dt)])
+
+
+def test_general_mode_avatars():
+    """C 模式 4 人：一行头像，同一水平线、等大；整组在正文区里水平、垂直居中；只有 lead 竖线用红；
+    正常稿没有警告。"""
+    r = generate(general_md(MEMBERS))
+    check("C team：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    s = body_slide(r)
+    if s is None:
+        return
+    check_avatars(s, MEMBERS, "C team 4 人")
+    avs = shapes_named(s, "Member Avatar")
+    if len(avs) == 4:
+        check("C team 4 人：头像同一水平线、等大、从左到右",
+              len({a.top for a in avs}) == 1 and len({a.width for a in avs}) == 1
+              and all(a.left < b.left for a, b in zip(avs, avs[1:])))
+        top, low = body_bounds(s)
+        grp_top = min(a.top for a in avs) / EMU
+        grp_bot = max(bottom(d) for d in shapes_named(s, "Member Duty")) / EMU
+        check("C team 4 人：整组垂直居中",
+              abs((grp_top - top) - (low - grp_bot)) <= 0.05, (top, grp_top, grp_bot, low))
+        mid = (center_x(avs[0]) + center_x(avs[-1])) / 2 / EMU
+        check("C team 4 人：整组水平居中", abs(mid - (0.56 + 6.1)) <= 0.02, mid)
+    check("C team：banner 以外只有 lead 竖线用红", red_elements(s) == ["Lead Accent"],
+          red_elements(s))
+
+
+# lead 写到两行（正文区最矮的正常情况：两行 lead + Next）
+LONG_LEAD = "分工按现场推进、数据复盘、系统支持三条线，周会对齐一次进度和问题，月底统一复盘各条线的结果和下月计划"
+
+
+def test_general_mode_capacity():
+    """C 模式 2 / 5 / 8 人和 8 人每段写满（两行 lead + Next）：都正确排布、没有警告、不越界；
+    5 人以上两行（第一行一半向上取整），每行头像同一水平线、各自水平居中，两行不相压；
+    几何审核不误报。"""
+    for members, label in ((MEMBERS[:2], "C team 2 人"), (EIGHT[:5], "C team 5 人"),
+                           (EIGHT, "C team 8 人"), (FULL, "C team 8 人写满")):
+        r = generate(general_md(members, lead=LONG_LEAD))
+        check(f"{label}：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+        s = body_slide(r)
+        if s is None:
+            continue
+        lead = one(s, "Lead")
+        check(f"{label}：lead 确实是两行", lead is not None and lead.height / EMU > 0.9,
+              lead.height / EMU if lead is not None else None)
+        check_avatars(s, members, label)
+        check(f"{label}：不越界", not out_of_bounds(r.prs, [s]), out_of_bounds(r.prs, [s]))
+        avs = shapes_named(s, "Member Avatar")
+        if len(avs) != len(members):
+            continue
+        first = -(-len(members) // 2) if len(members) > 4 else len(members)
+        for row in (avs[:first], avs[first:]):
+            if not row:
+                continue
+            mid = (center_x(row[0]) + center_x(row[-1])) / 2 / EMU
+            check(f"{label}：每行 {len(row)} 个头像同一水平线、水平居中",
+                  len({a.top for a in row}) == 1 and abs(mid - 6.66) <= 0.02, mid)
+        if len(members) > 4:
+            duties = shapes_named(s, "Member Duty")
+            check(f"{label}：第二行头像在第一行职责下面",
+                  avs[first].top > max(bottom(d) for d in duties[:first]))
+        out = review(r.workdir / "deck.md", r.path)
+        geo = [x for x in out.stdout.splitlines()
+               if x.startswith(("[出界]", "[重叠]", "[错位]", "[文字溢出]", "[压"))]
+        check(f"{label}：几何审核不误报", not geo, out.stdout)
+
+
+def test_general_mode_overflow_warning():
+    """C 模式：正文区放不下（lead 写到三行 + Next，8 人每段写满）时警告，信息带页标题。"""
+    lead = LONG_LEAD + "，并把问题清单同步给各车间主任和班组长确认，下月起每周五下午固定召开复盘会"
+    r = generate(general_md(FULL, title="Crowded Team", lead=lead))
+    check("C team：放不下时警告溢出正文区",
+          r.rc == 0 and any("Crowded Team" in w and "溢出" in w for w in warnings(r.stderr)),
+          r.stderr)
+
+
 if __name__ == "__main__":
     test_render()
     test_review()
     test_capacity_limits()
     test_capacity_errors()
+    test_general_mode_avatars()
+    test_general_mode_capacity()
+    test_general_mode_overflow_warning()
     finish()

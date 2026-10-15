@@ -6,6 +6,7 @@
 文中引用的图片现生成纯色图。
 """
 import re
+import sys
 
 from deckcheck import LAYOUT_INDEX, SKILL, check, finish, generate, one, run_style
 
@@ -146,8 +147,50 @@ def test_process_general_mode():
               doc is not None and doc == got, (doc, got))
 
 
+TEAM_PAGE = """---
+title: Mock Deck
+---
+
+# 项目团队 / TEAM
+## 两人小组，现场和数据分开负责
+Layout: team
+- 周航 | 现场推进 | 贴码和巡检
+- 陈雨 | 数据复盘 | 每周出周报
+分工按现场和数据两条线，周会对齐
+"""
+
+
+def test_team_general_mode():
+    """team 方向 C：形状命名表的名字生成器都会画、不画卡片；头像首字 / 姓名 / 角色 / 职责的
+    字号（最大一档）、粗体、颜色和代码一致；inspect 标记形状和代码一致。"""
+    names = re.findall(r"`([^`]+)`", _table_row("team（通用 / 项目模式）"))
+    check("layouts.md：形状命名表有 team（通用 / 项目模式）一行，列出头像、姓名、角色、短线、职责",
+          {"Member Avatar N", "Member Name N", "Member Role N", "Member Rule N",
+           "Member Duty N"} <= set(names), names)
+    r = generate(TEAM_PAGE)
+    s = r.slides[1] if r.rc == 0 else None
+    drawn = {sh.name for sh in s.shapes} if s is not None else set()
+    want = {re.sub(r" N$", " 1", n) for n in names}
+    check("layouts.md：team（通用 / 项目模式）的形状名生成器都会画、没有卡片",
+          want and want <= drawn and "Member Card 1" not in drawn, sorted(want - drawn))
+    for label, shape in (("团队头像首字（通用 / 项目模式）", "Member Avatar 1"),
+                         ("团队姓名（通用 / 项目模式）", "Member Name 1"),
+                         ("团队角色（通用 / 项目模式）", "Member Role 1"),
+                         ("团队职责（通用 / 项目模式）", "Member Duty 1")):
+        doc = _full_style_row(label)
+        got = run_style(one(s, shape)) if s is not None and one(s, shape) else None
+        check(f"layouts.md：{label} 的字号、粗体、颜色和生成器一致",
+              doc is not None and doc == got, (doc, got))
+    sys.path.insert(0, str(SKILL / "scripts"))
+    from layouts import team  # noqa: E402
+    text = DOC.read_text(encoding="utf-8")
+    check("layouts.md：team 小节写的 inspect 标记形状和代码一致",
+          f"inspect 靠 `{team.MARK_SHAPE}` 认出 team" in text, team.MARK_SHAPE)
+
+
 if __name__ == "__main__":
     test_doc_examples_generate()
     test_common_shape_names()
     test_process_general_mode()
+    test_team_general_mode()
     finish()

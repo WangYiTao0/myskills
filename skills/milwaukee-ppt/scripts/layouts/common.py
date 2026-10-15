@@ -29,6 +29,8 @@ EA_FONT = "PingFang SC"       # 中文字体（a:ea）
 
 # 黑白灰（section / agenda / team / table）：正文和标题、次要文字（英文名、角色）、细线
 INK, MUTED, RULE = "1A1A1A", "6B6B6B", "BFBFBF"
+# 方向 C 正文说明文字（process 说明、team 职责……）：近黑，比 MUTED 深，投影上看得清
+DESC_INK = "333333"
 # 这几个版式排文本框 / 表格行高用的行高倍数：字号 × 1.25。审核脚本估算溢出按字号 × 1.2，
 # 比这里紧 4%，所以生成器按 1.25 排出的框审核不会报溢出（见 scripts/README.md 审核脚本一节）。
 LINE_SPACING = 1.25

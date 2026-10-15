@@ -25,8 +25,8 @@ from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (IMG_W, INK as C_INK, LINE_SPACING as C_LINE_SPACING, RULE, add_line,
-                     add_page_chrome, add_run, add_shape, add_textbox, body_area, fill_titles,
+from .common import (DESC_INK, IMG_W, INK as C_INK, LINE_SPACING as C_LINE_SPACING, RULE,
+                     add_line, add_page_chrome, add_run, add_shape, add_textbox, body_area, fill_titles,
                      strip_theme_style, fit_body, take_slot, text_lines, text_width_in, warn)
 
 NAME = "process"
@@ -57,7 +57,6 @@ TITLE_PAD = 0.15            # 步骤名框比列宽左右各窄
 DESC_GAP = 0.12             # 步骤名 → 说明
 DESC_PT = 18
 DESC_PAD = 0.2              # 说明框比列宽左右各窄
-DESC_INK = "333333"         # 说明：近黑
 DESC_MAX_LINES = 2          # 说明最多几行
 WIDOW_CHARS = 2             # 末行只剩这么几个字以内算折行难看
 

@@ -16,7 +16,7 @@ BODY_LAYOUTS = ["agenda", "section", "evidence", "process", "section", "before-a
                 "stats", "stats-side", "table", "section", "timeline", "timeline-phase",
                 "team", "image-text"]
 # 模板 layout 0 的版式靠形状认：页内标记形状名
-MARKERS = {"agenda": "Agenda Number 1", "section": "Section Number", "team": "Member Card 1",
+MARKERS = {"agenda": "Agenda Number 1", "section": "Section Number", "team": "Member Avatar 1",
            "table": "Data Table"}
 
 

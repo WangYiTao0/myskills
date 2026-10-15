@@ -85,6 +85,10 @@ Next: 10 月底前完成全部工具贴码
 | 流程编号（通用 / 项目模式） | 40pt bold #FFFFFF，编号圆直径 1.1"、#1A1A1A 底 |
 | 流程步骤名（通用 / 项目模式） | 24pt bold #1A1A1A |
 | 流程说明（通用 / 项目模式） | 18pt #333333 |
+| 团队头像首字（通用 / 项目模式） | 44pt bold #FFFFFF，头像直径 1.4"、#1A1A1A 底（放不下时按档缩小，最小一档 20pt、直径 0.5"） |
+| 团队姓名（通用 / 项目模式） | 24pt bold #1A1A1A（按档缩小：22 / 20 / 16pt） |
+| 团队角色（通用 / 项目模式） | 16pt #6B6B6B（按档缩小：16 / 14 / 12pt） |
+| 团队职责（通用 / 项目模式） | 18pt #333333（按档缩小：16 / 14 / 12pt） |
 | 底部红条（月报模式） | 14pt 白字 |
 | lead（通用 / 项目模式） | 22pt bold #1A1A1A |
 | Next 行（通用 / 项目模式） | 16pt bold #1A1A1A |
@@ -341,7 +345,7 @@ Layout: agenda
 
 ## team · 团队页
 
-模板 layout 0（和 evidence、section、agenda 共用；inspect 靠 `Member Card 1` 认出 team）。列出成员、角色和分工，每人一张卡片；本期不带头像。
+模板 layout 0（和 evidence、section、agenda 共用；inspect 靠 `Member Name 1` 认出 team）。列出成员、角色和分工：通用 / 项目模式每人一个姓名首字圆形头像，月报模式每人一张卡片；都不放照片。
 
 ```markdown
 # 项目团队 / TEAM
@@ -355,14 +359,16 @@ Layout: team
 ```
 
 - 字段：2–8 行无序列表「- 姓名 | 角色 | 职责」，一人一行，三段都必填。其余普通文字行进底部红条（一句分工结论），`Next:`、`Tag:` 照常可用。
-- 容量：2–8 人。每段按 4 张一行时的卡片宽度量：姓名一行放得下（约 8 个汉字 / 15 个英文字母），角色一行放得下（约 12 个汉字），职责最多 3 行（约 40 个汉字）。只有 1 人不必做团队页；超过 8 人按小组拆页，或只列牵头人。
+- 容量：2–8 人。每段按月报模式 4 张一行时的卡片宽度量（两种模式同一口径）：姓名一行放得下（约 8 个汉字 / 15 个英文字母），角色一行放得下（约 12 个汉字），职责最多 3 行（约 40 个汉字）。只有 1 人不必做团队页；超过 8 人按小组拆页，或只列牵头人。
 - 主标题、副标题照常填 idx 0 / 10；副标题写一句结论（团队怎么分工），不要写成「团队成员」。
-- 结论红条：保留。团队页通常有一句分工结论（谁牵头、按什么分线、怎么协同），写在成员行后面；没写时审核照常报「缺结论行」。
-- 画法：每人一张 #F5F5F5 底、#E5E5E5 细描边的卡片，卡片宽固定为一行 4 张时的宽度；2–4 人排一行，5–8 人排两行（第一行 = 总数一半向上取整，第二行从同一左沿排起）；整组在正文区里水平、垂直居中。卡片里自上而下：20pt bold #1A1A1A 姓名，14pt #6B6B6B 角色，一条 #BFBFBF 细线，12pt #1A1A1A 职责。只用黑白灰，不标重点、不用红。
+- 结论：通用 / 项目模式画成 lead，月报模式进底部红条。团队页通常有一句分工结论（谁牵头、按什么分线、怎么协同），写在成员行后面；没写时审核照常报「缺结论行」。
+- 画法（通用 / 项目模式，方向 C）：不画卡片。每人一列，自上而下居中：黑底白字的姓名首字圆形头像（`Member Avatar N`，#1A1A1A 底，首字 bold 白字；拉丁名取第一个字母）、姓名（`Member Name N`，bold #1A1A1A）、角色（`Member Role N`，#6B6B6B）、一条 0.7" 长的 #BFBFBF 短线（`Member Rule N`）、职责（`Member Duty N`，#333333）。2–4 人排一行，5–8 人排两行（第一行 = 总数一半向上取整），每行各自在正文区里水平居中；列宽 = 正文区宽 ÷ 每行人数（2 人时按 3 列算，免得隔太远），文字框比列宽左右各窄 0.2"。头像和字号分四档从大到小试（头像直径 / 首字 / 姓名 / 角色 / 职责：1.4" / 44 / 24 / 16 / 18pt → 1.1" / 36 / 22 / 16 / 16pt → 0.85" / 30 / 20 / 14 / 14pt → 0.5" / 20 / 16 / 12 / 12pt），取第一档「姓名、角色一行放得下，整组高度放得进正文区」的；行高按字号 × 1.25 估，各人职责框等高（取行数最多的那人）。整组在正文区里垂直居中。8 人每段写满、lead 两行加 Next 时最小一档也放得下。不用红。
+- 画法（月报模式，不变）：每人一张 #F5F5F5 底、#E5E5E5 细描边的卡片，卡片宽固定为一行 4 张时的宽度；2–4 人排一行，5–8 人排两行（第一行 = 总数一半向上取整，第二行从同一左沿排起）；整组在正文区里水平、垂直居中。卡片里自上而下：20pt bold #1A1A1A 姓名，14pt #6B6B6B 角色，一条 #BFBFBF 细线，12pt #1A1A1A 职责。只用黑白灰，不标重点、不用红。
 - 适用：项目汇报第 07 节「项目团队」（SKILL.md §1，不带 PDCA）、新项目立项时介绍小组分工、跨部门协作汇报列出各方对接人。
-- 反例：只有一两个人且没有分工可讲（在封面或收尾写汇报人即可）；把职责写成一段话或几条子列表（每人一句分工）；用团队页列资源需求、人力缺口（用 stats 或 evidence 讲数字和证据）；想放头像（本期不支持，生成后手工补）。
+- 反例：只有一两个人且没有分工可讲（在封面或收尾写汇报人即可）；把职责写成一段话或几条子列表（每人一句分工）；用团队页列资源需求、人力缺口（用 stats 或 evidence 讲数字和证据）；想放照片（不支持，生成后手工补）。
 - 报错：少于 2 人或多于 8 人；某行不是三段；某段为空；姓名、角色一行放不下；职责超过 3 行；成员行漏写列表符号（`陈雨 | 数据复盘 | …`，免得悄悄进红条）；标了 `!`；写了缩进子列表。报错信息带页标题。
-- 审核：`review_deck.py` 对 team 和其他有红条的版式一样检查「缺结论行」「目录式副标题」；几何检查不需要另加豁免（卡片和卡片里的文字同属 `Member … N` 一个组件）。
+- 警告：通用 / 项目模式下最小一档也放不进正文区（lead 超过两行时可能出现），建议精简职责。
+- 审核：`review_deck.py` 对 team 和其他版式一样检查「缺结论行」「目录式副标题」；几何检查不需要另加豁免（卡片 / 头像和它下面的文字同属 `Member … N` 一个组件）。
 
 ## table · 表格页
 
@@ -450,7 +456,8 @@ Layout: section
 | timeline（写了状态） | `Milestone Node N`、`Milestone Check N`（只在已完成节点上）、`Milestone Date N`、`Milestone Text N`（标题一段 + 说明一段）、`Progress Line`（绿色已完成段）、`Remaining Line`（灰色虚线）、`Current Ring`、`Current Tag`；图例 `Legend Icon 1–4`、`Legend Label 1–4`（1 已完成、2 进行中、3 未完成、4 关键里程碑）、`Legend Check 1`（已完成图标上的对勾） |
 | timeline（不写状态） | `Timeline Line`、`Timeline Node N`、`Timeline Date N`、`Timeline Text N` |
 | agenda | `Agenda Number N`（章节编号；`Agenda Number 1` 也是 inspect 区分 agenda / section / evidence 的标记形状）、`Agenda Rule N`（竖线）、`Agenda Name N`（中文名）、`Agenda English N`（英文名） |
-| team | `Member Card N`（卡片底；`Member Card 1` 也是 inspect 区分 team / agenda / section / evidence 的标记形状）、`Member Name N`（姓名）、`Member Role N`（角色）、`Member Rule N`（角色和职责之间的细线）、`Member Duty N`（职责） |
+| team（通用 / 项目模式） | `Member Avatar N`（黑底白字姓名首字圆形头像）、`Member Name N`（姓名；`Member Name 1` 也是 inspect 区分 team / agenda / section / evidence 的标记形状，两种模式都有）、`Member Role N`（角色）、`Member Rule N`（角色和职责之间的短线）、`Member Duty N`（职责） |
+| team（月报模式） | `Member Card N`（卡片底）、`Member Name N`（姓名）、`Member Role N`（角色）、`Member Rule N`（角色和职责之间的细线）、`Member Duty N`（职责） |
 | table | `Data Table`（原生表格，graphicFrame；第一行是表头，单元格按 `shape.table.cell(行, 列)` 取，行列从 0 起；`Data Table` 也是 inspect 区分 table / team / agenda / section / evidence 的标记形状）、`Table Key Bar`（`!` 行左侧的红竖条，只在标了 `!` 时有） |
 | section | `Section Number`（章节编号，也是 inspect 区分 section / evidence 的标记形状）、`Section Rule`（竖线）、`Section Name`（中文名）、`Section English`（英文名） |
 | timeline-phase | `Phase Segment N`（箭头段，标题在段内）、`Phase Date N`、`Phase Stem N`（细线）、`Phase Marker N`（菱形或小圆点）、`Phase Key Label N`（只有关键里程碑）、`Phase Text N`（说明）；图例 `Legend Icon 1–4`（缩小的箭头段 / 菱形）、`Legend Label 1–4`（编号同 timeline） |
@@ -464,7 +471,7 @@ Layout: section
 - 重叠不报：
   - 模板占位框（主标题、action title、各版式槽位，包括被图片盖住的 Before/After 13 / 14）；
   - `Caption Bar`（叠在最上层）、`Month Tag`（框比字大，下沿伸进内容区 0.12"；有 PDCA 图标时框让到图标左侧，不和图标相压）；
-  - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Process Mark 2` 和 `Process Title 2` / `Process Desc 2` / `Process Line 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
+  - 同一组件：名字第一个词相同、编号 N 相同，如 `Process Card 2` 和 `Process Number 2`、`Process Mark 2` 和 `Process Title 2` / `Process Desc 2` / `Process Line 2`、`Side Card 1` 和 `Side Number 1`、`Member Card 4` 和 `Member Duty 4`、`Member Avatar 4` 和 `Member Name 4`、`Milestone Node 3` 和 `Milestone Check 3`、`Legend Icon 1` 和 `Legend Check 1`；
   - `Current Ring` 和 `Milestone …`（外圈套在进行中节点上）；
   - `Lead` 和 `Lead Accent`、`Next Rule` 和 `Next Line`（两两豁免；它们和正文形状相压照样报）。
 - 原生表格（table 的 `Data Table`）整张算一个形状，出界、重叠照常按外框查；单元格不另加豁免。文字溢出按单元格估算（同文本框口径：字宽 `text_width_in`、行高字号 × 1.2），某行估计高过行高才报。
