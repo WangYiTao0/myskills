@@ -139,6 +139,10 @@ def test_docs():
     review_md = (SKILL.parent / "ppt-review" / "SKILL.md").read_text(encoding="utf-8")
     check("ppt-review：交付 / 细调处写明细调稿再审时「正文形状被改过」怎么看",
           RULE in review_md and "细调" in review_md)
+    check("scripts README：写明「正文形状被改过」只比名字和个数，按原名删掉重画查不出来",
+          "按原名" in readme and "查不出来" in readme and "正文形状无法比对" in readme)
+    check("ppt-review：写明「正文形状被改过」只比名字，按原名删掉重画查不出来（局限）",
+          "只比名字" in review_md and "按原名" in review_md and "查不出来" in review_md)
 
 
 if __name__ == "__main__":
