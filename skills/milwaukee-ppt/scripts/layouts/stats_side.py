@@ -7,7 +7,7 @@
     ### Mock findings                                    ← 可选，结论区小标题，默认「结论」
     > Mock finding one.                                  ← 结论要点，自动编号，1–4 条
     口径：Mock source note.                             ← 可选，一行（或 Source:），灰色小字贴结论区底
-    Mock one-line conclusion.                           ← 其余普通文字行进底部红条
+    Mock one-line conclusion.                           ← 其余普通文字行是结论（月报进底部红条，通用 / 项目模式画成 lead）
 
 卡片不带解读：卡片行下面缩进的 `- ` 子列表报错（解读写成 `> ` 要点，或改用 stats）。
 字段：fields = {"items": [{"label", "value", "note", "key"}...], "points": [...],
