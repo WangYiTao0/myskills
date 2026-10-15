@@ -16,6 +16,7 @@ import math
 import os
 import re
 import sys
+import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -106,11 +107,22 @@ def check_agenda_sections(doc):
             for p in doc.pages if p.layout == "section" and p.fields["name"] not in names]
 
 
+def squash(text):
+    """去掉全部空白（含全角空格、手动换行），比较文字是否画出来时用：细调换行不算改了字。"""
+    return re.sub(r"\s+", "", text)
+
+
+def bare(text):
+    """去掉空白和标点（含全角），比较两句是不是同一句话时用。"""
+    return "".join(ch for ch in squash(text) if not unicodedata.category(ch).startswith("P"))
+
+
 def check_lead(page):
-    """方向 C（通用 / 项目汇报模式）下的 lead：不能和副标题一样；对比页只能有一句 lead。"""
+    """方向 C（通用 / 项目汇报模式）下的 lead：不能和副标题一样（去掉标点和空白后比）；
+    对比页只能有一句 lead。"""
     issues = []
     text = conclusion_text(page)
-    if text and text == page.action_title.strip():
+    if text and bare(text) == bare(page.action_title):
         issues.append(("lead 和副标题相同", where(page), f"结论行（lead）和副标题都是「{text}」",
                        "副标题写本页结论，lead 重申结论并补上数据支撑（SKILL.md §4），两句不要一样"))
     if page.layout == "before-after" and page.fields["lead"]:
@@ -495,8 +507,8 @@ def _texts(slide, name):
 
 
 def check_drawn(slide, page, place, lead):
-    """结论和 Next 画进了 pptx：方向 C 下结论在 Lead、Next 在 Next Line（文字一致）；
-    月报模式下两句都要出现在底部红条 Caption Bar 里。"""
+    """结论和 Next 画进了 pptx：方向 C 下结论在 Lead、Next 在 Next Line（各段拼起来、去掉空白后
+    文字一致，细调时拆段 / 手动换行不报）；月报模式下两句都要出现在底部红条 Caption Bar 里。"""
     if page.layout in NAV_LAYOUTS:
         return []
     issues = []
@@ -506,7 +518,7 @@ def check_drawn(slide, page, place, lead):
         if not want:
             continue
         got = _texts(slide, shape)
-        if (got != [want]) if lead else (want not in got):
+        if (squash("".join(got)) != squash(want)) if lead else (want not in got):
             seen = "没有这个形状" if not got else f"里面是「{' / '.join(got)}」"
             issues.append((rule, place, f"文稿的{label}「{want}」没画进「{shape}」（{seen}）",
                            REDRAW))

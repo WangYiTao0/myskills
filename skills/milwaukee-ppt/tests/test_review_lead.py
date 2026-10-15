@@ -5,6 +5,10 @@ lead 和副标题相同、对比页两个 lead。
 做法：生成器按文稿出 pptx（正样本，不报），再用 python-pptx 改坏（负样本，报对应规则）；
 只看审核脚本的输出。文稿内容全部虚构。
 """
+import copy
+
+from pptx.oxml.ns import qn
+
 from deckcheck import broken, check, finish, generated, lines_with, review
 
 RULES = ("结论没画出来", "Next 没画出来", "lead 和副标题相同", "对比页两个 lead", "流程说明折行")
@@ -49,6 +53,29 @@ def retext(name, text, page=2):
     return change
 
 
+def split_text(name, how, page=2):
+    """细调换行：把 name 形状的文字从中间拆开——"para" 拆成两段，"br" 在段内插手动换行。"""
+    def change(prs):
+        for sh in prs.slides[page - 1].shapes:
+            if sh.name != name:
+                continue
+            para = sh.text_frame.paragraphs[0]
+            run = para.runs[0]
+            text = run.text
+            cut = len(text) // 2
+            run.text = text[:cut]
+            if how == "para":
+                new_p = copy.deepcopy(para._p)
+                para._p.addnext(new_p)
+                new_p.findall(qn("a:r"))[0].find(qn("a:t")).text = text[cut:]
+            else:
+                tail = copy.deepcopy(run._r)
+                tail.find(qn("a:t")).text = text[cut:]
+                run._r.addnext(tail)
+                run._r.addnext(run._r.makeelement(qn("a:br"), {}))
+    return change
+
+
 def test_generator_output_passes():
     for label, md in (("通用模式", GENERAL), ("月报模式", MONTHLY),
                       ("项目模式", GENERAL.replace("title:", "report: project\ntitle:", 1)
@@ -76,12 +103,29 @@ def test_conclusion_not_drawn():
           and any("第 2 页" in ln for ln in lines_with(r.stdout, "Next 没画出来")), r.stdout)
 
 
+def test_line_break_tuning_not_reported():
+    md, pptx = generated(GENERAL, IMAGES)
+    for name in ("Lead", "Next Line"):
+        for how, label in (("para", "拆成两段"), ("br", "段内手动换行")):
+            r = review(md, broken(pptx, split_text(name, how)))
+            check(f"通用模式 {name} {label}（细调换行）：不报「结论没画出来」/「Next 没画出来」",
+                  not lines_with(r.stdout, "结论没画出来") and not lines_with(r.stdout, "Next 没画出来"),
+                  r.stdout)
+
+
 def test_lead_same_as_subtitle():
     md = GENERAL.replace("早班交接时 6 台叉车同时排队充电", "充电位高峰排队超过 20 分钟")
     r = review(*generated(md, IMAGES))
     check("lead 等于副标题：报「lead 和副标题相同」",
           any("现场证据 / EVIDENCE" in ln for ln in lines_with(r.stdout, "lead 和副标题相同")),
           r.stdout)
+    for lead, label in (("充电位高峰排队超过 20 分钟。", "多一个句号"),
+                        ("充电位高峰排队，超过20分钟", "多逗号、少空格"),
+                        ("充电位高峰排队　超过 20 分钟！", "全角空格和全角叹号")):
+        r = review(*generated(GENERAL.replace("早班交接时 6 台叉车同时排队充电", lead), IMAGES))
+        check(f"lead 和副标题只差标点 / 空白（{label}）：报「lead 和副标题相同」",
+              any("现场证据 / EVIDENCE" in ln for ln in lines_with(r.stdout, "lead 和副标题相同")),
+              r.stdout)
     md = MONTHLY.replace("早班交接时 6 台叉车同时排队充电", "充电位高峰排队超过 20 分钟")
     r = review(*generated(md, IMAGES))
     check("月报模式（红条不是 lead）：不报「lead 和副标题相同」",
@@ -135,6 +179,7 @@ def test_process_desc_wrap():
 if __name__ == "__main__":
     test_generator_output_passes()
     test_conclusion_not_drawn()
+    test_line_break_tuning_not_reported()
     test_lead_same_as_subtitle()
     test_before_after_two_leads()
     test_process_desc_wrap()
