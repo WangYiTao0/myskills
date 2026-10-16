@@ -15,7 +15,8 @@ from deckcheck import (LAYOUT_INDEX, caption_bar, check, finish, generate, make_
 
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 ---
 
 # Default Page
@@ -34,7 +35,7 @@ IMAGES = {"img/a.png": (1600, 900), "img/b.png": ((800, 800), (60, 60, 60))}
 def test_explicit_and_default():
     r = generate(MD, images=IMAGES)
     check("evidence：退出码 0", r.rc == 0, r.stderr)
-    body = r.slides[1:]
+    body = r.slides[1:-1]          # 月报模式：最后一页是 Thank You
     check("evidence：不写 Layout 与写 Layout: Evidence（大小写不敏感）都用 layout 0",
           len(body) == 2 and all(
               s.slide_layout == r.prs.slide_layouts[LAYOUT_INDEX["evidence"]]
@@ -56,7 +57,8 @@ def test_explicit_and_default():
 
 URL_MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 ---
 
 # URL Page

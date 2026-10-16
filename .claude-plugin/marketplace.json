@@ -14,7 +14,7 @@
       "name": "milwaukee-ppt",
       "source": "./skills/milwaukee-ppt",
       "description": "Milwaukee Tool 工作汇报 PPT 格式与视觉规范 + 实战版式案例库",
-      "version": "0.4.1"
+      "version": "0.6.0"
     },
     {
       "name": "pbip-mcp-workflow",
@@ -81,6 +81,18 @@
       "source": "./skills/wayfinder-github",
       "description": "把存在 GitHub issue 里的 wayfinder 地图画成星图看 — 只读快照喂给 wayfinder-maps 查看器并持续跟随，兼管这套 GitHub adapter 的字段约定(规划方法本身归 wayfinder-maps)",
       "version": "0.1.0"
+    },
+    {
+      "name": "ppt-grill",
+      "source": "./skills/ppt-grill",
+      "description": "汇报 PPT 打磨访谈 — 决策树分轮追问、每题带推荐答案，边问边写定稿简报（观众/结论/页序/口径表/预判问答），确认后交 milwaukee-ppt 生成",
+      "version": "0.2.0"
+    },
+    {
+      "name": "ppt-review",
+      "source": "./skills/ppt-review",
+      "description": "汇报 PPT 生成后的 AI 审核 — 跑 milwaukee-ppt 审核脚本 + 核对清单（版式/内容量/页序/标题/! 标记），改 md 重新生成，最多两轮后附结果交人审核",
+      "version": "0.2.0"
     }
   ]
 }

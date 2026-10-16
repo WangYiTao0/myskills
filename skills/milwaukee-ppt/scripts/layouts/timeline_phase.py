@@ -2,9 +2,9 @@
 
 字段：3–6 条「- [!]日期 | 标题 | 说明 | 状态」，每条都必须写状态（说明可空）；
 `!` 标关键里程碑（只认一个，`!!` 报错）→ fields["items"] = [(日期, 标题, 说明, 状态, 是否关键)]；
-其余普通文字行进红条结论。
+其余普通文字行是结论（月报进底部红条，通用 / 项目模式画成标题下的 lead）。
 
-画法（Spec #20，见 references/layouts.md「timeline-phase」）：槽位横向等分成 n 段箭头
+画法（Spec #20，见 references/layouts/timeline-phase.md）：槽位横向等分成 n 段箭头
 （首段 homePlate、其余 chevron），段上写标题：
 已完成绿底白字，进行中琥珀底深色字且加高，未完成浅粉底 + 红描边 + 红字。
 日期在段上方；段下方细线连到标记（关键里程碑黑色大菱形 + “关键里程碑”，普通节点灰色小圆点），
@@ -23,7 +23,7 @@ from mdparse import DeckError
 from .common import (BRAND_RED, DOING, DOING_AMBER, DOING_INK, DONE, DONE_GREEN, KEY_LABEL,
                      LIST_ITEM, STATUS_LABELS, TODO, add_legend, add_line, add_page_chrome,
                      add_run, add_shape, add_textbox, fill_titles, key_mark, parse_statuses,
-                     take_slot, text_lines, text_width_in, warn)
+                     fit_body, take_slot, text_lines, text_width_in, warn)
 
 NAME = "timeline-phase"
 LAYOUT_INDEX = 6
@@ -150,7 +150,8 @@ def _overflows(date, title, desc, st, seg_w, seg_h, text_w, text_h):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    left, top, width, slot_h = take_slot(slide, SLOT_IDX)   # 空槽位不留在页面上
+    # 空槽位不留在页面上；方向 C 下上下沿换成正文区
+    left, top, width, slot_h = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
 
     items = page.fields["items"]
     n = len(items)

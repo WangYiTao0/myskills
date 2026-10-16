@@ -11,7 +11,8 @@ NAME = "image-text"
 TITLE = "Mock Image + Text Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 

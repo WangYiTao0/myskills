@@ -2,7 +2,7 @@
 
 运行：python3 skills/milwaukee-ppt/tests/test_stats.py
 """
-from deckcheck import (CONTENT_SLOT_IN, EMU, LAYOUT_INDEX, body_slide, caption_bar,
+from deckcheck import (BRAND_RED, INK, CONTENT_SLOT_IN, bottom, one, review, EMU, LAYOUT_INDEX, body_slide, caption_bar,
                        caption_style_problems, check, deck_error, fill_color, finish, generate, geometry, inside,
                        out_of_bounds,
                        paragraphs, placeholder, line_color, red_elements, run_styles, runs, shapes_named,
@@ -12,7 +12,8 @@ NAME = "stats"
 TITLE = "Mock Stats Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -67,7 +68,8 @@ def stats_md(items, title=TITLE):
     body = "\n".join(items)
     return f"""
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -254,7 +256,8 @@ def test_columns_fill_slot():
 
 POINTS_MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -384,6 +387,119 @@ def test_legacy_without_points():
     check("stats 旧写法：所有栏顶线同高", len({x.top for x in rules}) == 1)
 
 
+# ---- 方向 C（通用 / 项目汇报模式）：数字 88pt、标签 / 说明放大、说明和解读近黑 ----
+
+NEAR_BLACK = "333333"
+
+
+def general_md(items, title=TITLE, extra="口径：Mock source line for the numbers above\n",
+               next_line=True):
+    body = "\n".join(items)
+    nxt = "Next: Mock next step.\n" if next_line else ""
+    return f"""
+---
+title: Mock Deck
+date: 14 Oct 2026
+---
+
+# {title}
+## Mock Action Title
+Layout: stats
+{body}
+{extra}Mock conclusion.
+{nxt}"""
+
+
+C_ITEMS = ["- Pilot tools | 120 件 | Mock scope note", "  - Mock point 1a", "  - Mock point 1b",
+           "- !Record rate | 100% | Mock rate note", "  - Mock point 2a",
+           "- Check-in time | 15 秒 | Mock time note", "  - Mock point 3a"]
+
+
+def body_bounds(s):
+    """C 模式正文区（EMU）：lead 下沿 + 0.19" 到 Next 细线上方 0.10"（没有 Next 时 6.95"）。"""
+    lead, rule = one(s, "Lead"), one(s, "Next Rule")
+    top = bottom(lead) + int(0.19 * EMU)
+    low = rule.top - int(0.10 * EMU) if rule is not None else int(6.95 * EMU)
+    return top, low
+
+
+def test_general_mode_sizes():
+    """C 模式：数字 88pt，标签 20pt bold，说明 16pt #333333，解读 16pt #333333；
+    顶线从正文区上沿起、口径底边贴正文区下沿；月报的字号不变（上面的用例守着）。"""
+    r = generate(general_md(C_ITEMS))
+    check("C stats：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    s = body_slide(r)
+    if s is None:
+        return
+    nums = shapes_named(s, "Stat Number")
+    check("C stats：大数字 88pt bold（重点品牌红），单位仍 28pt 灰",
+          [runs(x) for x in nums] == [
+              [("120", 88.0, True, INK), (" 件", 28.0, False, "6B6B6B")],
+              [("100", 88.0, True, BRAND_RED), ("%", 28.0, False, "6B6B6B")],
+              [("15", 88.0, True, INK), (" 秒", 28.0, False, "6B6B6B")]],
+          [runs(x) for x in nums])
+    check("C stats：标签 20pt bold #1A1A1A",
+          all(run_styles(x) == {(20.0, True, INK)} for x in shapes_named(s, "Stat Label")),
+          [run_styles(x) for x in shapes_named(s, "Stat Label")])
+    check("C stats：说明 16pt 不加粗 #333333",
+          all(run_styles(x) == {(16.0, False, NEAR_BLACK)} for x in shapes_named(s, "Stat Note")),
+          [run_styles(x) for x in shapes_named(s, "Stat Note")])
+    check("C stats：解读 16pt 不加粗 #333333",
+          all(run_styles(x) == {(16.0, False, NEAR_BLACK)} for x in shapes_named(s, "Stat Points")),
+          [run_styles(x) for x in shapes_named(s, "Stat Points")])
+    top, low = body_bounds(s)
+    rules = shapes_named(s, "Stat Rule")
+    src = one(s, "Stat Source")
+    check("C stats：顶线贴正文区上沿", all(abs(x.top - top) <= 2 for x in rules),
+          (top / EMU, [x.top / EMU for x in rules]))
+    check("C stats：口径底边贴正文区下沿", src is not None and abs(bottom(src) - low) <= 2,
+          src is not None and (bottom(src) / EMU, low / EMU))
+
+
+def test_general_mode_capacity():
+    """C 模式写满（4 栏、每栏 3 条解读、口径、Next）：不警告、都在正文区里，审核 REVIEW OK；
+    放不下 88pt 时大数字统一缩小（不低于 60pt 时不警告）。"""
+    items = []
+    for i in range(1, 5):
+        items += [f"- {'!' if i == 2 else ''}Label {i} | {i}20 件 | Mock note {i}",
+                  f"  - Mock point {i}a", f"  - Mock point {i}b", f"  - Mock point {i}c"]
+    md = general_md(items, title="Full Stats")
+    r = generate(md)
+    check("C stats 写满：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    s = body_slide(r)
+    if s is None:
+        return
+    top, low = body_bounds(s)
+    out = [x.name for x in s.shapes if x.name.startswith("Stat ")
+           and (x.top < top - 2 or bottom(x) > low + 2)]
+    check("C stats 写满：形状都在正文区里", not out, out)
+    pts = {runs(x)[0][1] for x in shapes_named(s, "Stat Number")}
+    check("C stats 写满：大数字同一字号、在 60–88pt", len(pts) == 1 and 60 <= min(pts) <= 88, pts)
+    out = review(r.workdir / "deck.md", r.path)
+    check("C stats 写满：审核 REVIEW OK", out.returncode == 0 and out.stdout.strip() == "REVIEW OK",
+          out.stdout + out.stderr)
+
+    # 每栏第一条解读折成两行：88pt 时解读放不下，大数字统一缩小让出高度，不警告
+    long_md = md.replace("Mock point 1a", "这一条解读写成两行文字的长度")
+    for i in range(2, 5):
+        long_md = long_md.replace(f"Mock point {i}a", "这一条解读写成两行文字的长度")
+    r = generate(long_md)
+    s = body_slide(r)
+    check("C stats 解读两行：退出码 0、没有警告", r.rc == 0 and not warnings(r.stderr), r.stderr)
+    if s is None:
+        return
+    pts = {runs(x)[0][1] for x in shapes_named(s, "Stat Number")}
+    check("C stats 解读两行：大数字统一缩到 88pt 以下、不低于 60pt",
+          len(pts) == 1 and 60 <= min(pts) < 88, pts)
+    top, low = body_bounds(s)
+    out = [x.name for x in s.shapes if x.name.startswith("Stat ")
+           and (x.top < top - 2 or bottom(x) > low + 2)]
+    check("C stats 解读两行：形状都在正文区里", not out, out)
+    out = review(r.workdir / "deck.md", r.path)
+    check("C stats 解读两行：审核 REVIEW OK",
+          out.returncode == 0 and out.stdout.strip() == "REVIEW OK", out.stdout + out.stderr)
+
+
 if __name__ == "__main__":
     test_chrome()
     test_columns_fill_slot()
@@ -396,4 +512,6 @@ if __name__ == "__main__":
     test_source_line()
     test_overflow_warnings()
     test_legacy_without_points()
+    test_general_mode_sizes()
+    test_general_mode_capacity()
     finish()

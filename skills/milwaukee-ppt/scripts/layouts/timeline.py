@@ -2,7 +2,7 @@
 
 字段：3–6 条无序列表，每条「[!]日期 | 标题 | 说明 [| 状态]」→
 fields["items"] = [(日期, 标题, 说明)]、fields["keys"]（行首 ! = 关键里程碑）、
-fields["statuses"]（common.parse_statuses：整页都没写为 None）；其余普通文字行进红条结论。
+fields["statuses"]（common.parse_statuses：整页都没写为 None）；其余普通文字行是结论（月报进底部红条，通用 / 项目模式画成标题下的 lead）。
 
 画法：槽位按条目数等分成列（列间距 0.3"），每列中心一个节点；日期在线上方，标题和说明
 在线下方，都与节点居中对齐。全部原生形状，画完删掉空的槽位占位框。
@@ -12,13 +12,15 @@ fields["statuses"]（common.parse_statuses：整页都没写为 None）；其余
 - 不写状态（旧写法）：黑白灰，一条灰横线连起首末节点；不写状态也不写 ! 时输出与 #24 之前
   逐字节一致（tests/test_timeline.py 的 LEGACY_SHA 守着）。带 ! 时会画菱形：放大的深灰菱形。
   形状名 Timeline Line / Node N / Date N / Text N。
-- 写了状态（Spec #20，见 references/layouts.md「timeline」）：已完成绿色实心圆 + 白对勾、
+- 写了状态（Spec #20，见 references/layouts/timeline.md）：已完成绿色实心圆 + 白对勾、
   首节点到进度终点是绿色粗线（Progress Line），之后灰色虚线（Remaining Line）；进行中放大的琥珀圆 + 外圈
   （Current Ring），上方近黑胶囊“当前”（Current Tag），日期加粗放大；未完成白底红描边。
   关键里程碑是放大的菱形，颜色按状态。右上角图例 4 项（common.add_legend：Legend Icon N /
   Legend Label N，N = 1 已完成、2 进行中、3 未完成、4 关键里程碑；已完成图标上的对勾 Legend Check 1）。节点相关形状名 Milestone Node N /
   Check N / Date N / Text N（N 为条目序号，对勾只在已完成节点上）。
 """
+from types import SimpleNamespace
+
 from pptx.dml.color import RGBColor
 from pptx.enum.dml import MSO_LINE_DASH_STYLE
 from pptx.enum.shapes import MSO_SHAPE
@@ -27,9 +29,9 @@ from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (DOING, DONE, DONE_GREEN, KEY_LABEL, LIST_ITEM, STATUS_COLORS, STATUS_LABELS,
+from .common import (LEGEND_H, DOING, DONE, DONE_GREEN, KEY_LABEL, LIST_ITEM, STATUS_COLORS, STATUS_LABELS,
                      TODO, add_legend, add_line, add_page_chrome, add_run, add_shape, add_textbox,
-                     fill_titles, key_mark, parse_statuses, strip_theme_style, take_slot,
+                     fill_titles, key_mark, parse_statuses, strip_theme_style, fit_body, take_slot,
                      text_lines, warn)
 
 NAME = "timeline"
@@ -83,18 +85,40 @@ def parse(page):
     page.fields = {"items": items, "keys": keys, "statuses": parse_statuses(page, raws)}
 
 
-def _overflow_warnings(page, items, col_w, date_h, body_h):
+def _text_pt(st, title, desc, width_in, title_style=None):
+    """一列线下文字（标题 + 说明）估计高度（pt），行高按字号 × 1.2。"""
+    ts = title_style or st.title
+    h = text_lines(title, ts[0], width_in) * ts[0] * LINE_SPACING
+    if desc:
+        h += DESC_SPACE_BEFORE + text_lines(desc, st.desc[0], width_in) * st.desc[0] * LINE_SPACING
+    return h
+
+
+def _text_h(st, items, col_w, keys=None, sts=None):
+    """各列线下文字估计高度的最大值（EMU）；方向 C 各列文字框等高用它。"""
+    width_in = Emu(col_w).inches
+    hs = []
+    for i, (_, title, desc) in enumerate(items):
+        ts = None
+        if sts is not None:
+            ts = st.title if (keys[i] or sts[i] == DOING) else st.s_title
+        hs.append(_text_pt(st, title, desc, width_in, ts))
+    return int(Pt(max(hs)))
+
+
+def _centered_line_y(rect_top, rect_bottom, above, below_gap, text_h):
+    """方向 C：线上部分（above，组顶到横线）+ 线下空隙 + 文字（text_h）整组在
+    [rect_top, rect_bottom] 里垂直居中，返回横线 y（EMU）；放不下时贴上沿。"""
+    group = above + below_gap + text_h
+    return rect_top + max(0, (rect_bottom - rect_top - group) // 2) + above
+
+
+def _overflow_warnings(page, items, col_w, date_h, body_h, st):
     """日期超过一行、标题 + 说明估计超出线下区域时警告（不中止）。"""
     width_in = Emu(col_w).inches
-
-    def height_pt(text, style):
-        return text_lines(text, style[0], width_in) * style[0] * LINE_SPACING
-
     for i, (date, title, desc) in enumerate(items, start=1):
-        date_pt = height_pt(date, DATE_STYLE)
-        body_pt = height_pt(title, TITLE_STYLE)
-        if desc:
-            body_pt += DESC_SPACE_BEFORE + height_pt(desc, DESC_STYLE)
+        date_pt = text_lines(date, st.date[0], width_in) * st.date[0] * LINE_SPACING
+        body_pt = _text_pt(st, title, desc, width_in)
         if date_pt > Emu(date_h).pt or body_pt > Emu(body_h).pt:
             warn(f"页「{page.title}」时间线第 {i} 条文字估计溢出, 建议精简日期 / 标题 / 说明")
 
@@ -116,17 +140,20 @@ def _line(slide, name, x1, x2, y, color, pt, dash=None):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    rect = take_slot(slide, SLOT_IDX)   # 空槽位不留在页面上
+    # 空槽位不留在页面上；方向 C 下上下沿换成正文区
+    rect = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
     if page.fields["statuses"] is None:
-        _render_plain(slide, page, rect)
+        _render_plain(slide, page, rect, ctx.lead)
     else:
-        _render_status(slide, page, rect)
+        _render_status(slide, page, rect, ctx.lead)
     add_page_chrome(slide, page, ctx)
     return slide
 
 
-def _render_plain(slide, page, rect):
-    """旧写法（不写状态）：黑白灰，输出与 #24 之前逐字节一致。"""
+def _render_plain(slide, page, rect, lead=False):
+    """旧写法（不写状态）：黑白灰，月报输出与 #24 之前逐字节一致。
+    方向 C（lead）：字号放大一档，日期 + 节点 + 文字整组在正文区里垂直居中。"""
+    st = GENERAL if lead else MONTHLY
     left, top, width, slot_h = rect
     items = page.fields["items"]
     n = len(items)
@@ -134,6 +161,10 @@ def _render_plain(slide, page, rect):
     col_w = (width - gap * (n - 1)) // n
     centers = [left + i * (col_w + gap) + col_w // 2 for i in range(n)]
     line_y = top + Inches(LINE_Y)
+    if lead:
+        above = Inches(NODE_D) // 2 + Inches(TEXT_GAP) + Inches(DATE_H)
+        below = Inches(NODE_D) // 2 + Inches(TEXT_GAP)
+        line_y = _centered_line_y(top, top + slot_h, above, below, _text_h(st, items, col_w))
 
     _line(slide, "Timeline Line", centers[0], centers[-1], line_y, LINE_COLOR, 1.5)
 
@@ -148,24 +179,26 @@ def _render_plain(slide, page, rect):
     date_top = line_y - d // 2 - Inches(TEXT_GAP) - date_h
     body_top = line_y + d // 2 + Inches(TEXT_GAP)
     body_h = top + slot_h - body_top
-    _overflow_warnings(page, items, col_w, date_h, body_h)
+    _overflow_warnings(page, items, col_w, date_h, body_h, st)
+    if lead:                # 文字框等高 = 最高那列的估计高度（整组居中按它算）
+        body_h = min(body_h, _text_h(st, items, col_w))
     for i, (cx, (date, title, desc)) in enumerate(zip(centers, items), start=1):
         x = cx - col_w // 2
         tf = add_textbox(slide, f"Timeline Date {i}", x, date_top, col_w, date_h,
                       MSO_ANCHOR.BOTTOM)
         tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-        add_run(tf.paragraphs[0], date, *DATE_STYLE)
+        add_run(tf.paragraphs[0], date, *st.date)
 
         tf = add_textbox(slide, f"Timeline Text {i}", x, body_top, col_w, body_h,
                       MSO_ANCHOR.TOP)
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
-        add_run(p, title, *TITLE_STYLE)
+        add_run(p, title, *st.title)
         if desc:
             p = tf.add_paragraph()
             p.alignment = PP_ALIGN.CENTER
             p.space_before = Pt(DESC_SPACE_BEFORE)
-            add_run(p, desc, *DESC_STYLE)
+            add_run(p, desc, *st.desc)
 
 
 # ---- 状态着色（Spec #20）-----------------------------------------------------------
@@ -193,6 +226,16 @@ TODO_TITLE_COLOR = MUTED               # 未完成的标题灰色
 LEGEND_ICON, LEGEND_KEY_ICON = 0.2, 0.26
 LEGEND_SWATCH = 0.22  # 图标占位宽
 LEGEND_TAG_DROP = 0.25  # 页面写了 Tag 时右上角有月份标识（1.12–1.42"），图例下移让开
+                        # （方向 C 正文区在 lead 下方、本来就在月份标识以下，不再下移）
+
+# 两种模式的字号：月报沿用上面的定稿值（输出逐字节不变）；方向 C（通用 / 项目模式，#51）
+# 日期 / 标题 / 说明 / “当前”各放大一档。
+MONTHLY = SimpleNamespace(date=DATE_STYLE, title=TITLE_STYLE, desc=DESC_STYLE,
+                          s_date=S_DATE_STYLE, cur_date=CUR_DATE_STYLE, tag=TAG_STYLE,
+                          s_title=S_TITLE_STYLE)
+GENERAL = SimpleNamespace(date=(14, True, MUTED), title=(22, True, INK), desc=(16, False, MUTED),
+                          s_date=(14, True, MUTED), cur_date=(16, True, INK),
+                          tag=(14, True, WHITE), s_title=(20, True, INK))
 
 
 def _shape(slide, kind, name, cx, cy, d, fill, line, line_pt):
@@ -209,7 +252,10 @@ def _node(slide, name, cx, cy, status, key, d):
     return _shape(slide, kind, name, cx, cy, d, color, WHITE, 1.5)
 
 
-def _render_status(slide, page, rect):
+def _render_status(slide, page, rect, lead=False):
+    """方向 C（lead）：字号放大一档；图例贴正文区右上角（已在 lead 下方），
+    “当前”标签 + 日期 + 节点 + 文字整组在图例以下的区域里垂直居中。"""
+    sty = GENERAL if lead else MONTHLY
     left, top, width, slot_h = rect
     items, keys, sts = (page.fields[k] for k in ("items", "keys", "statuses"))
     n = len(items)
@@ -217,8 +263,15 @@ def _render_status(slide, page, rect):
     col_w = (width - gap * (n - 1)) // n
     centers = [left + i * (col_w + gap) + col_w // 2 for i in range(n)]
     line_y = top + Inches(S_LINE_Y)
-
-    _legend(slide, left + width, top + (Inches(LEGEND_TAG_DROP) if page.tag else 0))
+    if lead:
+        _legend(slide, left + width, top)
+        above = Inches(S_DATE_GAP) + Inches(DATE_H)
+        if DOING in sts:        # “当前”标签在日期框上方
+            above += Inches(TAG_GAP) + Inches(TAG_H) // 2
+        line_y = _centered_line_y(top + Inches(LEGEND_H), top + slot_h, above,
+                                  Inches(S_BODY_GAP), _text_h(sty, items, col_w, keys, sts))
+    else:
+        _legend(slide, left + width, top + (Inches(LEGEND_TAG_DROP) if page.tag else 0))
 
     # 进度：到“进行中”为止；没有进行中时到最后一个已完成
     reached = [i for i, st in enumerate(sts) if st in (DONE, DOING)]
@@ -247,26 +300,28 @@ def _render_status(slide, page, rect):
         tf = add_textbox(slide, f"Milestone Date {i}", x, date_top, col_w, date_h,
                       MSO_ANCHOR.BOTTOM)
         tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-        add_run(tf.paragraphs[0], date, *(CUR_DATE_STYLE if st == DOING else S_DATE_STYLE))
+        add_run(tf.paragraphs[0], date, *(sty.cur_date if st == DOING else sty.s_date))
         if st == DOING:
-            _current_tag(slide, cx, date_top - Inches(TAG_GAP))
+            _current_tag(slide, cx, date_top - Inches(TAG_GAP), sty.tag)
 
     body_top = line_y + Inches(S_BODY_GAP)
     body_h = top + slot_h - body_top
-    _overflow_warnings(page, items, col_w, date_h, body_h)
+    _overflow_warnings(page, items, col_w, date_h, body_h, sty)
+    if lead:                # 文字框等高 = 最高那列的估计高度（整组居中按它算）
+        body_h = min(body_h, _text_h(sty, items, col_w, keys, sts))
     for i, (cx, st, key, (_, title, desc)) in enumerate(zip(centers, sts, keys, items),
                                                        start=1):
         tf = add_textbox(slide, f"Milestone Text {i}", cx - col_w // 2, body_top, col_w, body_h,
                       MSO_ANCHOR.TOP)
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
-        pt, bold, color = TITLE_STYLE if (key or st == DOING) else S_TITLE_STYLE
+        pt, bold, color = sty.title if (key or st == DOING) else sty.s_title
         add_run(p, title, pt, bold, TODO_TITLE_COLOR if st == TODO else color)
         if desc:
             p = tf.add_paragraph()
             p.alignment = PP_ALIGN.CENTER
             p.space_before = Pt(DESC_SPACE_BEFORE)
-            add_run(p, desc, *DESC_STYLE)
+            add_run(p, desc, *sty.desc)
 
 
 def _legend(slide, right, top):
@@ -299,7 +354,7 @@ def _check(slide, name, cx, cy, size):
     return sp
 
 
-def _current_tag(slide, cx, cy):
+def _current_tag(slide, cx, cy, style=TAG_STYLE):
     """进行中节点上方的“当前”胶囊标签（近黑底白字）。"""
     w, h = Inches(TAG_W), Inches(TAG_H)
     sp = add_shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, "Current Tag", cx - w // 2, cy - h // 2,
@@ -309,4 +364,4 @@ def _current_tag(slide, cx, cy):
     tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Pt(0)
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     tf.paragraphs[0].alignment = PP_ALIGN.CENTER
-    add_run(tf.paragraphs[0], "当前", *TAG_STYLE)
+    add_run(tf.paragraphs[0], "当前", *style)

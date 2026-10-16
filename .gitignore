@@ -27,3 +27,6 @@ venv/
 .claude/
 
 skills/milwaukee-ppt/assets/Thumbs.db
+
+# M365 skill 打包产物（tools/m365_package.py）
+/dist/

@@ -1,6 +1,6 @@
 """解析层：md 文稿 → 文档模型（frontmatter + 页列表）。
 
-本模块只切页、取通用字段（主标题 #、action title ##、Layout:、Tag:、Next:/下一步：），
+本模块只切页、取通用字段（主标题 #、action title ##、Layout:、Tag:、PDCA:、Next:/下一步：），
 其余正文行原样放进 page.lines，再交给 layouts 里对应的版式模块解析成
 page.fields（本版式字段）和 page.conclusion（底部红条结论）。
 新增版式不用改这里。
@@ -20,6 +20,7 @@ class Page:
     action_title: str = ""
     layout: str = "evidence"
     tag: str = ""
+    pdca: list = field(default_factory=list)         # 项目汇报模式的 PDCA 阶段，如 ["D", "C"]
     conclusion: list = field(default_factory=list)   # 普通文字行 → 底部红条（版式模块填）
     next: str = ""
     next_label: str = "Next"
@@ -55,7 +56,38 @@ def is_monthly(meta):
     return not meta.get("title") and bool(meta.get("month"))
 
 
+def uses_lead(meta):
+    """方向 C（结论画成标题下的 lead、Next 画在页底一行）：通用模式和项目汇报模式都是；
+    月报模式仍画底部红条。"""
+    return not is_monthly(meta)
+
+
+PROJECT_REPORT = "project"
+PDCA_LETTERS = ("P", "D", "C", "A")
+
+
+def is_project(meta):
+    """项目汇报模式：frontmatter 写了 report: project，各页才能写 PDCA:。"""
+    return meta.get("report", "").strip().lower() == PROJECT_REPORT
+
+
+def _parse_pdca(text, title):
+    """「D」「D/C」→ ["D", "C"]：字母只认 P / D / C / A（不区分大小写），用 / 分隔，不重复。"""
+    letters = [part.strip().upper() for part in text.split("/")]
+    bad = [part for part in letters if part not in PDCA_LETTERS]
+    if bad:
+        raise DeckError(f"页「{title}」的 PDCA 写错: {text!r}, "
+                        f"只认 P / D / C / A，组合用 / 分隔，如 PDCA: D/C")
+    if len(set(letters)) != len(letters):
+        raise DeckError(f"页「{title}」的 PDCA 有重复字母: {text!r}")
+    return letters
+
+
 def _validate_meta(meta):
+    report = meta.get("report", "").strip()
+    if report and report.lower() != PROJECT_REPORT:
+        raise DeckError(f"frontmatter 的 report 只认 {PROJECT_REPORT}（项目汇报模式）, "
+                        f"实际: {report!r}")
     if meta.get("title"):
         return                                   # 通用模式：只要 title
     if not meta.get("month"):
@@ -114,11 +146,20 @@ def parse(path):
         if mtag:
             cur.tag = mtag.group(1).strip()
             continue
+        mpdca = re.match(r"(?i)^pdca\s*[:：]\s*(.+)$", line)
+        if mpdca:
+            cur.pdca = _parse_pdca(mpdca.group(1), cur.title)
+            continue
         cur.lines.append(line)
         cur.indents.append(_indent(raw) if line else 0)
 
     if not pages:
         raise DeckError("md 中没有找到任何页 (以 '# ' 开头的标题)")
+    if not is_project(meta):
+        for page in pages:
+            if page.pdca:
+                raise DeckError(f"页「{page.title}」写了 PDCA:，但 frontmatter 没写 "
+                                f"report: {PROJECT_REPORT}；PDCA 图标只在项目汇报模式下使用")
     import layouts            # 延迟导入：layouts 依赖本模块的 Page / DeckError
     for page in pages:
         layouts.parse_page(page)

@@ -11,7 +11,7 @@ import subprocess
 import sys
 import textwrap
 
-from deckcheck import (EMU, SKILL, check, finish, generate, open_pptx, runs)
+from deckcheck import (EMU, SKILL, check, finish, generate, lines_with, open_pptx, review, runs)
 
 DOC = SKILL / "SKILL.md"
 
@@ -73,6 +73,11 @@ def test_snippet_runs():
           and added[0]._element.find(
               "{http://schemas.openxmlformats.org/presentationml/2006/main}style") is None,
           [(sh.name) for sh in added])
+    r2 = review(work / "deck.md", outs[0])
+    flagged = lines_with(r2.stdout, "正文形状被改过")
+    check("细调示例再审：挪位置、改文字不报，只有新加的形状报「正文形状被改过」",
+          len(flagged) == 1 and added and added[0].name in flagged[0]
+          and "Stat Number 2" not in flagged[0], r2.stdout)
 
 
 if __name__ == "__main__":

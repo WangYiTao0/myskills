@@ -1,6 +1,6 @@
 """image-text 版式：左图右文，基于模板 layout 7「Image + Text」。
 
-字段：一张图 `![](...)` + 若干条无序列表要点（建议 ≤5）；其余普通文字行进红条结论。
+字段：一张图 `![](...)` + 若干条无序列表要点（建议 ≤5）；其余普通文字行是结论（月报进底部红条，通用 / 项目模式画成标题下的 lead）。
 - 图放进 idx 20 图框的矩形里：按比例完整显示、不裁切、居中；图框占位框本身删掉，不留提示文字。
 - 要点写进 idx 21 文字槽位，样式沿用槽位自带的（16pt、灰色圆点、段后间距）。
 """
@@ -8,8 +8,10 @@ import re
 
 from mdparse import DeckError
 
-from .common import (add_page_chrome, fill_titles, fit_picture, load_image, remove_shape,
-                     slot, take_slot, warn)
+from pptx.util import Inches
+
+from .common import (add_page_chrome, body_area, fill_titles, fit_body, fit_picture, load_image,
+                     remove_shape, slot, take_slot, warn)
 
 NAME = "image-text"
 LAYOUT_INDEX = 7
@@ -45,22 +47,28 @@ def parse(page):
     page.fields = {"image": images[0], "points": points}
 
 
-def _place_image(slide, ref, ctx, page_title):
-    """删掉图框占位框，在它的矩形里等比缩放、居中放图。"""
-    rect = take_slot(slide, IMAGE_FRAME_IDX)
-    pic = fit_picture(slide, load_image(ref, ctx, page_title), *rect)
+def _place_image(slide, page, ctx):
+    """删掉图框占位框，在它的矩形里等比缩放、居中放图（方向 C 下上下沿换成正文区）。"""
+    rect = fit_body(take_slot(slide, IMAGE_FRAME_IDX), page, ctx)
+    pic = fit_picture(slide, load_image(page.fields["image"], ctx, page.title), *rect)
     pic.name = "Image"
     return pic
 
 
-def _fill_points(slide, points):
+def _fill_points(slide, points, page, ctx):
     """每条要点一段，只写文字，字号/颜色/圆点/段距全部继承槽位的 lstStyle。
 
-    没有要点时删掉槽位，免得 PowerPoint 里露出提示文字。"""
+    没有要点时删掉槽位，免得 PowerPoint 里露出提示文字。方向 C 下文字槽位的上下沿
+    挪到正文区（左右不变）。"""
     area = slot(slide, TEXT_AREA_IDX)
     if not points:
         remove_shape(area)
         return
+    if ctx.lead:
+        body = body_area(page, ctx)
+        left, width = area.left, area.width
+        area.left, area.top, area.width, area.height = (left, Inches(body.top), width,
+                                                        Inches(body.height))
     tf = area.text_frame
     tf.text = points[0]
     for text in points[1:]:
@@ -70,7 +78,7 @@ def _fill_points(slide, points):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    _place_image(slide, page.fields["image"], ctx, page.title)
-    _fill_points(slide, page.fields["points"])
+    _place_image(slide, page, ctx)
+    _fill_points(slide, page.fields["points"], page, ctx)
     add_page_chrome(slide, page, ctx)
     return slide

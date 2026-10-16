@@ -1,12 +1,13 @@
 """before-after 版式：模板 layout 3「Before / After」，槽位约定见 references/before-after.md。
 
 文稿写法：
-    第一个 ### 之前的普通文字      → lead（正文顶部一行粗体）
+    第一个 ### 之前的普通文字      → lead（正文顶部一行粗体；只在月报模式画，
+                                   方向 C 下结论行就是 lead，这段文字报警告、不画）
     ### Before[: 自定义标题]        → 改前小节；标题默认 BEFORE（idx 11）
         一张图 ![](...) 或一段短文  → 内容区 idx 13
         Caption: 一句说明           → idx 15
     ### After[: 自定义标题]         → 改后小节，同上（idx 12 / 14 / 16）
-    最后一个小节之后的普通文字      → 底部红条结论
+    最后一个小节之后的普通文字      → 结论（月报进底部红条，方向 C 画成 lead）
 小节在 Caption: 行或空行处结束；两个小节之间不能有普通文字。
 
 字段：fields = {"lead": str, "before": Side, "after": Side}，
@@ -19,8 +20,8 @@ from pptx.util import Emu, Inches
 
 from mdparse import DeckError
 
-from .common import (IMG_LEFT, IMG_W, add_page_chrome, add_run, caption_lines, fill_titles,
-                     fit_picture, load_image, text_lines, text_width_in, warn)
+from .common import (IMG_LEFT, IMG_W, TAG_W, add_page_chrome, add_run, body_area, caption_lines,
+                     fill_titles, fit_picture, load_image, text_lines, text_width_in, warn)
 
 NAME = "before-after"
 LAYOUT_INDEX = 3
@@ -31,7 +32,7 @@ SLOTS = {"before": {"title": 11, "content": 13, "caption": 15},
 
 # 正文 lead：模板样例页「Lead」文本框的位置与样式（英寸）。写了 Tag 时右端让到月份标识左侧。
 LEAD_LEFT, LEAD_TOP, LEAD_W, LEAD_H = 0.56, 1.30, 11.90, 0.42
-TAG_LEFT = IMG_LEFT + IMG_W - 1.7          # common.add_month_tag 的文本框左缘
+TAG_LEFT = IMG_LEFT + IMG_W - TAG_W        # common.add_month_tag 的文本框左缘
 LEAD_PT = 20
 INK = "1A1A1A"
 CAPTION_PT = 16                            # 模板 caption 槽：16pt bold、不换行
@@ -44,6 +45,11 @@ LINE_SPACING = 1.2
 BAR_SAFE_BOTTOM = 5.55
 CAPTION_IN_FRAME_H = 0.35
 CONTENT_CAPTION_GAP = 0.10
+# 方向 C：模板槽位的上下沿（英寸）。左右标题下移到正文区上沿（不早于模板的 1.96"）；
+# caption 在框下 6.12–6.47" 超出正文区下沿（有 Next 行时）就同样挪进对比框底部。
+SIDE_TITLE_TOP = 1.96
+FRAME_TOP = 2.55                           # 模板对比框（layout 形状）上沿
+CAPTION_BOTTOM = 6.12 + 0.35
 
 _IMG = re.compile(r"^!\[[^\]]*\]\(([^)]+)\)$")
 _SECTION = re.compile(r"^###\s+(\S+?)\s*(?:[:：]\s*(.*))?$")
@@ -142,7 +148,8 @@ def _add_lead(slide, page):
 
 
 def _fit_above_bar(content, caption):
-    """把 caption 槽挪进对比框底部，内容区缩到 caption 上方（都在红条可能的最高位置之上）。"""
+    """把 caption 槽挪进对比框底部，内容区缩到 caption 上方（都在红条可能的最高位置之上；
+    方向 C 下在 Next 行之上）。"""
     cap_top = Inches(BAR_SAFE_BOTTOM - CAPTION_IN_FRAME_H)
     left, top, width = content.left, content.top, content.width
     caption.left, caption.top = left, cap_top
@@ -151,16 +158,33 @@ def _fit_above_bar(content, caption):
     content.height = cap_top - Inches(CONTENT_CAPTION_GAP) - top
 
 
+def _fit_body(slide, page, ctx):
+    """方向 C：左右标题下移到正文区上沿；caption 超出正文区下沿时挪进对比框底部。
+    返回是否要挪 caption。"""
+    area = body_area(page, ctx)
+    title_top = max(SIDE_TITLE_TOP, area.top)
+    for key in SIDES:
+        title = slide.placeholders[SLOTS[key]["title"]]
+        left, width, height = title.left, title.width, title.height
+        title.left, title.top, title.width, title.height = left, Inches(title_top), width, height
+        if Emu(title.top + title.height).inches > FRAME_TOP:
+            warn(f"页「{page.title}」的结论（lead）太长，{key.upper()} 标题压到对比框，建议精简结论")
+    if page.fields["lead"]:
+        warn(f"页「{page.title}」对比页第一个 ### 前的文字不画（结论行就是 lead），"
+             f"请和结论合并成一句: {page.fields['lead']}")
+    return CAPTION_BOTTOM > area.bottom + 1e-9
+
+
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    has_bar = bool(caption_lines(page))
+    fit_frame = _fit_body(slide, page, ctx) if ctx.lead else bool(caption_lines(page))
     for key in SIDES:
         side, slots = page.fields[key], SLOTS[key]
         slide.placeholders[slots["title"]].text = side["title"]
         content = slide.placeholders[slots["content"]]
         caption = slide.placeholders[slots["caption"]]
-        if has_bar:
+        if fit_frame:
             _fit_above_bar(content, caption)
         content.text = "\n".join(side["text"])     # 放图时为空：先清空槽内文字
         content.text_frame.word_wrap = True            # 模板槽是不换行的，短文要在槽宽内换行
@@ -170,6 +194,7 @@ def render(prs, page, ctx):
                         content.left, content.top, content.width, content.height)
         caption.text = side["caption"]
         _check_caption(page, side, caption)
-    _add_lead(slide, page)
+    if not ctx.lead:
+        _add_lead(slide, page)
     add_page_chrome(slide, page, ctx)
     return slide

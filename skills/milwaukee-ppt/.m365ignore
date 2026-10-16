@@ -1,0 +1,6 @@
+# tools/m365_package.py 打 M365 Copilot 包时额外排除的文件（glob，相对本目录；/ 结尾=整个目录）
+# SVG 源图：M365 不支持 .svg；生成器只插同名 .png
+assets/pdca/*.svg
+# 示例配图在第 4 层，超过 M365 目录深度上限 3；deck.md 仍随包作写法示例
+examples/demo/img/
+examples/demo/make_images.py

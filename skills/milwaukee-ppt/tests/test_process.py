@@ -5,16 +5,17 @@
 """
 import re
 
-from deckcheck import (CONTENT_SLOT_IN, EMU, LAYOUT_INDEX, body_slide, caption_bar,
-                       caption_style_problems, check, finish, generate, out_of_bounds,
-                       paragraphs, placeholder, red_elements, shapes_named, tag_shape,
-                       warnings)
+from deckcheck import (CONTENT_SLOT_IN, EMU, INK, LAYOUT_INDEX, body_slide, bottom, caption_bar,
+                       caption_style_problems, center_x, center_y, check, fill_color, finish,
+                       generate, geometry, line_color, one, out_of_bounds, paragraphs,
+                       placeholder, red_elements, run_styles, runs, shapes_named, tag_shape, warnings)
 
 NAME = "process"
 TITLE = "Mock Process Page"
 MD = """
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -65,7 +66,8 @@ def steps_md(steps, title=TITLE):
     body = "\n".join(f"{i}. {s}" for i, s in enumerate(steps, start=1))
     return f"""
 ---
-title: Mock Deck
+month: 2026-10
+author: Mock.Author
 date: 13 Oct 2026
 ---
 
@@ -93,6 +95,12 @@ def test_cards_text():
     check("process：序号圆 1、2、3",
           [n.text_frame.text for n in nums] == ["1", "2", "3"],
           [n.text_frame.text for n in nums])
+    # 月报卡片字号（#13 定稿）：步骤名 18pt bold #1A1A1A、说明 14pt #6B6B6B；
+    # 方向 C 的说明 18pt 不能覆盖月报值
+    check("月报 process：步骤名 18pt bold、说明 14pt #6B6B6B",
+          cards and all(runs(c, 0) and {x[1:] for x in runs(c, 0)} == {(18.0, True, "1A1A1A")}
+                        and {x[1:] for x in runs(c, 1)} == {(14.0, False, "6B6B6B")} for c in cards),
+          [(runs(c, 0), runs(c, 1)) for c in cards])
 
 
 SLOT = CONTENT_SLOT_IN     # 槽位 idx 17「Process Area」
@@ -176,6 +184,123 @@ def test_overflow_warning():
     check("process：正常说明没有警告", not warnings(r.stderr), r.stderr)
 
 
+# ---- 方向 C（通用 / 项目汇报模式）：编号圆 + 连接线，标题和说明居中在圆下，不画卡片 ----
+
+def general_md(steps, title=TITLE, next_line=True):
+    body = "\n".join(f"{i}. {s}" for i, s in enumerate(steps, start=1))
+    nxt = "Next: 9 月推广到 A 仓\n" if next_line else ""
+    return f"""
+---
+title: Mock Deck
+date: 14 Oct 2026
+---
+
+# {title}
+## Mock Action Title
+Layout: process
+{body}
+三步完成排班，司机不再凭经验排队
+{nxt}"""
+
+
+C_STEPS = ["登记 | 交班时登记剩余电量", "排队 | 系统按电量排序", "充电 | 到点去指定充电位"]
+WHITE = "FFFFFF"
+NEAR_BLACK = "333333"
+GRAY_LINE = "BFBFBF"
+
+
+def test_general_mode_marks_and_lines():
+    """C 模式：N 个黑底白字编号圆、N-1 条灰色连接线，标题 24pt bold、说明 18pt 近黑居中在圆下。"""
+    for steps in (C_STEPS, FIVE):
+        n = len(steps)
+        r = generate(general_md(steps))
+        check(f"C process {n} 步：退出码 0", r.rc == 0, r.stderr)
+        s = body_slide(r)
+        if s is None:
+            continue
+        names = [sh.name for sh in s.shapes]
+        check(f"C process {n} 步：不画卡片和旧序号圆",
+              not shapes_named(s, "Process Card") and not shapes_named(s, "Process Number"),
+              names)
+        marks = shapes_named(s, "Process Mark")
+        lines = shapes_named(s, "Process Line")
+        titles = shapes_named(s, "Process Title")
+        descs = shapes_named(s, "Process Desc")
+        check(f"C process {n} 步：{n} 个编号圆、{n - 1} 条连接线、{n} 个标题和说明",
+              (len(marks), len(lines), len(titles), len(descs)) == (n, n - 1, n, n), names)
+        if (len(marks), len(lines), len(titles), len(descs)) != (n, n - 1, n, n):
+            continue
+        check(f"C process {n} 步：编号圆是黑底圆、白色粗体编号 1..{n}",
+              all(geometry(m) == "ellipse" and fill_color(m) == INK
+                  and m.width == m.height and m.text_frame.text == str(i)
+                  and {(b, c) for _, b, c in run_styles(m)} == {(True, WHITE)}
+                  for i, m in enumerate(marks, start=1)),
+              [(geometry(m), fill_color(m), m.text_frame.text) for m in marks])
+        check(f"C process {n} 步：编号圆等大、同一水平线",
+              len({m.width for m in marks}) == 1 and len({m.top for m in marks}) == 1)
+        check(f"C process {n} 步：连接线灰色、水平、夹在相邻两圆之间不相压",
+              all(line_color(ln) == GRAY_LINE and ln.height == 0
+                  and abs(ln.top - center_y(a)) <= 2
+                  and ln.left >= a.left + a.width and ln.left + ln.width <= b.left
+                  for ln, a, b in zip(lines, marks, marks[1:])),
+              [(line_color(ln), ln.left / EMU, ln.top / EMU) for ln in lines])
+        texts_ok = [paragraphs(t) for t in titles] == [[x.split(" | ")[0]] for x in steps] \
+            and [paragraphs(d) for d in descs] == [[x.split(" | ")[1]] for x in steps]
+        check(f"C process {n} 步：标题 = 步骤名、说明 = 一句说明", texts_ok,
+              ([paragraphs(t) for t in titles], [paragraphs(d) for d in descs]))
+        check(f"C process {n} 步：标题 24pt bold 近黑、说明 18pt 不加粗 #333333",
+              all(run_styles(t) == {(24.0, True, INK)} for t in titles)
+              and all(run_styles(d) == {(18.0, False, NEAR_BLACK)} for d in descs),
+              (run_styles(titles[0]), run_styles(descs[0])))
+        check(f"C process {n} 步：标题、说明在圆下方，水平居中对齐圆心",
+              all(t.top >= bottom(m) and d.top >= bottom(t)
+                  and abs(center_x(t) - center_x(m)) <= 2 and abs(center_x(d) - center_x(m)) <= 2
+                  and t.text_frame.paragraphs[0].alignment == 2
+                  and d.text_frame.paragraphs[0].alignment == 2
+                  for m, t, d in zip(marks, titles, descs)),
+              [(m.top / EMU, t.top / EMU, d.top / EMU) for m, t, d in zip(marks, titles, descs)])
+        check(f"C process {n} 步：编号圆铺满正文区宽度（首末列中心在 1/2n 处）",
+              abs(center_x(marks[0]) - (0.56 + 12.2 / (2 * n)) * EMU) <= 0.02 * EMU
+              and abs(center_x(marks[-1]) - (0.56 + 12.2 - 12.2 / (2 * n)) * EMU) <= 0.02 * EMU,
+              (center_x(marks[0]) / EMU, center_x(marks[-1]) / EMU))
+        rule = one(s, "Next Rule")
+        lead = one(s, "Lead")
+        top_in = bottom(lead) / EMU + 0.19
+        low_in = rule.top / EMU - 0.10
+        grp_top = min(m.top for m in marks) / EMU
+        grp_bot = max(bottom(d) for d in descs) / EMU
+        check(f"C process {n} 步：整组在正文区内、垂直居中",
+              grp_top >= top_in - 0.01 and grp_bot <= low_in + 0.01
+              and abs((grp_top - top_in) - (low_in - grp_bot)) <= 0.05,
+              (top_in, grp_top, grp_bot, low_in))
+        check(f"C process {n} 步：banner 以外只有 lead 竖线用红",
+              red_elements(s) == ["Lead Accent"], red_elements(s))
+        check(f"C process {n} 步：正常说明没有警告", not warnings(r.stderr), r.stderr)
+
+
+# 3 步时说明框约 3.67" 宽，18pt 汉字约 0.25" → 每行约 14 字
+WIDOW = "每班交接时登记叉车剩余电量和位置"          # 16 字：第二行只剩 2 字
+TOO_LONG = "交班时由司机在终端登记剩余电量，系统按电量和到达时间排序，再推送充电时段"  # 3 行
+TWO_LINES = "交班时登记剩余电量，系统按电量自动排序"     # 19 字：两行，末行 5 字
+
+
+def test_general_mode_wrap_warning():
+    """C 模式：说明超过两行或末行只剩 ≤2 字时警告（含页标题和步骤名）；正常两行不警告。"""
+    for label, desc, want in (("末行只剩两字", WIDOW, True), ("超过两行", TOO_LONG, True),
+                              ("正常两行", TWO_LINES, False)):
+        steps = [f"登记 | {desc}", "排队 | 系统按电量排序", "充电 | 到点去指定充电位"]
+        r = generate(general_md(steps, title="Wrap Page"))
+        w = [x for x in warnings(r.stderr) if "Wrap Page" in x and "折行" in x and "登记" in x]
+        check(f"C process：{label}{'有' if want else '没有'}折行警告",
+              r.rc == 0 and len(w) == (1 if want else 0), r.stderr)
+
+
+def test_monthly_no_wrap_warning():
+    """月报模式不变：同样的说明不报折行警告（卡片画法另有溢出警告口径）。"""
+    r = generate(steps_md([f"登记 | {WIDOW}", "排队 | 系统按电量排序", "充电 | 到点去指定充电位"]))
+    check("月报 process：不报折行警告", not [x for x in warnings(r.stderr) if "折行" in x], r.stderr)
+
+
 if __name__ == "__main__":
     test_chrome()
     test_cards_text()
@@ -183,4 +308,7 @@ if __name__ == "__main__":
     test_slot_cleared_and_colors()
     test_step_count_errors()
     test_overflow_warning()
+    test_general_mode_marks_and_lines()
+    test_general_mode_wrap_warning()
+    test_monthly_no_wrap_warning()
     finish()

@@ -18,6 +18,14 @@
 - named(slide, name)            名字恰为 name 的全部形状；one(slide, name) 恰好一个时返回它，否则 None
 - slide_xmls(path)              各页 slide XML 字节，和改动前的输出逐字节比较
 - deck_error(r, title, *needles) 报错退出且信息含页标题（和 needles）
+- review(md, pptx=None)         调审核脚本 review_deck.py → (退出码, stdout, stderr)
+- generated(md, images=None)    生成 → (文稿路径, pptx 路径)，失败抛出；reviewed(md, images=None) 生成后再审
+- lines_with(out, rule)         审核输出里「[rule]」开头的行
+- broken(pptx, change)          生成结果另存一份、用 change(prs) 改坏 → 新路径（审核负样本）
+- registered_layouts()          生成器注册表里的全部版式名（从未知版式的报错信息里读）
+- layouts_in(md)                文稿各页用到的版式名（不写 Layout: 的页算 evidence），查正样本覆盖
+- layouts_doc_text()            版式文档全文（references/layouts.md 总览 + layouts/ 下各版式文件）；
+                                layout_doc(name) 单个版式文件；layout_doc_names() 总览清单里的版式文件名
 - 常量：STATUS_COLORS / DONE_GREEN / DOING_AMBER / DOING_INK、UNIT_PT / UNIT_COLOR
 - check(name, ok, detail) 记录结果；finish() 打印汇总并按结果退出
 """
@@ -35,6 +43,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 
 SKILL = Path(__file__).resolve().parent.parent
 GENERATOR = SKILL / "scripts" / "generate_ppt.py"
+REVIEWER = SKILL / "scripts" / "review_deck.py"
 TEMPLATE = SKILL / "assets" / "MS_Template.pptx"
 
 EMU = 914400
@@ -46,6 +55,7 @@ CAPTION_BOTTOM = 6477000
 CAPTION_MIN_CY = 1097952
 
 BRAND_RED = "DB011C"
+INK = "1A1A1A"                 # 近黑：正文、lead、Next 行
 # 视为“红色”的颜色：品牌红 + 常见纯红/深红，防止有人另起一个红
 RED_COLORS = {BRAND_RED, "FF0000", "C00000", "E3000F", "D0021B", "CC0000"}
 
@@ -55,7 +65,8 @@ STATUS_COLORS = {"done": DONE_GREEN, "doing": DOING_AMBER, "todo": BRAND_RED}
 UNIT_PT, UNIT_COLOR = 28, "6B6B6B"   # 数字后的单位：28pt 灰色、不加粗
 
 LAYOUT_INDEX = {"evidence": 0, "before-after": 3, "process": 4, "stats": 5,
-                "stats-side": 5, "timeline": 6, "timeline-phase": 6, "image-text": 7}
+                "stats-side": 5, "timeline": 6, "timeline-phase": 6, "image-text": 7,
+                "section": 0, "agenda": 0, "team": 0, "table": 0}
 
 # 模板槽位（英寸，L / T / W / H；#13 定稿）
 CONTENT_SLOT_IN = (0.56, 1.30, 12.21, 4.30)   # process 17 / stats 18 / timeline 19
@@ -370,3 +381,82 @@ def slide_xmls(pptx_path):
 def deck_error(r, title, *needles):
     """生成器报错退出，错误信息含页标题和 needles 里的每一段文字。"""
     return r.rc != 0 and title in r.stderr and all(s in r.stderr for s in needles)
+
+
+def review(md, pptx=None):
+    """跑审核脚本：md、pptx 为路径（pptx 可省略，只审文稿）→ CompletedProcess（rc / stdout / stderr）。"""
+    cmd = [sys.executable, str(REVIEWER), str(md)] + ([str(pptx)] if pptx is not None else [])
+    return subprocess.run(cmd, capture_output=True, text=True)
+
+
+def generated(md, images=None):
+    """生成器按文稿出 pptx → (文稿路径, pptx 路径)；生成失败时抛出，带生成器的 stderr。"""
+    r = generate(md, images=images)
+    if r.rc != 0:
+        raise RuntimeError(r.stderr)
+    return r.workdir / "deck.md", r.path
+
+
+def reviewed(md, images=None):
+    """生成 pptx 再审核 → 审核的 CompletedProcess（生成失败时抛出）。"""
+    return review(*generated(md, images))
+
+
+def lines_with(out, rule):
+    """审核输出里以「[rule]」开头的行。"""
+    return [line for line in out.splitlines() if line.startswith(f"[{rule}]")]
+
+
+def broken(pptx, change):
+    """把生成器的输出另存一份（临时目录），用 change(prs) 改坏 → 新路径；原文件不动。"""
+    prs = open_pptx(pptx)
+    change(prs)
+    out = Path(tempfile.mkdtemp(prefix="mppt-bad-")) / "bad.pptx"
+    prs.save(str(out))
+    return out
+
+
+def registered_layouts():
+    """生成器注册表里的全部版式名，按注册顺序。只走外部切入点：写一个未知版式，
+    从报错信息「可选: a / b / …」里读出来；新版式登记进注册表后自动出现在这里。"""
+    r = generate("""
+        ---
+        title: 注册表探测
+        ---
+        # 探测页
+        Layout: __no_such_layout__
+        """)
+    m = re.search(r"可选: (.+)$", r.stderr, re.M)
+    if r.rc == 0 or not m:
+        raise RuntimeError(f"读不到注册表: {r.stderr}")
+    return [name.strip() for name in m.group(1).split(" / ")]
+
+
+def layouts_in(md):
+    """文稿各页用到的版式名集合（不写 Layout: 的页是 evidence）。"""
+    pages = re.split(r"^# ", md, flags=re.M)[1:]
+    return {(re.search(r"^Layout: (\S+)$", p, flags=re.M) or [None, "evidence"])[1].lower()
+            for p in pages}
+
+
+LAYOUTS_DOC = SKILL / "references" / "layouts.md"
+LAYOUTS_DOC_DIR = SKILL / "references" / "layouts"
+
+
+def layout_doc_names():
+    """总览 layouts.md「各版式文件」清单里列出的版式文件名（不带 .md），按清单顺序。"""
+    text = LAYOUTS_DOC.read_text(encoding="utf-8")
+    return re.findall(r"(?m)^- `layouts/([\w-]+)\.md`", text)
+
+
+def layout_doc(name):
+    """单个版式文件 references/layouts/<name>.md 的全文。"""
+    return (LAYOUTS_DOC_DIR / f"{name}.md").read_text(encoding="utf-8")
+
+
+def layouts_doc_text():
+    """版式文档全文：总览 layouts.md 在前，再按总览清单顺序拼上各版式文件。
+    文档一致性测试按全文查找（字号表行、形状名行、示例代码块）。"""
+    parts = [LAYOUTS_DOC.read_text(encoding="utf-8")]
+    parts += [layout_doc(n) for n in layout_doc_names()]
+    return "\n".join(parts)

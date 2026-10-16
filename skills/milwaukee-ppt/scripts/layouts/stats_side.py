@@ -7,17 +7,18 @@
     ### Mock findings                                    ← 可选，结论区小标题，默认「结论」
     > Mock finding one.                                  ← 结论要点，自动编号，1–4 条
     口径：Mock source note.                             ← 可选，一行（或 Source:），灰色小字贴结论区底
-    Mock one-line conclusion.                           ← 其余普通文字行进底部红条
+    Mock one-line conclusion.                           ← 其余普通文字行是结论（月报进底部红条，通用 / 项目模式画成 lead）
 
 卡片不带解读：卡片行下面缩进的 `- ` 子列表报错（解读写成 `> ` 要点，或改用 stats）。
 字段：fields = {"items": [{"label", "value", "note", "key"}...], "points": [...],
 "source": str 或 None, "heading": str}
 渲染：槽位 idx 18 左侧 6.0" 竖排横卡（浅灰底），卡内大数字（单位缩小）在左、标签和说明在右；
-右侧是结论区：小标题、细分隔线、编号要点，口径贴底。几何见 Spec #20 和 references/layouts.md。
+右侧是结论区：小标题、细分隔线、编号要点，口径贴底。几何见 Spec #20 和 references/layouts/stats-side.md。
 形状名：Side Card N、Side Accent N（只有重点卡）、Side Number N、Side Text N、
 Side Conclusion Title、Side Conclusion Rule、Side Points、Stat Source。
 """
 import re
+from types import SimpleNamespace
 
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
@@ -26,9 +27,9 @@ from pptx.util import Emu, Inches, Pt
 
 from mdparse import DeckError
 
-from .common import (BRAND_RED, LATIN_FONT, add_number, add_page_chrome, add_run, add_shape,
+from .common import (BRAND_RED, DESC_INK, LATIN_FONT, add_number, add_page_chrome, add_run, add_shape,
                      SOURCE_LINE, add_textbox, check_stat_cards, fill_titles, number_width_in,
-                     parse_stat_card, sub_item, take_slot, text_lines, warn)
+                     parse_stat_card, sub_item, fit_body, take_slot, text_lines, warn)
 
 NAME = "stats-side"
 LAYOUT_INDEX = 5
@@ -37,7 +38,7 @@ SLOT_IDX = 18
 MIN_ITEMS, MAX_ITEMS = 2, 3
 MAX_POINTS = 4
 
-# 几何（英寸，Spec #20 定稿，见 references/layouts.md「stats-side」）
+# 几何（英寸，Spec #20 定稿，见 references/layouts/stats-side.md）
 LEFT_W = 6.0              # 左侧卡片列宽
 CARD_GAP = 0.3            # 卡片竖向间距
 ACCENT_W = 0.06           # 重点卡左侧红竖条
@@ -64,6 +65,16 @@ POINTS_Y = 0.7            # 要点距槽位顶
 POINT_SPACE_PT = 14       # 要点段前距
 POINT_LINE = 1.15         # 要点行距倍数
 SOURCE_H = 0.5            # 口径框高（文字贴底）
+
+# 两种模式的字号、颜色和卡内几何：月报沿用上面的定稿值（输出逐字节不变）；方向 C（通用 /
+# 项目模式，#51）数字 72pt、标签 20pt、说明 16pt 近黑、结论区小标题 20pt、要点 18pt，
+# 卡内数字框加宽到 2.9" 放下 72pt。
+MONTHLY = SimpleNamespace(number_pt=NUMBER_PT, label_pt=LABEL_PT, note_pt=NOTE_PT,
+                          note_color=GRAY, heading_pt=HEADING_PT, point_pt=POINT_PT,
+                          point_space_pt=POINT_SPACE_PT, num_x=NUM_X, num_w=NUM_W, text_x=TEXT_X)
+GENERAL = SimpleNamespace(number_pt=72, label_pt=20, note_pt=16, note_color=DESC_INK,
+                          heading_pt=20, point_pt=18, point_space_pt=16,
+                          num_x=0.3, num_w=2.9, text_x=3.3)
 
 _POINT = re.compile(r"^>\s*(.*)$")
 _HEADING = re.compile(r"^###\s+(.*)$")
@@ -115,14 +126,15 @@ def _shape(slide, name, x, y, w, h, fill):
     return sp
 
 
-def _number_size(items, title):
-    """所有大数字共用一个字号：60pt 放不下最长的那个时统一缩小（整数 pt），并警告。
+def _number_size(items, title, st, card_h_in):
+    """所有大数字共用一个字号：st.number_pt（月报 60pt、方向 C 72pt）放不下最长的那个、
+    或一行高过卡片时统一缩小（整数 pt）；缩到 60pt 以下才警告。
     宽度用 common.number_width_in（通用口径）。stats 的同名函数用自己的逐字宽表，
     口径不同是有意的，原因见 scripts/README.md「估算」。"""
     def fits(pt):
-        return all(number_width_in(it["value"], pt) <= NUM_W for it in items)
+        return all(number_width_in(it["value"], pt) <= st.num_w for it in items)
 
-    pt = NUMBER_PT
+    pt = min(st.number_pt, int(card_h_in * 72 / LINE))     # 一行高不超过卡片
     while pt > NUMBER_MIN_PT and not fits(pt):
         pt -= 1
     if pt < NUMBER_PT:
@@ -133,16 +145,16 @@ def _number_size(items, title):
     return pt
 
 
-def _cards(slide, items, left, top, height, title):
+def _cards(slide, items, left, top, height, title, st):
     n = len(items)
     card_w = Inches(LEFT_W)
     card_h = (height - Inches(CARD_GAP) * (n - 1)) // n
-    number_pt = _number_size(items, title)
-    text_w_in = LEFT_W - TEXT_X - TEXT_PAD_R
+    number_pt = _number_size(items, title, st, Emu(card_h).inches)
+    text_w_in = LEFT_W - st.text_x - TEXT_PAD_R
     for i, it in enumerate(items, start=1):
-        need = (text_lines(it["label"], LABEL_PT, text_w_in) * LABEL_PT * LINE
+        need = (text_lines(it["label"], st.label_pt, text_w_in) * st.label_pt * LINE
                 + LABEL_NOTE_GAP_PT
-                + text_lines(it["note"], NOTE_PT, text_w_in) * NOTE_PT * LINE) / 72
+                + text_lines(it["note"], st.note_pt, text_w_in) * st.note_pt * LINE) / 72
         if need > Emu(card_h).inches:
             warn(f"页「{title}」第 {i} 张卡的标签和说明估计放不下, 建议缩短说明")
     for i, it in enumerate(items, start=1):
@@ -150,15 +162,15 @@ def _cards(slide, items, left, top, height, title):
         _shape(slide, f"Side Card {i}", left, y, card_w, card_h, CARD_FILL)
         if it["key"]:
             _shape(slide, f"Side Accent {i}", left, y, Inches(ACCENT_W), card_h, BRAND_RED)
-        tf = add_textbox(slide, f"Side Number {i}", left + Inches(NUM_X), y, Inches(NUM_W), card_h,
-                  MSO_ANCHOR.MIDDLE, wrap=False)
+        tf = add_textbox(slide, f"Side Number {i}", left + Inches(st.num_x), y, Inches(st.num_w),
+                  card_h, MSO_ANCHOR.MIDDLE, wrap=False)
         add_number(tf.paragraphs[0], it["value"], number_pt, BRAND_RED if it["key"] else INK)
-        tf = add_textbox(slide, f"Side Text {i}", left + Inches(TEXT_X), y,
-                  card_w - Inches(TEXT_X + TEXT_PAD_R), card_h, MSO_ANCHOR.MIDDLE)
-        add_run(tf.paragraphs[0], it["label"], LABEL_PT, True, INK)
+        tf = add_textbox(slide, f"Side Text {i}", left + Inches(st.text_x), y,
+                  card_w - Inches(st.text_x + TEXT_PAD_R), card_h, MSO_ANCHOR.MIDDLE)
+        add_run(tf.paragraphs[0], it["label"], st.label_pt, True, INK)
         p = tf.add_paragraph()
         p.space_before = Pt(LABEL_NOTE_GAP_PT)
-        add_run(p, it["note"], NOTE_PT, False, GRAY)
+        add_run(p, it["note"], st.note_pt, False, st.note_color)
 
 
 def _numbered(paragraph, pt):
@@ -173,27 +185,28 @@ def _numbered(paragraph, pt):
     pPr.append(pPr.makeelement(qn("a:buAutoNum"), {"type": "arabicPlain"}))
 
 
-def _conclusion(slide, fields, x, top, w, bottom, title):
+def _conclusion(slide, fields, x, top, w, bottom, title, st):
     tf = add_textbox(slide, "Side Conclusion Title", x, top, w, Inches(HEADING_H))
-    add_run(tf.paragraphs[0], fields["heading"], HEADING_PT, True, INK)
+    add_run(tf.paragraphs[0], fields["heading"], st.heading_pt, True, INK)
     _shape(slide, "Side Conclusion Rule", x, top + Inches(RULE_Y), w, Pt(1), RULE_COLOR)
 
     points_top = top + Inches(POINTS_Y)
     points_bottom = bottom - (Inches(SOURCE_H) if fields["source"] else 0)
     tf = add_textbox(slide, "Side Points", x, points_top, w, points_bottom - points_top)
-    text_w_in = Emu(w).inches - POINT_PT * 1.4 / 72        # 去掉悬挂缩进
-    need = (sum(text_lines(t, POINT_PT, text_w_in) for t in fields["points"])
-            * POINT_PT * LINE * POINT_LINE
-            + POINT_SPACE_PT * (len(fields["points"]) - 1)) / 72
+    pt = st.point_pt
+    text_w_in = Emu(w).inches - pt * 1.4 / 72        # 去掉悬挂缩进
+    need = (sum(text_lines(t, pt, text_w_in) for t in fields["points"])
+            * pt * LINE * POINT_LINE
+            + st.point_space_pt * (len(fields["points"]) - 1)) / 72
     if need > Emu(points_bottom - points_top).inches:
         warn(f"页「{title}」的结论要点估计放不下, 建议缩短要点或减少条数")
     for j, text in enumerate(fields["points"]):
         p = tf.paragraphs[0] if j == 0 else tf.add_paragraph()
         if j:
-            p.space_before = Pt(POINT_SPACE_PT)
+            p.space_before = Pt(st.point_space_pt)
         p.line_spacing = POINT_LINE
-        _numbered(p, POINT_PT)
-        add_run(p, text, POINT_PT, False, INK)
+        _numbered(p, pt)
+        add_run(p, text, pt, False, INK)
 
     if fields["source"]:
         if text_lines(fields["source"], SOURCE_PT, Emu(w).inches) * SOURCE_PT * LINE / 72 > SOURCE_H:
@@ -206,9 +219,11 @@ def _conclusion(slide, fields, x, top, w, bottom, title):
 def render(prs, page, ctx):
     slide = prs.slides.add_slide(prs.slide_layouts[LAYOUT_INDEX])
     fill_titles(slide, page)
-    left, top, width, height = take_slot(slide, SLOT_IDX)
-    _cards(slide, page.fields["items"], left, top, height, page.title)
+    # 方向 C 下上下沿换成正文区（common.fit_body）
+    left, top, width, height = fit_body(take_slot(slide, SLOT_IDX), page, ctx)
+    st = GENERAL if ctx.lead else MONTHLY      # 方向 C 放大字号
+    _cards(slide, page.fields["items"], left, top, height, page.title, st)
     x = left + Inches(LEFT_W + COL_GAP)
-    _conclusion(slide, page.fields, x, top, left + width - x, top + height, page.title)
+    _conclusion(slide, page.fields, x, top, left + width - x, top + height, page.title, st)
     add_page_chrome(slide, page, ctx)
     return slide
