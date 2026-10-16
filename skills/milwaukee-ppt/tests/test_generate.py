@@ -5,10 +5,11 @@
 测试图片用 Pillow 现生成纯色图；文稿内容全部虚构。
 """
 import hashlib
+import shutil
 import tempfile
 from pathlib import Path
 
-from deckcheck import (CAPTION_BOTTOM, CAPTION_MIN_CY, EMU,
+from deckcheck import (CAPTION_BOTTOM, CAPTION_MIN_CY, EMU, SKILL,
                        TEMPLATE, caption_bar, caption_style_problems,
                        check, finish, generate, make_image, open_pptx,
                        out_of_bounds, paragraphs, slide_parts, slide_xmls, tag_texts, texts)
@@ -149,6 +150,169 @@ def test_monthly_regression():
         parts = slide_parts(Path(tmp) / "out.pptx")
         check("包里的 slide 部件数 = 页数（样例页部件已删）",
               len(parts) == len(slides), parts)
+
+
+# 月报全版式逐字节回归：12 种版式各一页（月报模式）。上面的 MONTHLY_SHA 只覆盖 evidence，
+# #49 曾把月报 process 说明字号改大而测试全绿；这里把其余版式的月报输出也钉住。
+# 图用 examples/demo/img 里的示例图；内容取自示例文稿。
+MONTHLY_ALL_MD = """
+---
+month: 2026-09
+author: Alex.Sample
+date: 13 Oct
+---
+
+# 目录 / AGENDA
+## 分三部分汇报，试点数据集中在第二部分
+Layout: agenda
+01 | 背景与方案 | BACKGROUND
+02 | 试点结果 | RESULTS
+03 | 推进安排 | ROLLOUT
+
+# 背景与方案 / BACKGROUND
+## 先看纸质登记的问题，再看扫码流程
+Layout: section
+01 | 背景与方案 | BACKGROUND
+
+# 项目背景 / BACKGROUND
+## 纸质登记让借还记录难以追溯
+Tag: Sep
+![](img/paper-log.png)
+![](img/online-form.png)
+抽查 3 个月的登记本，约三成借出记录没有归还登记
+Next: 10 月底前完成全部工具贴码
+
+# 新流程 / PROCESS
+## 借还改为扫码登记，四步完成
+Layout: process
+1. 贴码 | 每件工具贴唯一二维码
+2. 扫码借出 | 扫码自动带出工具信息
+3. 到期提醒 | 到期前一天推送提醒
+4. 扫码归还 | 归还时扫码，自动入库
+新流程已在试点车间运行 4 周
+
+# 借还登记 / BEFORE-AFTER
+## 登记从手写改为扫码，记录自动留存
+Layout: before-after
+
+### Before: 纸质登记
+![](img/paper-log.png)
+Caption: 借出时手写登记，归还靠自觉补记
+
+### After: 扫码登记
+![](img/online-form.png)
+Caption: 扫码自动带出工具信息，归还时扫码登记
+
+试点 4 周内借还记录全部可追溯
+Next: 11 月起推广到第二个车间
+
+# 关键数据 / KEY RESULTS
+## 试点 4 周，借还记录全部可追溯
+Layout: stats
+- 试点工具 | 120 件 | 覆盖试点车间全部手持工具
+  - 电动工具 86 件、量具 34 件
+- !记录完整率 | 100% | 改前约 70%，抽查口径相同
+  - 4 周借还 1,240 次，全部有归还记录
+- 单次登记用时 | 15 秒 | 改前手写约 1 分钟
+口径：改前取 6–8 月登记本抽查，改后取系统导出
+试点 4 周借还记录完整率 100%
+
+# 试点结论 / FINDINGS
+## 记录完整率达到 100%，具备推广条件
+Layout: stats-side
+- 试点工具 | 120 件 | 覆盖试点车间全部手持工具
+- !记录完整率 | 100% | 改前约 70%
+- 单次登记用时 | 15 秒 | 改前手写约 1 分钟
+### 试点结论
+> 记录完整率达到 100%，抽查不再缺页
+> 逾期提醒起作用，逾期件数明显下降
+口径：改前取 6–8 月登记本抽查，改后取系统导出
+Next: 11 月起推广到第二个车间
+
+# 车间对比 / WORKSHOPS
+## 机加车间逾期最多，推广时先补提醒
+Layout: table
+| 车间 | 试点工具 | 4 周借还 | 逾期件数 |
+| --- | --- | --- | --- |
+| 装配车间 | 52 件 | 560 次 | 3 件 |
+| !机加车间 | 48 件 | 520 次 | 11 件 |
+| 总装车间 | 20 件 | 160 次 | 1 件 |
+机加车间逾期 11 件，占三个车间逾期总数的七成以上
+
+# 项目节点 / MILESTONE
+## 软件按计划上线，贴码比计划晚一周
+Layout: timeline
+- 07 Jul | 立项 | 确定车间与工具范围 | 完成
+- !04 Aug | 表单上线 | 扫码表单开放试用 | 完成
+- 25 Aug | 贴码完成 | 比计划晚一周 | 完成
+- !15 Sep | 试点开始 | 切换为扫码登记 | 完成
+- 13 Oct | 试点复盘 | 4 周数据汇总中 | 进行中
+- !03 Nov | 推广二车间 | 二车间切换扫码 | 未完成
+试点复盘 10 月内完成
+
+# 推广阶段 / ROLLOUT
+## 试点阶段已完成，正在复盘
+Layout: timeline-phase
+- Jul | 立项 | 确定车间与工具范围 | 完成
+- Aug | 准备 | 表单上线、全部贴码 | 完成
+- !Sep | 试点 | 试点车间切换扫码 | 完成
+- Oct | 复盘 | 4 周数据汇总中 | 进行中
+- !Nov | 推广 | 第二个车间切换扫码 | 未完成
+复盘结论 10 月底前提交
+
+# 项目团队 / TEAM
+## 四人小组，现场推进和数据复盘分开负责
+Layout: team
+- 林晓 | 项目负责人 | 统筹进度和车间对接
+- 周航 | 现场推进 | 试点车间贴码和巡检
+- 陈雨 | 数据复盘 | 汇总借还记录出周报
+- 吴凡 | 系统支持 | 扫码表单维护
+分工按现场和数据两条线，周会对齐一次
+
+# 借还看板 / DASHBOARD
+## 看板一眼看出逾期未还的工具
+Layout: image-text
+![](img/dashboard.png)
+- 按车间显示在借、逾期、闲置数量
+- 逾期数量单独标红，点开可见借用人
+- 每天早班前自动刷新
+看板已在试点车间晨会使用
+"""
+
+# 6c9dc2b（方向 C 之前）的生成器生成 MONTHLY_ALL_MD 的各页 slide XML sha256；
+# 当前代码生成结果与之逐字节一致时写入。{部件名: (版式, sha256)}
+MONTHLY_ALL_SHA = {
+    "ppt/slides/slide1.xml": ("封面", "558477f9a531327cabba1a5d79e7a2e0ff646c29bd0aae1ad515e647bc3272c2"),
+    "ppt/slides/slide2.xml": ("agenda", "c7c425026b535490a0cedbcec066ae34302ace6c101ec765a087f5d1730d48b7"),
+    "ppt/slides/slide3.xml": ("section", "d0365c1c32e9fb4c833d0560d6c0a163409203e1b04839c555b1efb2401a9847"),
+    "ppt/slides/slide4.xml": ("evidence", "88a85bdca068b81ba95f0a8e4213bc718c73803a6a4a0c161be2070f494891c7"),
+    "ppt/slides/slide5.xml": ("process", "8b22bcfba59b0c89c55c471190daca1e54ba6a7d06812f6512250b158ce9de00"),
+    "ppt/slides/slide6.xml": ("before-after", "ea23b91b13fef41b2c830b11ef6397f43501f1a1b9951d623882d3a9c438f113"),
+    "ppt/slides/slide7.xml": ("stats", "0992ac6c19272a8559794c89885b25b2168b9491ef8e513d4c44e8ff28ae098a"),
+    "ppt/slides/slide8.xml": ("stats-side", "9c11d7ed620dd796b62abab77fdfb7ae8c1bff03edc576af88d04cfd8fa76314"),
+    "ppt/slides/slide9.xml": ("table", "e267be9b2b4df64fc2359dbe1536038fe3e3de97fdfd0a37a3650f8d7073dee5"),
+    "ppt/slides/slide10.xml": ("timeline", "e51ead3bc26d7a868f9ea1f184827506b997dc59eb8d3ea4ff265ccb21e6f2a8"),
+    "ppt/slides/slide11.xml": ("timeline-phase", "e47ff9090714948733babdc19605a5afe0e30e9d7fb0d49ae0af50645fa1459f"),
+    "ppt/slides/slide12.xml": ("team", "8b03ab987b35b4d13c56ceb8cb2e99f32e92a4c3be4dbbc5c560e53ebcc7ad98"),
+    "ppt/slides/slide13.xml": ("image-text", "2b90d26682aa87dba22ef53ca28eb77bd57e568cb222438171c4e2c25e3237f8"),
+    "ppt/slides/slide14.xml": ("Thank You", "c89c199746d67277afa243eb1dacce8f26093c0b3b40e070e0d1a869532e1f46"),
+}
+
+
+def test_monthly_all_layouts_regression():
+    with tempfile.TemporaryDirectory() as tmp:
+        shutil.copytree(SKILL / "examples" / "demo" / "img", Path(tmp) / "img")
+        rc, _, err, _ = run(MONTHLY_ALL_MD, tmp)
+        check("月报全版式：退出码 0", rc == 0, err)
+        out = Path(tmp) / "out.pptx"
+        got = ({n: hashlib.sha256(x).hexdigest() for n, x in slide_xmls(out).items()}
+               if out.exists() else {})
+        bad = [f"{n}（{MONTHLY_ALL_SHA[n][0] if n in MONTHLY_ALL_SHA else '多出的页'}）"
+               for n in sorted(set(got) | set(MONTHLY_ALL_SHA),
+                               key=lambda n: int("".join(c for c in n if c.isdigit())))
+               if got.get(n) != MONTHLY_ALL_SHA.get(n, (None, None))[1]]
+        check("月报全版式：各页 slide XML 与 6c9dc2b 基线逐字节一致", not bad,
+              "不一致的页：" + "、".join(bad))
 
 
 def test_errors():
@@ -317,6 +481,7 @@ def test_unknown_layout():
 
 def main():
     test_monthly_regression()
+    test_monthly_all_layouts_regression()
     test_errors()
     test_default_output_name()
     test_caption_grows_upward()
