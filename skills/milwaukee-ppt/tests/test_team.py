@@ -357,6 +357,7 @@ def test_general_mode_duty_wrap():
           and not lines_with(out.stdout, "团队职责折行"), r.stderr + out.stdout)
 
 
+DOC_LINE_SPACING = 1.25   # layouts/team.md：行高按字号 × 1.25 估
 LATIN_DUTY = "aaaaaaaaa bbbbbbbbb ccccccccc ddddddddd eeeeeeeee"   # 按词断行比按总宽估多一行
 
 
@@ -365,7 +366,7 @@ def test_general_mode_duty_box_fits_wrap():
     按词断行多出的那一行也装得下。"""
     import sys
     sys.path.insert(0, str(SKILL / "scripts"))
-    from layouts.common import LINE_SPACING, wrap_lines  # noqa: E402
+    from layouts.common import wrap_lines  # noqa: E402
     members = [CLEAN[0][:2] + (LATIN_DUTY,)] + CLEAN[1:3]     # 3 人一行：职责框约 3.67" 宽
     r = generate(general_md(members, title="Latin Team"))
     s = body_slide(r)
@@ -375,7 +376,7 @@ def test_general_mode_duty_box_fits_wrap():
         return
     pt = duty.text_frame.paragraphs[0].runs[0].font.size.pt
     width = (duty.width - duty.text_frame.margin_left - duty.text_frame.margin_right) / EMU
-    need = len(wrap_lines(LATIN_DUTY, pt, width)) * pt * LINE_SPACING / 72
+    need = len(wrap_lines(LATIN_DUTY, pt, width)) * pt * DOC_LINE_SPACING / 72
     check("C team 拉丁职责：职责框高装得下按词断行的行数",
           duty.height / EMU >= need - 0.01, (duty.height / EMU, need, wrap_lines(LATIN_DUTY, pt, width)))
 

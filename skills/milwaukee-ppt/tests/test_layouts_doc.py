@@ -8,6 +8,7 @@ md 进、pptx 出。
 文中引用的图片现生成纯色图。
 """
 import re
+import subprocess
 import sys
 
 from deckcheck import (LAYOUT_INDEX, LAYOUTS_DOC_DIR, SKILL, check, finish, generate, layout_doc,
@@ -172,7 +173,7 @@ Layout: team
 
 def test_team_general_mode():
     """team 方向 C：形状命名表的名字生成器都会画、不画卡片；头像首字 / 姓名 / 角色 / 职责的
-    字号（最大一档）、粗体、颜色和代码一致；inspect 标记形状和代码一致。"""
+    字号（最大一档）、粗体、颜色和代码一致；inspect 标记形状生成器会画、inspect 认得出。"""
     names = re.findall(r"`([^`]+)`", _table_row("team（通用 / 项目模式）"))
     check("layouts.md：形状命名表有 team（通用 / 项目模式）一行，列出头像、姓名、角色、短线、职责",
           {"Member Avatar N", "Member Name N", "Member Role N", "Member Rule N",
@@ -191,11 +192,14 @@ def test_team_general_mode():
         got = run_style(one(s, shape)) if s is not None and one(s, shape) else None
         check(f"layouts.md：{label} 的字号、粗体、颜色和生成器一致",
               doc is not None and doc == got, (doc, got))
-    sys.path.insert(0, str(SKILL / "scripts"))
-    from layouts import team  # noqa: E402
-    text = layout_doc("team")
-    check("layouts/team.md：写的 inspect 标记形状和代码一致",
-          f"inspect 靠 `{team.MARK_SHAPE}` 认出 team" in text, team.MARK_SHAPE)
+    m = re.search(r"inspect 靠 `([^`]+)` 认出 team", layout_doc("team"))
+    mark = m.group(1) if m else None
+    check("layouts/team.md：写的 inspect 标记形状生成器会画", mark is not None and mark in drawn,
+          (mark, sorted(drawn)))
+    out = subprocess.run([sys.executable, str(SKILL / "scripts" / "inspect_ppt.py"), str(r.path)],
+                         capture_output=True, text=True).stdout if r.rc == 0 else ""
+    check("layouts/team.md：生成的 team 页 inspect 认作 team",
+          re.search(r"(?m)^== 第 2 页 .*\| 版式: team$", out) is not None, out[:600])
 
 
 NUMBERS_DECK = """---
