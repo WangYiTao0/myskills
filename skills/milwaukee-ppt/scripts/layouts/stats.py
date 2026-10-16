@@ -1,4 +1,4 @@
-"""stats 版式：数据对比 / Key Results，基于模板 layout 5「Stats」，分栏式（Spec #20，见 references/layouts.md「stats」）。
+"""stats 版式：数据对比 / Key Results，基于模板 layout 5「Stats」，分栏式（Spec #20，见 references/layouts/stats.md）。
 
 文稿写法：2–4 条无序列表「标签 | 数字 | 一句说明」；最多一条在列表符号后加 `!`，
 标为重点（它那栏的顶线和数字用品牌红）。卡片行下面缩进的 `- ` 子列表是这张卡的解读，
@@ -37,7 +37,7 @@ SLOT_IDX = 18
 MIN_ITEMS, MAX_ITEMS = 2, 4
 MAX_POINTS = 3            # 每栏解读最多几条
 
-# 几何（英寸，Spec #20 定稿，见 references/layouts.md「stats」）
+# 几何（英寸，Spec #20 定稿，见 references/layouts/stats.md）
 GAP = 0.45                # 栏间距
 RULE_H = 0.06             # 顶部粗线
 RULE_GAP = 0.19           # 顶线 → 标签

@@ -60,7 +60,7 @@ description: 汇报 PPT 生成前的打磨访谈：按决策树分轮追问（�
 
 ### 拟用版式（第 4 层）
 
-版式名只用 milwaukee-ppt 生成器的 12 种：`evidence`、`before-after`、`process`、`stats`、`stats-side`、`timeline`、`timeline-phase`、`image-text`、`section`、`agenda`、`team`、`table`。按内容选，依据和每种版式的容量看 milwaukee-ppt 的 `references/layouts.md`「选版速查」和各版式小节；容量超了就在页序里拆页。
+版式名只用 milwaukee-ppt 生成器的 12 种：`evidence`、`before-after`、`process`、`stats`、`stats-side`、`timeline`、`timeline-phase`、`image-text`、`section`、`agenda`、`team`、`table`。按内容选，依据和每种版式的容量看 milwaukee-ppt 的 `references/layouts.md`「选版速查」和各版式文件 `references/layouts/<版式名>.md`；容量超了就在页序里拆页。
 
 素材清单为"无"时，每页的版式都从不需要配图的版式里选：`process`、`stats`、`stats-side`、`timeline`、`timeline-phase`、`agenda`、`section`、`team`、`table`，以及两边都写短文的 `before-after`。`evidence`、`image-text` 只在素材清单里有对应图片时选，并在该页"素材"列写明用哪张图。
 
@@ -116,7 +116,7 @@ description: 汇报 PPT 生成前的打磨访谈：按决策树分轮追问（�
 | 文稿模式 = 通用 | frontmatter 不写 `report`，各页不写 `PDCA:` |
 | 封面 | frontmatter `title` / `subtitle` / `date` / `author` / `closing`（"无"就不写） |
 | 页序表每一行 | 一页：主标题 → `# `，结论标题 → `## `，拟用版式 → `Layout:`，"lead / Next"列的 lead → 普通文字行（月报模式这句画成底部红条），Next → `Next:` |
-| 内容要点与素材 | 按该版式在 `references/layouts.md` 里的字段写法写；图片写 `![](文件名)` |
+| 内容要点与素材 | 按该版式在 `references/layouts/<版式名>.md` 里的字段写法写；图片写 `![](文件名)` |
 | 口径表 | stats / stats-side 页的 `口径：` 行；数字写法和口径表一致 |
 | 预判问答 | 不进文稿，留给用户备讲 |
 

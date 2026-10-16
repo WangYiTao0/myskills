@@ -13,7 +13,7 @@
 字段：fields = {"items": [{"label", "value", "note", "key"}...], "points": [...],
 "source": str 或 None, "heading": str}
 渲染：槽位 idx 18 左侧 6.0" 竖排横卡（浅灰底），卡内大数字（单位缩小）在左、标签和说明在右；
-右侧是结论区：小标题、细分隔线、编号要点，口径贴底。几何见 Spec #20 和 references/layouts.md。
+右侧是结论区：小标题、细分隔线、编号要点，口径贴底。几何见 Spec #20 和 references/layouts/stats-side.md。
 形状名：Side Card N、Side Accent N（只有重点卡）、Side Number N、Side Text N、
 Side Conclusion Title、Side Conclusion Rule、Side Points、Stat Source。
 """
@@ -38,7 +38,7 @@ SLOT_IDX = 18
 MIN_ITEMS, MAX_ITEMS = 2, 3
 MAX_POINTS = 4
 
-# 几何（英寸，Spec #20 定稿，见 references/layouts.md「stats-side」）
+# 几何（英寸，Spec #20 定稿，见 references/layouts/stats-side.md）
 LEFT_W = 6.0              # 左侧卡片列宽
 CARD_GAP = 0.3            # 卡片竖向间距
 ACCENT_W = 0.06           # 重点卡左侧红竖条

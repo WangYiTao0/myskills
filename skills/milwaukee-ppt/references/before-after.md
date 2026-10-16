@@ -1,6 +1,6 @@
 # Before / After 模板使用
 
-用生成器出这一页时（`Layout: before-after`），文稿写法、报错与警告见 `layouts.md` 的 before-after 小节；本文件管槽位几何、事实对应和验收。
+用生成器出这一页时（`Layout: before-after`），文稿写法、报错与警告见 `layouts/before-after.md`；本文件管槽位几何、事实对应和验收。
 
 ## 来源与边界
 

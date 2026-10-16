@@ -1,24 +1,26 @@
-"""references/layouts.md 里的示例照抄就能生成：md 进、pptx 出。
+"""references/layouts.md（总览）和 references/layouts/<版式名>.md（各版式文件）里的示例照抄就能生成：
+md 进、pptx 出。
 
 运行：python3 skills/milwaukee-ppt/tests/test_layouts_doc.py
-做法：抽出文档里所有 ```markdown 代码块。第一个块是完整文稿格式（带 frontmatter）；
+做法：总览在前、各版式文件按总览「各版式文件」清单顺序拼成全文（deckcheck.layouts_doc_text），
+抽出全文里所有 ```markdown 代码块。第一个块是完整文稿格式（带 frontmatter）；
 其余是各版式的片段，没有 `# ` 标题的补一个，然后拼成一份文稿生成一次。
 文中引用的图片现生成纯色图。
 """
 import re
 import sys
 
-from deckcheck import LAYOUT_INDEX, SKILL, check, finish, generate, one, run_style
+from deckcheck import (LAYOUT_INDEX, LAYOUTS_DOC_DIR, SKILL, check, finish, generate, layout_doc,
+                       layout_doc_names, layouts_doc_text, one, run_style)
 
-DOC = SKILL / "references" / "layouts.md"
 _BLOCK = re.compile(r"^```markdown\n(.*?)^```", re.S | re.M)
 _IMG = re.compile(r"!\[[^\]]*\]\(([^)]+)\)")
 _LAYOUT = re.compile(r"(?im)^layout\s*[:：]\s*(\S+)\s*$")
-NOT_YET_DOCUMENTED = set()   # 已注册、文档还没写的版式；新增版式写进 layouts.md 前临时登记
+NOT_YET_DOCUMENTED = set()   # 已注册、文档还没写的版式；新增版式写进 layouts/<版式名>.md 前临时登记
 
 
 def doc_blocks():
-    return _BLOCK.findall(DOC.read_text(encoding="utf-8"))
+    return _BLOCK.findall(layouts_doc_text())
 
 
 def assemble(blocks):
@@ -28,6 +30,14 @@ def assemble(blocks):
             block = f"# 示例片段 {i}\n" + block
         parts.append(block.strip("\n"))
     return "\n\n".join(parts) + "\n"
+
+
+def test_doc_files_listed():
+    """总览「各版式文件」清单和 references/layouts/ 下的文件一一对应。"""
+    listed = layout_doc_names()
+    on_disk = sorted(p.stem for p in LAYOUTS_DOC_DIR.glob("*.md"))
+    check("layouts.md：「各版式文件」清单列全 layouts/ 下的文件、不重复",
+          sorted(listed) == on_disk and len(set(listed)) == len(listed), (listed, on_disk))
 
 
 def test_doc_examples_generate():
@@ -64,13 +74,13 @@ Next: 11 月前推广到其余 4 条线
 
 
 def _common_row():
-    m = re.search(r"(?m)^\| 各版式共用 \| (.*) \|$", DOC.read_text(encoding="utf-8"))
+    m = re.search(r"(?m)^\| 各版式共用 \| (.*) \|$", layouts_doc_text())
     return m.group(1) if m else ""
 
 
 def _style_row(label):
     m = re.search(rf"(?m)^\| {re.escape(label)} \| (\d+)pt (bold )?#?(\w+)? ?\|?",
-                  DOC.read_text(encoding="utf-8"))
+                  layouts_doc_text())
     return (float(m.group(1)), bool(m.group(2))) if m else None
 
 
@@ -117,12 +127,12 @@ Layout: process
 def _full_style_row(label):
     """样式表里 label 一行开头的「NNpt [bold ]#RRGGBB」→ (字号, 粗体, 颜色)；没有返回 None。"""
     m = re.search(rf"(?m)^\| {re.escape(label)} \| (\d+)pt (bold )?#(\w{{6}})",
-                  DOC.read_text(encoding="utf-8"))
+                  layouts_doc_text())
     return (float(m.group(1)), bool(m.group(2)), m.group(3).upper()) if m else None
 
 
 def _table_row(label):
-    m = re.search(rf"(?m)^\| {re.escape(label)} \| (.*) \|$", DOC.read_text(encoding="utf-8"))
+    m = re.search(rf"(?m)^\| {re.escape(label)} \| (.*) \|$", layouts_doc_text())
     return m.group(1) if m else ""
 
 
@@ -183,8 +193,8 @@ def test_team_general_mode():
               doc is not None and doc == got, (doc, got))
     sys.path.insert(0, str(SKILL / "scripts"))
     from layouts import team  # noqa: E402
-    text = DOC.read_text(encoding="utf-8")
-    check("layouts.md：team 小节写的 inspect 标记形状和代码一致",
+    text = layout_doc("team")
+    check("layouts/team.md：写的 inspect 标记形状和代码一致",
           f"inspect 靠 `{team.MARK_SHAPE}` 认出 team" in text, team.MARK_SHAPE)
 
 
@@ -263,6 +273,7 @@ def test_numbers_general_mode():
 
 
 if __name__ == "__main__":
+    test_doc_files_listed()
     test_doc_examples_generate()
     test_common_shape_names()
     test_process_general_mode()

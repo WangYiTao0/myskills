@@ -54,7 +54,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 
 用户要出 pptx 时按这四步走：
 
-1. **整理文稿**：把用户的自由文稿整理成带 Layout 标记的 md——每个 `#` 一页，`##` 是 action title，一行 `Layout: <版式名>` 选版式（不写 = evidence），普通文字行是本页一句话结论，`Next:` 是下一步（月报模式两句都进底部红条；通用模式和项目汇报模式下结论画成标题下的 lead、`Next:` 画在页底一行，见 §5 Page 2）。版式字段、选版依据、反例都在 `references/layouts.md`，整理前先读；内容仍守本文件 §4、§6、§7（项目汇报再加 §1–§3）。完整示例：`examples/demo/deck.md`。
+1. **整理文稿**：把用户的自由文稿整理成带 Layout 标记的 md——每个 `#` 一页，`##` 是 action title，一行 `Layout: <版式名>` 选版式（不写 = evidence），普通文字行是本页一句话结论，`Next:` 是下一步（月报模式两句都进底部红条；通用模式和项目汇报模式下结论画成标题下的 lead、`Next:` 画在页底一行，见 §5 Page 2）。选版依据在 `references/layouts.md`「选版速查」，各版式字段、反例在 `references/layouts/<版式名>.md`，整理前先读；内容仍守本文件 §4、§6、§7（项目汇报再加 §1–§3）。完整示例：`examples/demo/deck.md`。
    - 用户没有提供图片时，不选 `evidence` / `image-text`（这两种必须配图），`before-after` 两侧都写短文；和 ppt-grill「素材清单为"无"」的规则一致。
    - 用户先用 ppt-grill 定过**简报**（`简报.md`）时，简报就是这一步的唯一输入：按 ppt-grill「交给 milwaukee-ppt」一节的对照表逐行转成 md，放在简报同目录，页数、页序、标题、数字和简报逐项一致。用户还没定简报、但想先把结论和页序磨清楚时，先走 ppt-grill。
 2. **生成**：跑上面的命令。退出码非 0 = 文稿有错，按错误信息里的「页「标题」」改 md 再跑；`警告:` 行不中止，带进第 3 步一起处理。
@@ -95,7 +95,7 @@ python3 scripts/generate_ppt.py <文稿.md> [-o 输出.pptx]
 
 生成器搭骨架：品牌、版式结构、间距、颜色规则都由它固定。用户在对话里要改某页细节（节点再大一点、多加一条标注）时，直接改生成好的 pptx：
 
-1. **检查**：`python3 scripts/inspect_ppt.py <输出.pptx>`。每页一个标题行 `== 第 N 页 | layout: <模板 layout> | 版式: <生成器版式>`，下面每个形状一行：名字、类型（占位框带 `idx=N`）、位置和大小（英寸）、文字开头。对照 `references/layouts.md`「形状命名约定」找到要改的元素。
+1. **检查**：`python3 scripts/inspect_ppt.py <输出.pptx>`。每页一个标题行 `== 第 N 页 | layout: <模板 layout> | 版式: <生成器版式>`，下面每个形状一行：名字、类型（占位框带 `idx=N`）、位置和大小（英寸）、文字开头。对照 `references/layouts.md`「形状命名约定」和该版式文件 `references/layouts/<版式名>.md`「形状名」找到要改的元素。
 2. **按名修改**：用 python-pptx 打开成稿，按页码取页、按 `shape.name` 取形状，改完另存为新文件。最小示例（`<skill>` 换成本 skill 目录，在成稿所在目录运行）：
 
    ```python
@@ -315,7 +315,7 @@ banner 以下的正文区用色遵循 §6.2 色板。
 
 ### 6.4 三个高频组合（实战沉淀的视觉模式）
 
-手工排版常用的三种组合（正文 lead、大数字 stat callout、icon row）及实战数值见 `references/design-system.md`；生成器的字号与间距以 `references/layouts.md` 为准。
+手工排版常用的三种组合（正文 lead、大数字 stat callout、icon row）及实战数值见 `references/design-system.md`；生成器的字号与间距以 `references/layouts.md` 及 `references/layouts/` 各版式文件为准。
 
 ---
 
@@ -377,7 +377,8 @@ banner 以下的正文区用色遵循 §6.2 色板。
 milwaukee-ppt/
 ├── SKILL.md                      # 本文件
 ├── references/
-│   ├── layouts.md                # 生成器 12 个版式的字段写法、适用场景、反例、报错与警告、形状命名约定
+│   ├── layouts.md                # 生成器版式总览:文稿格式、报错与警告、共用排版、选版速查、形状命名约定
+│   ├── layouts/<版式名>.md       # 每个版式一份:字段写法、适用场景、反例、报错与警告、字号、形状名
 │   ├── layout-patterns.md        # 已验证案例参考(项目汇报 15 种 + 月报 5 种),非版式白名单
 │   ├── before-after.md           # Before/After 布局的 slot 契约与事实对比验收
 │   ├── project-report.md         # 项目汇报模式 §1–§3 完整规则(Agenda / PDCA / 已落地 vs 未来)

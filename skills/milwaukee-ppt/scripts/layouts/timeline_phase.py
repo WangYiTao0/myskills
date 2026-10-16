@@ -4,7 +4,7 @@
 `!` 标关键里程碑（只认一个，`!!` 报错）→ fields["items"] = [(日期, 标题, 说明, 状态, 是否关键)]；
 其余普通文字行是结论（月报进底部红条，通用 / 项目模式画成标题下的 lead）。
 
-画法（Spec #20，见 references/layouts.md「timeline-phase」）：槽位横向等分成 n 段箭头
+画法（Spec #20，见 references/layouts/timeline-phase.md）：槽位横向等分成 n 段箭头
 （首段 homePlate、其余 chevron），段上写标题：
 已完成绿底白字，进行中琥珀底深色字且加高，未完成浅粉底 + 红描边 + 红字。
 日期在段上方；段下方细线连到标记（关键里程碑黑色大菱形 + “关键里程碑”，普通节点灰色小圆点），

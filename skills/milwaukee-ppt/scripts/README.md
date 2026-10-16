@@ -41,7 +41,7 @@
   done
   ```
   （bash / zsh 写法；在 fish 里先 `bash` 再贴。）转完和 SVG 并排看一眼（如用浏览器打开两者），确认圆弧、颜色、字母一致。
-- 形状命名：每个画出来的形状都 `name = "<角色> N"`（N 从 1 起，与条目顺序一致），这是生成后细调时对 AI 的契约；各版式的名字列在 `references/layouts.md`「形状命名约定」，改名时同步改那一节。
+- 形状命名：每个画出来的形状都 `name = "<角色> N"`（N 从 1 起，与条目顺序一致），这是生成后细调时对 AI 的契约；共用形状的名字列在 `references/layouts.md`「形状命名约定」，各版式的名字列在 `references/layouts/<版式名>.md`「形状名」，改名时同步改对应那一节。
 - 测试：每个版式一个 `tests/test_<版式>.py`，只走“md 进、pptx 出”；辅助函数（`generate`、`body_slide`、`pictures`、`shapes_named`、`run_style` 等）和模板槽位常量都在 `tests/deckcheck.py`，测试文件里不要再各写一份。`python3 tests/run_all.py` 跑全部。
   - 各版式测试文件的文稿用月报 frontmatter（`month` + `author`），守住月报的底部红条路径；方向 C（通用 / 项目模式）的 lead、Next 行、正文区在 `tests/test_lead.py` 里按全部内容版式统一查。版式改方向 C 样式时，在自己的测试文件里另加通用模式的用例。
   - 新增辅助：`runs(shape, para=0)` 返回一段里每个 run 的 `(文字, 字号, 粗体, 颜色)`，查单位拆分；`fill_color` / `line_color` 取形状纯色填充 / 描边 hex（没有为 `None`）；`geometry(shape)` 取预设几何名（`ellipse`、`diamond`、`homePlate`、`chevron`…）；`inside(shape, rect_in)` 判断形状落在英寸矩形内（如 `CONTENT_SLOT_IN`）；`slide_xmls(path)` 取各页 slide XML 字节，用于和改动前逐字节比较；`deck_error(r, title, *needles)` 判断报错退出且信息含页标题。`review(md, pptx=None)` 跑审核脚本、返回 `CompletedProcess`；`generated(md, images=None)` 生成并返回 `(文稿路径, pptx 路径)`（失败抛出），`reviewed(md, images=None)` 生成后再审；`lines_with(out, rule)` 取审核输出里 `[rule]` 开头的行；`broken(pptx, change)` 把生成结果另存一份、用 `change(prs)` 改坏，做审核负样本。`registered_layouts()` 从未知版式的报错信息里读出注册表全部版式名（只走外部切入点）。`inside_shape(inner, outer)` 判断形状落在另一个形状里；`center_x` / `center_y` / `bottom` 取中心坐标和底边；`named(slide, name)` 取名字恰为 name 的全部形状，`one(slide, name)` 恰好一个时返回它。常量 `STATUS_COLORS`、`DONE_GREEN`、`DOING_AMBER`、`DOING_INK`、`UNIT_PT`、`UNIT_COLOR`。

@@ -12,7 +12,7 @@ fields["statuses"]（common.parse_statuses：整页都没写为 None）；其余
 - 不写状态（旧写法）：黑白灰，一条灰横线连起首末节点；不写状态也不写 ! 时输出与 #24 之前
   逐字节一致（tests/test_timeline.py 的 LEGACY_SHA 守着）。带 ! 时会画菱形：放大的深灰菱形。
   形状名 Timeline Line / Node N / Date N / Text N。
-- 写了状态（Spec #20，见 references/layouts.md「timeline」）：已完成绿色实心圆 + 白对勾、
+- 写了状态（Spec #20，见 references/layouts/timeline.md）：已完成绿色实心圆 + 白对勾、
   首节点到进度终点是绿色粗线（Progress Line），之后灰色虚线（Remaining Line）；进行中放大的琥珀圆 + 外圈
   （Current Ring），上方近黑胶囊“当前”（Current Tag），日期加粗放大；未完成白底红描边。
   关键里程碑是放大的菱形，颜色按状态。右上角图例 4 项（common.add_legend：Legend Icon N /

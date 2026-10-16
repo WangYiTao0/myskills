@@ -6,7 +6,7 @@ Member Role N（角色）、Member Rule N（角色和职责之间的细线）、
 """
 from deckcheck import (SKILL, CONTENT_SLOT_IN, EMU, INK, LAYOUT_INDEX, body_slide, bottom, caption_bar, lines_with,
                        center_x, check, deck_error, fill_color, finish, generate, geometry, inside,
-                       inside_shape, line_color, one, out_of_bounds, paragraphs, placeholder,
+                       inside_shape, layout_doc, line_color, one, out_of_bounds, paragraphs, placeholder,
                        red_elements, review, run_style, run_styles, shapes_named, tag_shape,
                        warnings)
 
@@ -381,10 +381,9 @@ def test_general_mode_duty_box_fits_wrap():
 
 
 def test_duty_wrap_docs():
-    """文档一致性：layouts.md 的 team 小节和 scripts README 的审核规则都写了「团队职责折行」。"""
-    layouts_md = (SKILL / "references" / "layouts.md").read_text(encoding="utf-8")
-    team = layouts_md.split("## team · 团队页", 1)[1].split("## table · 表格页", 1)[0]
-    check("layouts.md team 小节：警告和审核写了职责折行（末行 ≤2 字、超过 3 行）",
+    """文档一致性：版式文件 layouts/team.md 和 scripts README 的审核规则都写了「团队职责折行」。"""
+    team = layout_doc("team")
+    check("layouts/team.md：警告和审核写了职责折行（末行 ≤2 字、超过 3 行）",
           "团队职责折行" in team and "末行" in team and "3 行" in team, team[-800:])
     readme = (SKILL / "scripts" / "README.md").read_text(encoding="utf-8")
     check("scripts README：审核规则列出「团队职责折行」", "团队职责折行" in readme)

@@ -24,6 +24,8 @@
 - broken(pptx, change)          生成结果另存一份、用 change(prs) 改坏 → 新路径（审核负样本）
 - registered_layouts()          生成器注册表里的全部版式名（从未知版式的报错信息里读）
 - layouts_in(md)                文稿各页用到的版式名（不写 Layout: 的页算 evidence），查正样本覆盖
+- layouts_doc_text()            版式文档全文（references/layouts.md 总览 + layouts/ 下各版式文件）；
+                                layout_doc(name) 单个版式文件；layout_doc_names() 总览清单里的版式文件名
 - 常量：STATUS_COLORS / DONE_GREEN / DOING_AMBER / DOING_INK、UNIT_PT / UNIT_COLOR
 - check(name, ok, detail) 记录结果；finish() 打印汇总并按结果退出
 """
@@ -435,3 +437,26 @@ def layouts_in(md):
     pages = re.split(r"^# ", md, flags=re.M)[1:]
     return {(re.search(r"^Layout: (\S+)$", p, flags=re.M) or [None, "evidence"])[1].lower()
             for p in pages}
+
+
+LAYOUTS_DOC = SKILL / "references" / "layouts.md"
+LAYOUTS_DOC_DIR = SKILL / "references" / "layouts"
+
+
+def layout_doc_names():
+    """总览 layouts.md「各版式文件」清单里列出的版式文件名（不带 .md），按清单顺序。"""
+    text = LAYOUTS_DOC.read_text(encoding="utf-8")
+    return re.findall(r"(?m)^- `layouts/([\w-]+)\.md`", text)
+
+
+def layout_doc(name):
+    """单个版式文件 references/layouts/<name>.md 的全文。"""
+    return (LAYOUTS_DOC_DIR / f"{name}.md").read_text(encoding="utf-8")
+
+
+def layouts_doc_text():
+    """版式文档全文：总览 layouts.md 在前，再按总览清单顺序拼上各版式文件。
+    文档一致性测试按全文查找（字号表行、形状名行、示例代码块）。"""
+    parts = [LAYOUTS_DOC.read_text(encoding="utf-8")]
+    parts += [layout_doc(n) for n in layout_doc_names()]
+    return "\n".join(parts)
