@@ -1,0 +1,26 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: pip install python-pptx
+      - run: python3 skills/milwaukee-ppt/tests/run_all.py
+      - name: tools 测试（存在就跑）
+        run: |
+          for t in tools/test_*.py tools/check_*.py tools/tests/run_all.py; do
+            [ -f "$t" ] || continue
+            python3 "$t"
+          done
+          for t in tools/test_*.sh; do
+            [ -f "$t" ] || continue
+            sh "$t"
+          done

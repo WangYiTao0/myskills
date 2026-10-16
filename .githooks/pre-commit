@@ -1,0 +1,30 @@
+#!/bin/sh
+# 受版本控制的 pre-commit。启用：git config core.hooksPath .githooks
+# 暂存区改动涉及 milwaukee-ppt / ppt-review / ppt-grill / tools 时跑测试，失败则阻止提交。
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+
+if ! git diff --cached --name-only | grep -Eq '^(skills/milwaukee-ppt/|skills/ppt-review/|skills/ppt-grill/|tools/)'; then
+  exit 0
+fi
+
+fail=0
+echo "pre-commit: 运行 milwaukee-ppt 测试（约 90 秒）..."
+python3 skills/milwaukee-ppt/tests/run_all.py || fail=1
+
+# tools/ 下的测试入口：存在就跑
+for t in tools/test_*.py tools/check_*.py tools/tests/run_all.py; do
+  [ -f "$t" ] || continue
+  echo "pre-commit: 运行 $t"
+  python3 "$t" || fail=1
+done
+for t in tools/test_*.sh; do
+  [ -f "$t" ] || continue
+  echo "pre-commit: 运行 $t"
+  sh "$t" || fail=1
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo "pre-commit: 测试失败，提交已阻止（确需跳过用 git commit --no-verify）" >&2
+  exit 1
+fi
