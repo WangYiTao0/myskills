@@ -19,6 +19,10 @@ Personal Claude Code plugin marketplace — a collection of custom skills for da
 
 每个 skill 的完整说明见对应目录下的 `SKILL.md`。
 
+## 开发：启用提交前测试
+
+克隆后执行一次：`git config core.hooksPath .githooks`。改动涉及 milwaukee-ppt / ppt-review / ppt-grill / tools 时，提交前自动跑测试。
+
 ## Installation
 
 ### Via Claude Code plugin system
